@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPMS • Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link href="/spms/assets/css/theme.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="spmsOverlay" class="spms-overlay"></div>
+
+    <div class="spms-app">
+      <!-- Sidebar -->
+      <aside id="spmsSidebar" class="spms-sidebar d-flex flex-column">
+        <div class="spms-brand">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+              <div class="rounded-4 p-2" style="background: rgba(37, 99, 235, .18); border: 1px solid rgba(37, 99, 235, .25);">
+                <i class="bi bi-mortarboard-fill text-white"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-white lh-sm">Student Profiling</div>
+                <small class="text-white-50">Management System</small>
+              </div>
+            </div>
+            <span class="badge rounded-pill">SPMS</span>
+          </div>
+        </div>
+
+        <nav class="spms-nav nav flex-column">
+          <a class="nav-link" data-spms-nav href="/spms/index.html"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+          <a class="nav-link" data-spms-nav href="/spms/students.html"><i class="bi bi-people"></i> Students</a>
+          <a class="nav-link" data-spms-nav href="/spms/add-student.html"><i class="bi bi-person-plus"></i> Add Student</a>
+          <a class="nav-link" data-spms-nav href="/spms/profile.html"><i class="bi bi-person-badge"></i> Profile</a>
+          <a class="nav-link" data-spms-nav href="/spms/reports.html"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+          <div class="px-3 mt-2">
+            <hr class="text-white-50" />
+          </div>
+          <a class="nav-link" href="javascript:void(0)"><i class="bi bi-gear"></i> Settings</a>
+        </nav>
+
+        <div class="mt-auto spms-sidebar-footer">
+          <div class="d-flex align-items-center gap-2">
+            <img src="/spms/assets/img/avatar.svg" class="rounded-4" width="42" height="42" alt="Admin" />
+            <div class="min-w-0">
+              <div class="fw-semibold text-white text-truncate">Registrar Admin</div>
+              <small>School Office</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="spms-main">
+        <!-- Topbar -->
+        <header class="spms-topbar">
+          <div class="container-fluid px-3 px-lg-4 py-3">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div class="d-flex align-items-center gap-2">
+                <button id="spmsSidebarToggle" class="btn btn-outline-primary d-lg-none rounded-4 px-3" type="button">
+                  <i class="bi bi-list"></i>
+                </button>
+                <div>
+                  <div class="fw-bold spms-page-title">Dashboard</div>
+                  <div class="spms-muted small">Overview of student profiling records</div>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <div class="input-group d-none d-md-flex">
+                  <span class="input-group-text"><i class="bi bi-search"></i></span>
+                  <input class="form-control" placeholder="Search students, sections, skills..." />
+                </div>
+                <button class="btn btn-primary rounded-4 px-3" type="button">
+                  <i class="bi bi-plus-lg me-1"></i> New
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="spms-content">
+          <div class="container-fluid">
+            <!-- KPIs -->
+            <div class="row g-3">
+              <div class="col-12 col-md-6 col-xl-3">
+                <div class="spms-card card h-100">
+                  <div class="card-body">
+                    <div class="spms-kpi">
+                      <div>
+                        <div class="value">327</div>
+                        <div class="label">Total Students</div>
+                        <div class="spms-muted small">Active profiles in the system</div>
+                      </div>
+                      <div class="icon"><i class="bi bi-people-fill"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-md-6 col-xl-3">
+                <div class="spms-card card h-100">
+                  <div class="card-body">
+                    <div class="spms-kpi">
+                      <div>
+                        <div class="value">42</div>
+                        <div class="label">With Violations</div>
+                        <div class="spms-muted small">Needs guidance / sanctions</div>
+                      </div>
+                      <div class="icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-md-6 col-xl-3">
+                <div class="spms-card card h-100">
+                  <div class="card-body">
+                    <div class="spms-kpi">
+                      <div>
+                        <div class="value">118</div>
+                        <div class="label">In Sports</div>
+                        <div class="spms-muted small">Active sports participation</div>
+                      </div>
+                      <div class="icon"><i class="bi bi-dribbble"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-md-6 col-xl-3">
+                <div class="spms-card card h-100">
+                  <div class="card-body">
+                    <div class="spms-kpi">
+                      <div>
+                        <div class="value">76</div>
+                        <div class="label">Special Skills</div>
+                        <div class="spms-muted small">Programming, leadership, etc.</div>
+                      </div>
+                      <div class="icon"><i class="bi bi-stars"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12 col-xl-7">
+                <div class="spms-card card h-100">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <div class="fw-bold">Students by Year Level</div>
+                    <span class="spms-chip"><i class="bi bi-bar-chart"></i> Updated today</span>
+                  </div>
+                  <div class="card-body">
+                    <canvas id="chartStudentsByYear" height="130"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-xl-5">
+                <div class="spms-card card h-100">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <div class="fw-bold">Violations Snapshot</div>
+                    <span class="spms-chip"><i class="bi bi-shield-check"></i> Discipline</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                      <div class="col-12 col-md-6 col-xl-12">
+                        <canvas id="chartViolations" height="160"></canvas>
+                      </div>
+                      <div class="col-12 col-md-6 col-xl-12">
+                        <div class="d-flex flex-column gap-2">
+                          <div class="spms-card card border-0" style="background: rgba(255,255,255,.55);">
+                            <div class="card-body py-3">
+                              <div class="d-flex align-items-center justify-content-between">
+                                <div class="fw-semibold">Top Violation</div>
+                                <span class="spms-chip"><i class="bi bi-flag"></i> Minor</span>
+                              </div>
+                              <div class="spms-muted small mt-1">Late attendance / tardiness</div>
+                            </div>
+                          </div>
+                          <div class="spms-card card border-0" style="background: rgba(255,255,255,.55);">
+                            <div class="card-body py-3">
+                              <div class="d-flex align-items-center justify-content-between">
+                                <div class="fw-semibold">Action Needed</div>
+                                <span class="spms-chip"><i class="bi bi-bell"></i> Follow-up</span>
+                              </div>
+                              <div class="spms-muted small mt-1">Review 8 pending guidance cases</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12 col-xl-8">
+                <div class="spms-card card">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <div class="fw-bold">Recent Profiles</div>
+                    <a class="btn btn-outline-primary rounded-4 btn-sm px-3" href="/spms/students.html">
+                      View all <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                  </div>
+                  <div class="card-body p-0">
+                    <div class="table-responsive">
+                      <table class="table spms-table table-hover mb-0 align-middle">
+                        <thead class="border-bottom">
+                          <tr>
+                            <th class="ps-3">Student</th>
+                            <th>Year</th>
+                            <th>Section</th>
+                            <th>Status</th>
+                            <th class="text-end pe-3">Quick Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td class="ps-3">
+                              <div class="d-flex align-items-center gap-2">
+                                <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                                <div>
+                                  <div class="fw-semibold">Alyssa M. Santos</div>
+                                  <div class="spms-muted small">alyssa.santos@school.edu</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>2nd</td>
+                            <td>BSIT-2A</td>
+                            <td><span class="spms-chip"><i class="bi bi-check-circle"></i> Cleared</span></td>
+                            <td class="text-end pe-3">
+                              <a class="btn btn-sm btn-primary rounded-4 px-3" href="/spms/profile.html">Open</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td class="ps-3">
+                              <div class="d-flex align-items-center gap-2">
+                                <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                                <div>
+                                  <div class="fw-semibold">Jerome D. Reyes</div>
+                                  <div class="spms-muted small">jerome.reyes@school.edu</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>1st</td>
+                            <td>BSBA-1B</td>
+                            <td><span class="spms-chip"><i class="bi bi-exclamation-circle"></i> Review</span></td>
+                            <td class="text-end pe-3">
+                              <a class="btn btn-sm btn-outline-primary rounded-4 px-3" href="/spms/profile.html">Open</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td class="ps-3">
+                              <div class="d-flex align-items-center gap-2">
+                                <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                                <div>
+                                  <div class="fw-semibold">Mae L. Cruz</div>
+                                  <div class="spms-muted small">mae.cruz@school.edu</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>3rd</td>
+                            <td>BSED-3C</td>
+                            <td><span class="spms-chip"><i class="bi bi-dribbble"></i> Athlete</span></td>
+                            <td class="text-end pe-3">
+                              <a class="btn btn-sm btn-outline-primary rounded-4 px-3" href="/spms/profile.html">Open</a>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-xl-4">
+                <div class="spms-card card h-100">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <div class="fw-bold">Quick Reports</div>
+                    <span class="spms-chip"><i class="bi bi-funnel"></i> Filters</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="d-grid gap-2">
+                      <a href="/spms/reports.html" class="btn btn-primary rounded-4 py-3 text-start">
+                        <div class="d-flex align-items-center justify-content-between">
+                          <div>
+                            <div class="fw-bold">Basketball Try-outs</div>
+                            <div class="small opacity-75">Students cleared for sports</div>
+                          </div>
+                          <i class="bi bi-chevron-right"></i>
+                        </div>
+                      </a>
+                      <a href="/spms/reports.html" class="btn btn-outline-primary rounded-4 py-3 text-start">
+                        <div class="d-flex align-items-center justify-content-between">
+                          <div>
+                            <div class="fw-bold">Programming Contest</div>
+                            <div class="small spms-muted">Filter by skills + GWA</div>
+                          </div>
+                          <i class="bi bi-chevron-right"></i>
+                        </div>
+                      </a>
+                      <a href="/spms/reports.html" class="btn btn-outline-primary rounded-4 py-3 text-start">
+                        <div class="d-flex align-items-center justify-content-between">
+                          <div>
+                            <div class="fw-bold">Violations Monitoring</div>
+                            <div class="small spms-muted">Sanctions & follow-ups</div>
+                          </div>
+                          <i class="bi bi-chevron-right"></i>
+                        </div>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="/spms/assets/js/app.js"></script>
+  </body>
+</html>
+

@@ -1,0 +1,281 @@
+/* Student Profiling Management System (SPMS) - UI Theme */
+
+:root{
+  --spms-primary: #1d4ed8;      /* blue-700 */
+  --spms-primary-2: #2563eb;    /* blue-600 */
+  --spms-surface: rgba(255,255,255,.78);
+  --spms-border: rgba(15, 23, 42, .08);
+  --spms-text: #0f172a;         /* slate-900 */
+  --spms-muted: #64748b;        /* slate-500 */
+  --spms-bg-1: #f6f8ff;
+  --spms-bg-2: #eef2ff;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  color: var(--spms-text);
+  background:
+    radial-gradient(1200px 800px at 10% 0%, rgba(37, 99, 235, .16), transparent 55%),
+    radial-gradient(900px 700px at 100% 20%, rgba(29, 78, 216, .12), transparent 60%),
+    linear-gradient(180deg, var(--spms-bg-1), var(--spms-bg-2));
+}
+
+.spms-app {
+  min-height: 100%;
+  display: flex;
+}
+
+/* Sidebar */
+.spms-sidebar {
+  width: 290px;
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, rgba(15, 23, 42, .92), rgba(2, 6, 23, .92));
+  border-right: 1px solid rgba(255,255,255,.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.spms-brand {
+  padding: 18px 18px 10px;
+}
+
+.spms-brand .badge {
+  background: rgba(37, 99, 235, .16) !important;
+  border: 1px solid rgba(37, 99, 235, .28);
+}
+
+.spms-nav {
+  padding: 8px 10px 14px;
+}
+
+.spms-nav .nav-link {
+  color: rgba(226, 232, 240, .86);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 6px 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+
+.spms-nav .nav-link:hover {
+  background: rgba(148, 163, 184, .10);
+  border-color: rgba(148, 163, 184, .14);
+  transform: translateY(-1px);
+}
+
+.spms-nav .nav-link.active {
+  background: rgba(37, 99, 235, .18);
+  border-color: rgba(37, 99, 235, .32);
+  color: #fff;
+}
+
+.spms-nav .nav-link .bi {
+  font-size: 1.05rem;
+}
+
+.spms-sidebar-footer {
+  padding: 14px 16px 18px;
+  color: rgba(226, 232, 240, .72);
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.spms-sidebar-footer small {
+  color: rgba(226, 232, 240, .58);
+}
+
+/* Main */
+.spms-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.spms-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  background: rgba(255,255,255,.70);
+  border-bottom: 1px solid var(--spms-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.spms-content {
+  padding: 22px;
+}
+
+.spms-page-title {
+  letter-spacing: -0.02em;
+}
+
+/* Cards */
+.spms-card {
+  background: var(--spms-surface);
+  border: 1px solid var(--spms-border);
+  border-radius: 18px;
+  box-shadow:
+    0 10px 30px rgba(2, 6, 23, .08),
+    0 1px 0 rgba(255,255,255,.5) inset;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.spms-card .card-header {
+  background: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, .06);
+  padding: 14px 16px;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+.spms-card .card-body {
+  padding: 16px;
+}
+
+.spms-muted {
+  color: var(--spms-muted);
+}
+
+.spms-kpi {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.spms-kpi .icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 99, 235, .12);
+  border: 1px solid rgba(37, 99, 235, .20);
+  color: var(--spms-primary);
+}
+
+.spms-kpi .value {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.spms-kpi .label {
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* Tables */
+.table.spms-table {
+  --bs-table-bg: transparent;
+}
+
+.spms-table thead th {
+  font-size: .86rem;
+  color: rgba(15, 23, 42, .72);
+  font-weight: 700;
+}
+
+.spms-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, .10);
+  object-fit: cover;
+  background: rgba(148, 163, 184, .20);
+}
+
+.spms-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .82rem;
+  border: 1px solid rgba(15, 23, 42, .10);
+  background: rgba(255,255,255,.55);
+}
+
+/* Forms */
+.form-control, .form-select {
+  border-radius: 14px;
+  border-color: rgba(15, 23, 42, .12);
+}
+.input-group-text {
+  border-radius: 14px;
+  border-color: rgba(15, 23, 42, .12);
+  background: rgba(255,255,255,.65);
+}
+
+/* Profile */
+.spms-cover {
+  border-radius: 18px;
+  height: 140px;
+  background:
+    radial-gradient(900px 260px at 0% 0%, rgba(37, 99, 235, .60), rgba(37, 99, 235, .12)),
+    linear-gradient(90deg, rgba(15, 23, 42, .78), rgba(15, 23, 42, .20));
+  border: 1px solid rgba(15, 23, 42, .10);
+  position: relative;
+  overflow: hidden;
+}
+
+.spms-profile-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.spms-profile-pic {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
+  border: 3px solid rgba(255,255,255,.9);
+  margin-top: -46px;
+  object-fit: cover;
+  background: rgba(148, 163, 184, .22);
+}
+
+.spms-section-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Responsive sidebar */
+@media (max-width: 991.98px){
+  .spms-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-103%);
+    transition: transform .18s ease;
+    z-index: 1030;
+  }
+  .spms-sidebar.show {
+    transform: translateX(0);
+  }
+  .spms-content {
+    padding: 16px;
+  }
+}
+
+.spms-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(2,6,23,.42);
+  z-index: 1025;
+}
+
+.spms-overlay.show {
+  display: block;
+}
+

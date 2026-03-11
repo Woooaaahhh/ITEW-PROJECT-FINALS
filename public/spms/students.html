@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPMS • Students</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link href="/spms/assets/css/theme.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="spmsOverlay" class="spms-overlay"></div>
+
+    <div class="spms-app">
+      <aside id="spmsSidebar" class="spms-sidebar d-flex flex-column">
+        <div class="spms-brand">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+              <div class="rounded-4 p-2" style="background: rgba(37, 99, 235, .18); border: 1px solid rgba(37, 99, 235, .25);">
+                <i class="bi bi-mortarboard-fill text-white"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-white lh-sm">Student Profiling</div>
+                <small class="text-white-50">Management System</small>
+              </div>
+            </div>
+            <span class="badge rounded-pill">SPMS</span>
+          </div>
+        </div>
+
+        <nav class="spms-nav nav flex-column">
+          <a class="nav-link" data-spms-nav href="/spms/index.html"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+          <a class="nav-link" data-spms-nav href="/spms/students.html"><i class="bi bi-people"></i> Students</a>
+          <a class="nav-link" data-spms-nav href="/spms/add-student.html"><i class="bi bi-person-plus"></i> Add Student</a>
+          <a class="nav-link" data-spms-nav href="/spms/profile.html"><i class="bi bi-person-badge"></i> Profile</a>
+          <a class="nav-link" data-spms-nav href="/spms/reports.html"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+          <div class="px-3 mt-2">
+            <hr class="text-white-50" />
+          </div>
+          <a class="nav-link" href="javascript:void(0)"><i class="bi bi-gear"></i> Settings</a>
+        </nav>
+
+        <div class="mt-auto spms-sidebar-footer">
+          <div class="d-flex align-items-center gap-2">
+            <img src="/spms/assets/img/avatar.svg" class="rounded-4" width="42" height="42" alt="Admin" />
+            <div class="min-w-0">
+              <div class="fw-semibold text-white text-truncate">Registrar Admin</div>
+              <small>School Office</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="spms-main">
+        <header class="spms-topbar">
+          <div class="container-fluid px-3 px-lg-4 py-3">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div class="d-flex align-items-center gap-2">
+                <button id="spmsSidebarToggle" class="btn btn-outline-primary d-lg-none rounded-4 px-3" type="button">
+                  <i class="bi bi-list"></i>
+                </button>
+                <div>
+                  <div class="fw-bold spms-page-title">Student List</div>
+                  <div class="spms-muted small">Search and manage student profiles</div>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <a class="btn btn-primary rounded-4 px-3" href="/spms/add-student.html">
+                  <i class="bi bi-person-plus me-1"></i> Add Student
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="spms-content">
+          <div class="container-fluid">
+            <div class="spms-card card">
+              <div class="card-header">
+                <div class="row g-2 align-items-center">
+                  <div class="col-12 col-lg-5">
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="bi bi-search"></i></span>
+                      <input id="studentSearch" class="form-control" placeholder="Search by name or email..." />
+                    </div>
+                  </div>
+                  <div class="col-6 col-lg-3">
+                    <select id="filterYear" class="form-select">
+                      <option value="">All Year Levels</option>
+                      <option>1st</option>
+                      <option>2nd</option>
+                      <option>3rd</option>
+                      <option>4th</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-lg-3">
+                    <select id="filterSection" class="form-select">
+                      <option value="">All Sections</option>
+                      <option>BSIT-2A</option>
+                      <option>BSBA-1B</option>
+                      <option>BSED-3C</option>
+                      <option>BSIT-4A</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-lg-1 text-lg-end">
+                    <span class="spms-chip"><i class="bi bi-list-check"></i> <span id="studentCount">0</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table id="studentsTable" class="table spms-table table-hover align-middle mb-0">
+                    <thead class="border-bottom">
+                      <tr>
+                        <th class="ps-3">Student</th>
+                        <th>Year Level</th>
+                        <th>Section</th>
+                        <th>Email</th>
+                        <th class="text-end pe-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr data-name="Alyssa M. Santos" data-year="2nd" data-section="BSIT-2A" data-email="alyssa.santos@school.edu">
+                        <td class="ps-3">
+                          <div class="d-flex align-items-center gap-2">
+                            <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                            <div>
+                              <div class="fw-semibold">Alyssa M. Santos</div>
+                              <div class="spms-muted small">ID: 2026-0012</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>2nd</td>
+                        <td>BSIT-2A</td>
+                        <td>alyssa.santos@school.edu</td>
+                        <td class="text-end pe-3">
+                          <div class="btn-group">
+                            <a class="btn btn-sm btn-outline-primary" href="/spms/profile.html"><i class="bi bi-eye"></i></a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr data-name="Jerome D. Reyes" data-year="1st" data-section="BSBA-1B" data-email="jerome.reyes@school.edu">
+                        <td class="ps-3">
+                          <div class="d-flex align-items-center gap-2">
+                            <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                            <div>
+                              <div class="fw-semibold">Jerome D. Reyes</div>
+                              <div class="spms-muted small">ID: 2026-0041</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>1st</td>
+                        <td>BSBA-1B</td>
+                        <td>jerome.reyes@school.edu</td>
+                        <td class="text-end pe-3">
+                          <div class="btn-group">
+                            <a class="btn btn-sm btn-outline-primary" href="/spms/profile.html"><i class="bi bi-eye"></i></a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr data-name="Mae L. Cruz" data-year="3rd" data-section="BSED-3C" data-email="mae.cruz@school.edu">
+                        <td class="ps-3">
+                          <div class="d-flex align-items-center gap-2">
+                            <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                            <div>
+                              <div class="fw-semibold">Mae L. Cruz</div>
+                              <div class="spms-muted small">ID: 2026-0087</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>3rd</td>
+                        <td>BSED-3C</td>
+                        <td>mae.cruz@school.edu</td>
+                        <td class="text-end pe-3">
+                          <div class="btn-group">
+                            <a class="btn btn-sm btn-outline-primary" href="/spms/profile.html"><i class="bi bi-eye"></i></a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr data-name="Kevin P. Lim" data-year="4th" data-section="BSIT-4A" data-email="kevin.lim@school.edu">
+                        <td class="ps-3">
+                          <div class="d-flex align-items-center gap-2">
+                            <img class="spms-avatar" src="/spms/assets/img/avatar.svg" alt="Avatar" />
+                            <div>
+                              <div class="fw-semibold">Kevin P. Lim</div>
+                              <div class="spms-muted small">ID: 2026-0120</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>4th</td>
+                        <td>BSIT-4A</td>
+                        <td>kevin.lim@school.edu</td>
+                        <td class="text-end pe-3">
+                          <div class="btn-group">
+                            <a class="btn btn-sm btn-outline-primary" href="/spms/profile.html"><i class="bi bi-eye"></i></a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Modal (UI only) -->
+          <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content spms-card">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title fw-bold">Edit Student</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-primary rounded-4 mb-0">
+                    This is a <strong>UI-only</strong> preview. Later, this will connect to your backend.
+                  </div>
+                </div>
+                <div class="modal-footer border-0">
+                  <button type="button" class="btn btn-outline-secondary rounded-4 px-3" data-bs-dismiss="modal">Close</button>
+                  <button type="button" class="btn btn-primary rounded-4 px-3" data-bs-dismiss="modal">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Delete Modal (UI only) -->
+          <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content spms-card">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title fw-bold">Delete Student</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="mb-1">Are you sure you want to delete this student profile?</p>
+                  <div class="spms-muted small">This action will be connected to the backend later.</div>
+                </div>
+                <div class="modal-footer border-0">
+                  <button type="button" class="btn btn-outline-secondary rounded-4 px-3" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-danger rounded-4 px-3" data-bs-dismiss="modal">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/spms/assets/js/app.js"></script>
+  </body>
+</html>
+
