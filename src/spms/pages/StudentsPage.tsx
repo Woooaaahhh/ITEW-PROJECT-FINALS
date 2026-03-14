@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
+import { useAuth } from '../auth/AuthContext'
 import { deleteStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
 
 const yearOptions = ['1st', '2nd', '3rd', '4th']
@@ -27,11 +28,14 @@ function matches(student: Student, q: string, year: string, section: string) {
 }
 
 export function StudentsPage() {
+  const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [year, setYear] = useState('')
   const [section, setSection] = useState('')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
+  const canEdit = user?.role === 'registrar'
+  const canDelete = user?.role === 'registrar'
 
   const q = useMemo(() => normalize(query), [query])
   const y = useMemo(() => normalize(year), [year])
@@ -138,23 +142,27 @@ export function StudentsPage() {
                       <Link className="btn btn-sm btn-outline-primary" to={`/students/${st.id}`} aria-label="View Profile">
                         <i className="bi bi-eye" />
                       </Link>
-                      <Link className="btn btn-sm btn-outline-secondary" to={`/students/${st.id}/edit`} aria-label="Edit">
-                        <i className="bi bi-pencil" />
-                      </Link>
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        type="button"
-                        aria-label="Delete"
-                        onClick={async () => {
-                          const ok = confirm(`Delete ${fullName(st)}?`)
-                          if (!ok) return
-                          await deleteStudent(st.id)
-                          const all = await listStudents()
-                          setStudents(all)
-                        }}
-                      >
-                        <i className="bi bi-trash" />
-                      </button>
+                      {canEdit && (
+                        <Link className="btn btn-sm btn-outline-secondary" to={`/students/${st.id}/edit`} aria-label="Edit">
+                          <i className="bi bi-pencil" />
+                        </Link>
+                      )}
+                      {canDelete && (
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          type="button"
+                          aria-label="Delete"
+                          onClick={async () => {
+                            const ok = confirm(`Delete ${fullName(st)}?`)
+                            if (!ok) return
+                            await deleteStudent(st.id)
+                            const all = await listStudents()
+                            setStudents(all)
+                          }}
+                        >
+                          <i className="bi bi-trash" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

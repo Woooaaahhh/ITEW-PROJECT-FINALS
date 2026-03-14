@@ -142,6 +142,22 @@ export async function seedIfEmpty(): Promise<void> {
       createdAt: ts,
       updatedAt: ts,
     },
+    {
+      id: makeId(),
+      firstName: 'Student',
+      middleName: 'Demo',
+      lastName: 'User',
+      birthdate: '2006-01-01',
+      gender: 'Male',
+      address: 'Campus Address',
+      email: 'student@spms.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '2nd',
+      section: 'BSIT-2A',
+      profilePictureDataUrl: null,
+      createdAt: ts,
+      updatedAt: ts,
+    },
   ]
 
   const tx = db.transaction(['students', 'meta'], 'readwrite')

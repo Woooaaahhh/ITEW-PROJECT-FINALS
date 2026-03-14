@@ -1,16 +1,72 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { AppShell, type PageMeta } from './components/AppShell'
+import { RequireAuth } from './components/RequireAuth'
+import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 import { DashboardPage } from './pages/DashboardPage'
+import { RedirectToRoleDashboard } from './pages/RedirectToRoleDashboard'
+import { RegistrarDashboard } from './pages/RegistrarDashboard'
+import { FacultyDashboard } from './pages/FacultyDashboard'
+import { StudentDashboard } from './pages/StudentDashboard'
 import { StudentsPage } from './pages/StudentsPage'
 import { AddStudentPage } from './pages/AddStudentPage'
 import { EditStudentPage } from './pages/EditStudentPage'
 import { StudentProfilePage } from './pages/StudentProfilePage'
+import { ReportsPage } from './pages/ReportsPage'
+import { SectionsPage } from './pages/SectionsPage'
+import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
+import { FacultySkillsPage } from './pages/FacultySkillsPage'
+import { StudentAcademicPage } from './pages/StudentAcademicPage'
+import { StudentSkillsPage } from './pages/StudentSkillsPage'
+import { StudentViolationsPage } from './pages/StudentViolationsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { LoginPage } from './pages/LoginPage'
 import { Link } from 'react-router-dom'
 
 const dashboardHandle: PageMeta = {
   title: 'Dashboard',
   subtitle: 'Student Profile Management overview',
+}
+
+const registrarHandle: PageMeta = {
+  title: 'Registrar Dashboard',
+  subtitle: 'Student profile management',
+  showSearch: true,
+}
+
+const facultyHandle: PageMeta = {
+  title: 'Faculty Dashboard',
+  subtitle: 'View students, record violations and skills',
+  showSearch: true,
+}
+
+const facultyViolationsHandle: PageMeta = {
+  title: 'Violations',
+  subtitle: 'Record and manage student violations',
+}
+
+const facultySkillsHandle: PageMeta = {
+  title: 'Skills',
+  subtitle: 'Assign and manage student skills',
+}
+
+const studentHandle: PageMeta = {
+  title: 'Student Dashboard',
+  subtitle: 'View your profile and academic info',
+}
+
+const studentAcademicHandle: PageMeta = {
+  title: 'Academic History',
+  subtitle: 'View your academic records',
+}
+
+const studentSkillsHandle: PageMeta = {
+  title: 'Skills',
+  subtitle: 'View your recorded skills',
+}
+
+const studentViolationsHandle: PageMeta = {
+  title: 'Violations',
+  subtitle: 'View your violation records',
 }
 
 const studentsHandle: PageMeta = {
@@ -55,22 +111,159 @@ const editHandle: PageMeta = {
   ),
 }
 
+const reportsHandle: PageMeta = {
+  title: 'Reports',
+  subtitle: 'Filter students and export CSV or print',
+}
+
+const sectionsHandle: PageMeta = {
+  title: 'Sections',
+  subtitle: 'Manage class sections',
+}
+
 const notFoundHandle: PageMeta = {
   title: 'Not Found',
   subtitle: 'Missing route',
 }
 
 export const spmsRouter = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
+
   {
-    element: <AppShell />,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
-      { path: '/', element: <DashboardPage />, handle: dashboardHandle },
-      { path: '/students', element: <StudentsPage />, handle: studentsHandle },
-      { path: '/students/new', element: <AddStudentPage />, handle: addHandle },
-      { path: '/students/:id', element: <StudentProfilePage />, handle: profileHandle },
-      { path: '/students/:id/edit', element: <EditStudentPage />, handle: editHandle },
+      { path: '/', element: <RedirectToRoleDashboard />, handle: dashboardHandle },
+      {
+        path: '/registrar',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar']}>
+            <RegistrarDashboard />
+          </RoleProtectedRoute>
+        ),
+        handle: registrarHandle,
+      },
+      {
+        path: '/faculty',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyDashboard />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyHandle,
+      },
+      {
+        path: '/faculty/violations',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyViolationsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyViolationsHandle,
+      },
+      {
+        path: '/faculty/skills',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultySkillsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultySkillsHandle,
+      },
+      {
+        path: '/student',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentDashboard />
+          </RoleProtectedRoute>
+        ),
+        handle: studentHandle,
+      },
+      {
+        path: '/student/academic',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentAcademicPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentAcademicHandle,
+      },
+      {
+        path: '/student/skills',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentSkillsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentSkillsHandle,
+      },
+      {
+        path: '/student/violations',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentViolationsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentViolationsHandle,
+      },
+      {
+        path: '/students',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar', 'faculty']}>
+            <StudentsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentsHandle,
+      },
+      {
+        path: '/students/new',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar']}>
+            <AddStudentPage />
+          </RoleProtectedRoute>
+        ),
+        handle: addHandle,
+      },
+      {
+        path: '/students/:id',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar', 'faculty', 'student']}>
+            <StudentProfilePage />
+          </RoleProtectedRoute>
+        ),
+        handle: profileHandle,
+      },
+      {
+        path: '/students/:id/edit',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar']}>
+            <EditStudentPage />
+          </RoleProtectedRoute>
+        ),
+        handle: editHandle,
+      },
+      {
+        path: '/reports',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar']}>
+            <ReportsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: reportsHandle,
+      },
+      {
+        path: '/sections',
+        element: (
+          <RoleProtectedRoute allowedRoles={['registrar']}>
+            <SectionsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: sectionsHandle,
+      },
       { path: '*', element: <NotFoundPage />, handle: notFoundHandle },
     ],
   },
 ])
-

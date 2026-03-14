@@ -3,12 +3,12 @@
 :root{
   --spms-primary: #1d4ed8;
   --spms-primary-2: #2563eb;
-  --spms-surface: rgba(255,255,255,.78);
+  --spms-surface: #ffffff;
   --spms-border: rgba(15, 23, 42, .08);
   --spms-text: #0f172a;
   --spms-muted: #64748b;
-  --spms-bg-1: #f6f8ff;
-  --spms-bg-2: #eef2ff;
+  --spms-bg-1: #ffffff;
+  --spms-bg-2: #ffffff;
 }
 
 html, body, #root {
@@ -17,10 +17,7 @@ html, body, #root {
 
 body {
   color: var(--spms-text);
-  background:
-    radial-gradient(1200px 800px at 10% 0%, rgba(37, 99, 235, .16), transparent 55%),
-    radial-gradient(900px 700px at 100% 20%, rgba(29, 78, 216, .12), transparent 60%),
-    linear-gradient(180deg, var(--spms-bg-1), var(--spms-bg-2));
+  background: #ffffff;
 }
 
 .spms-app {
@@ -99,10 +96,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 1020;
-  background: rgba(255,255,255,.70);
+  background: #ffffff;
   border-bottom: 1px solid var(--spms-border);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .spms-content {
@@ -117,11 +112,7 @@ body {
   background: var(--spms-surface);
   border: 1px solid var(--spms-border);
   border-radius: 18px;
-  box-shadow:
-    0 10px 30px rgba(2, 6, 23, .08),
-    0 1px 0 rgba(255,255,255,.5) inset;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
 }
 
 .spms-card .card-header {
@@ -273,5 +264,26 @@ body {
   body { background: #fff !important; }
   .spms-content { padding: 0 !important; }
   .spms-card { box-shadow: none !important; background: #fff !important; }
+}
+
+/* Login page */
+.spms-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.spms-login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--spms-surface);
+  border: 1px solid var(--spms-border);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(2, 6, 23, .12);
+  backdrop-filter: blur(12px);
+}
+.spms-login-card .card-body {
+  padding: 28px 24px;
 }
 

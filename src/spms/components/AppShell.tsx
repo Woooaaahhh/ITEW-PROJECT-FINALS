@@ -1,20 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useMatches } from 'react-router-dom'
+import { Outlet, useMatches, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 import { Sidebar } from './Sidebar'
+import { Topbar } from './Topbar'
 
 export type PageMeta = {
   title: string
   subtitle?: string
   right?: React.ReactNode
+  showSearch?: boolean
 }
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
-
+  const { user } = useAuth()
+  const location = useLocation()
   const matches = useMatches()
   const meta = (matches[matches.length - 1]?.handle as PageMeta | undefined) ?? { title: 'SPMS' }
 
+  const headerRight =
+    location.pathname === '/students' && user?.role !== 'registrar' ? null : meta.right
+
   const overlayClass = useMemo(() => `spms-overlay${mobileOpen ? ' show' : ''}`, [mobileOpen])
+  const showSearch = meta.showSearch === true
 
   useEffect(() => {
     if (mobileOpen) document.body.style.overflow = 'hidden'
@@ -46,28 +54,14 @@ export function AppShell() {
       <div className="spms-app">
         <Sidebar mobileOpen={mobileOpen} />
         <main className="spms-main">
-          <header className="spms-topbar">
-            <div className="container-fluid px-3 px-lg-4 py-3">
-              <div className="d-flex align-items-center justify-content-between gap-3">
-                <div className="d-flex align-items-center gap-2">
-                  <button
-                    className="btn btn-outline-primary d-lg-none rounded-4 px-3"
-                    type="button"
-                    onClick={() => setMobileOpen((v) => !v)}
-                    aria-label="Toggle sidebar"
-                  >
-                    <i className="bi bi-list" />
-                  </button>
-                  <div>
-                    <div className="fw-bold spms-page-title">{meta.title}</div>
-                    {meta.subtitle ? <div className="spms-muted small">{meta.subtitle}</div> : null}
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center gap-2 spms-no-print">{meta.right}</div>
-              </div>
-            </div>
-          </header>
+          <Topbar
+            title={meta.title}
+            subtitle={meta.subtitle}
+            showSearch={showSearch}
+            searchPlaceholder="Search students..."
+            right={headerRight}
+            onToggleSidebar={() => setMobileOpen((v) => !v)}
+          />
 
           <section className="spms-content">
             <div className="container-fluid">

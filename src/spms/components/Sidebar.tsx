@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import { AppIcon } from './AppIcon'
 import avatarUrl from '../../assets/react.svg'
+import { useAuth } from '../auth/AuthContext'
+import { ROLES } from '../auth/types'
 
 type SidebarProps = {
   mobileOpen: boolean
@@ -12,6 +14,9 @@ function cx(...parts: Array<string | false | undefined>) {
 
 export function Sidebar({ mobileOpen }: SidebarProps) {
   const navClass = ({ isActive }: { isActive: boolean }) => `nav-link${isActive ? ' active' : ''}`
+  const { user } = useAuth()
+  const role = user?.role ?? 'registrar'
+  const isStudent = role === 'student'
 
   return (
     <aside
@@ -20,47 +25,79 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
       aria-label="Sidebar navigation"
     >
       <div className="spms-brand">
-        <div className="d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <AppIcon />
-            <div>
-              <div className="fw-bold text-white lh-sm">Student Profiling</div>
-              <small className="text-white-50">Management System</small>
+        <div className="d-flex align-items-center gap-2">
+          <AppIcon />
+          <div className="min-w-0">
+            <div className="fw-bold text-white lh-tight" style={{ fontSize: '.9rem' }}>
+              Student Profiling
+            </div>
+            <div className="text-white-50" style={{ fontSize: '.7rem' }}>
+              Management System
             </div>
           </div>
-          <span className="badge rounded-pill">SPMS</span>
         </div>
       </div>
 
       <nav className="spms-nav nav flex-column">
-        <NavLink className={navClass} to="/" end>
+        <NavLink className={navClass} to={role === 'registrar' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
-        <NavLink className={navClass} to="/students">
-          <i className="bi bi-people" /> Students
-        </NavLink>
-        <NavLink className={navClass} to="/students/new">
-          <i className="bi bi-person-plus" /> Add Student
-        </NavLink>
-
-        <div className="px-3 mt-2">
-          <hr className="text-white-50" />
-        </div>
-        <a className="nav-link" href="javascript:void(0)">
-          <i className="bi bi-gear" /> Settings
-        </a>
+        {!isStudent && (
+          <>
+            <NavLink className={navClass} to="/students">
+              <i className="bi bi-people" /> Students
+            </NavLink>
+            {role === 'faculty' && (
+              <>
+                <NavLink className={navClass} to="/faculty/violations">
+                  <i className="bi bi-exclamation-triangle" /> Violations
+                </NavLink>
+                <NavLink className={navClass} to="/faculty/skills">
+                  <i className="bi bi-award" /> Skills
+                </NavLink>
+              </>
+            )}
+            {role === 'registrar' && (
+              <NavLink className={navClass} to="/sections">
+                <i className="bi bi-diagram-3" /> Sections
+              </NavLink>
+            )}
+            {role === 'registrar' && (
+              <NavLink className={navClass} to="/reports">
+                <i className="bi bi-file-earmark-bar-graph" /> Reports
+              </NavLink>
+            )}
+          </>
+        )}
+        {isStudent && (
+          <>
+            {user?.studentId && (
+              <NavLink className={navClass} to={`/students/${user.studentId}`}>
+                <i className="bi bi-person-badge" /> My Profile
+              </NavLink>
+            )}
+            <NavLink className={navClass} to="/student/academic">
+              <i className="bi bi-journal-text" /> Academic History
+            </NavLink>
+            <NavLink className={navClass} to="/student/skills">
+              <i className="bi bi-award" /> Skills
+            </NavLink>
+            <NavLink className={navClass} to="/student/violations">
+              <i className="bi bi-exclamation-triangle" /> Violations
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="mt-auto spms-sidebar-footer">
         <div className="d-flex align-items-center gap-2">
-          <img src={avatarUrl} className="rounded-4" width={42} height={42} alt="Admin" />
+          <img src={avatarUrl} className="rounded-3" width={40} height={40} alt="" />
           <div className="min-w-0">
-            <div className="fw-semibold text-white text-truncate">Registrar Admin</div>
-            <small>School Office</small>
+            <div className="fw-semibold text-white text-truncate" style={{ fontSize: '.85rem' }}>{user?.name ?? 'User'}</div>
+            <small className="text-white-50">{ROLES[role]}</small>
           </div>
         </div>
       </div>
     </aside>
   )
 }
-
