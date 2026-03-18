@@ -53,7 +53,7 @@ export function Topbar({
     navigate('/login', { replace: true })
   }
 
-  const role = user?.role ?? 'registrar'
+  const role = user?.role ?? 'admin'
 
   return (
     <header className="spms-topbar">

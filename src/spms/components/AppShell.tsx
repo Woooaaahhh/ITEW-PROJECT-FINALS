@@ -19,7 +19,7 @@ export function AppShell() {
   const meta = (matches[matches.length - 1]?.handle as PageMeta | undefined) ?? { title: 'SPMS' }
 
   const headerRight =
-    location.pathname === '/students' && user?.role !== 'registrar' ? null : meta.right
+    location.pathname === '/students' && user?.role !== 'admin' ? null : meta.right
 
   const overlayClass = useMemo(() => `spms-overlay${mobileOpen ? ' show' : ''}`, [mobileOpen])
   const showSearch = meta.showSearch === true

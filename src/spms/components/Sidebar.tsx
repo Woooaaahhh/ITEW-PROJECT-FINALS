@@ -15,7 +15,7 @@ function cx(...parts: Array<string | false | undefined>) {
 export function Sidebar({ mobileOpen }: SidebarProps) {
   const navClass = ({ isActive }: { isActive: boolean }) => `nav-link${isActive ? ' active' : ''}`
   const { user } = useAuth()
-  const role = user?.role ?? 'registrar'
+  const role = user?.role ?? 'admin'
   const isStudent = role === 'student'
 
   return (
@@ -39,7 +39,7 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
       </div>
 
       <nav className="spms-nav nav flex-column">
-        <NavLink className={navClass} to={role === 'registrar' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
+        <NavLink className={navClass} to={role === 'admin' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
         {!isStudent && (
@@ -57,12 +57,17 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
                 </NavLink>
               </>
             )}
-            {role === 'registrar' && (
+            {role === 'admin' && (
+              <NavLink className={navClass} to="/users">
+                <i className="bi bi-person-badge" /> Faculty
+              </NavLink>
+            )}
+            {role === 'admin' && (
               <NavLink className={navClass} to="/sections">
                 <i className="bi bi-diagram-3" /> Sections
               </NavLink>
             )}
-            {role === 'registrar' && (
+            {role === 'admin' && (
               <NavLink className={navClass} to="/reports">
                 <i className="bi bi-file-earmark-bar-graph" /> Reports
               </NavLink>
@@ -94,7 +99,7 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
           <img src={avatarUrl} className="rounded-3" width={40} height={40} alt="" />
           <div className="min-w-0">
             <div className="fw-semibold text-white text-truncate" style={{ fontSize: '.85rem' }}>{user?.name ?? 'User'}</div>
-            <small className="text-white-50">{ROLES[role]}</small>
+            {role === 'student' ? null : <small className="text-white-50">{ROLES[role]}</small>}
           </div>
         </div>
       </div>
