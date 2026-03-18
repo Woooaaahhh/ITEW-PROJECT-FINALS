@@ -79,7 +79,8 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-      return ['/', '/faculty', '/students', '/faculty/violations', '/faculty/skills']
+case 'faculty':
+      return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/students']
     case 'student':
       return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
     default:
@@ -117,6 +118,7 @@ export function canAccessPath(
     if (path === '/registrar' || path === '/student' || path.startsWith('/students/new') || path === '/reports')
       return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
+if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/sections')) return false
     return (
       path === '/' ||

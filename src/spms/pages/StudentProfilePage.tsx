@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
 import { getStudent, type Student } from '../db/students'
+import { getStudentRecords } from '../db/studentRecords'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -33,6 +34,7 @@ export function StudentProfilePage() {
   }, [id])
 
   const name = useMemo(() => (student ? fullName(student) : 'Student'), [student])
+  const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student])
 
   if (loading) {
     return (
@@ -221,7 +223,35 @@ export function StudentProfilePage() {
                   <span className="spms-chip"><i className="bi bi-clipboard-check" /> Record</span>
                 </div>
                 <div className="card-body">
-                  {emptySection('No violations on record.')}
+                  {!records || records.violations.length === 0 ? (
+                    emptySection('No violations on record.')
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      {records.violations.slice(0, 5).map((v) => (
+                        <div key={v.id} className="d-flex justify-content-between gap-3">
+                          <div className="flex-grow-1">
+                            <div className="fw-semibold small">{v.violation_type}</div>
+                            <div className="spms-muted small">{v.description}</div>
+                          </div>
+                          <div className="text-end">
+                            <div className="spms-muted small">{new Date(v.date).toLocaleDateString()}</div>
+                            <span
+                              className="badge rounded-pill"
+                              style={{
+                                background: v.status.toLowerCase() === 'resolved' ? 'rgba(34, 197, 94, .15)' : 'rgba(234, 179, 8, .15)',
+                                color: v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
+                              }}
+                            >
+                              {v.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {records.violations.length > 5 ? (
+                        <div className="spms-muted small">Showing 5 of {records.violations.length} records.</div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -262,7 +292,29 @@ export function StudentProfilePage() {
               <span className="spms-chip"><i className="bi bi-award" /> Activities</span>
             </div>
             <div className="card-body">
-              {emptySection('No non-academic achievements recorded yet.')}
+              {!records || records.achievements.length === 0 ? (
+                emptySection('No non-academic achievements recorded yet.')
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {records.achievements.slice(0, 5).map((a) => (
+                    <div key={a.id} className="d-flex justify-content-between gap-3">
+                      <div className="flex-grow-1">
+                        <div className="fw-semibold small">
+                          {a.title}{' '}
+                          {a.category ? (
+                            <span className="badge rounded-pill bg-primary-subtle text-primary ms-1">{a.category}</span>
+                          ) : null}
+                        </div>
+                        <div className="spms-muted small">{a.description}</div>
+                      </div>
+                      <div className="text-end spms-muted small">{new Date(a.date).toLocaleDateString()}</div>
+                    </div>
+                  ))}
+                  {records.achievements.length > 5 ? (
+                    <div className="spms-muted small">Showing 5 of {records.achievements.length} records.</div>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         </div>
