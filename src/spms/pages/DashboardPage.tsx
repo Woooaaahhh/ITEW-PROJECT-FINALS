@@ -38,11 +38,11 @@ export function DashboardPage() {
     }
   }, [])
 
-  const role = user?.role ?? 'registrar'
+  const role = user?.role ?? 'admin'
   const byYear = useMemo(() => countByYear(students), [students])
   const recent = useMemo(() => students.slice(0, 5), [students])
   const total = students.length
-  const canAddStudent = role === 'registrar'
+  const canAddStudent = role === 'admin'
   const isStudent = role === 'student'
   const studentId = user?.role === 'student' ? user.studentId : undefined
 

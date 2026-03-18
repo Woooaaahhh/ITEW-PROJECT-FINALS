@@ -1,4 +1,5 @@
 import type { AuthUser, UserRole } from './types'
+import axios from 'axios'
 
 const STORAGE_KEY = 'spms_auth'
 
@@ -8,6 +9,10 @@ export function getStoredAuth(): AuthUser | null {
     if (!raw) return null
     const data = JSON.parse(raw) as AuthUser
     if (!data?.token || !data?.role) return null
+    // Backward-compat: old builds used role = "registrar"
+    if ((data as unknown as { role?: string })?.role === 'registrar') {
+      ;(data as unknown as { role: UserRole }).role = 'admin'
+    }
     return data
   } catch {
     return null
@@ -22,50 +27,46 @@ export function clearStoredAuth(): void {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-/** Mock login: validates credentials and returns user with role. Replace with real API call. */
+type ApiLoginResponse = {
+  token: string
+  user: { user_id: number; username: string; email: string; role: UserRole }
+}
+
+/** Real login via backend API. */
 export async function login(identifier: string, password: string): Promise<AuthUser> {
-  await new Promise((r) => setTimeout(r, 600))
-
-  const id = identifier.trim().toLowerCase()
-  const pwd = password
-
-  // Demo credentials (replace with backend validation)
-  if (id === 'registrar@spms.edu' && pwd === 'reg123') {
-    return {
-      token: `tk_reg_${Date.now()}`,
-      role: 'registrar',
-      name: 'Registrar Admin',
-      email: 'registrar@spms.edu',
-    }
+  let data: ApiLoginResponse
+  try {
+    const res = await axios.post<ApiLoginResponse>('/api/login', { identifier, password })
+    data = res.data
+  } catch (err: unknown) {
+    const message =
+      axios.isAxiosError(err) ? (err.response?.data as { message?: string } | undefined)?.message : undefined
+    throw new Error(message || 'Invalid username/email or password')
   }
-  if (id === 'faculty@spms.edu' && pwd === 'faculty123') {
-    return {
-      token: `tk_fac_${Date.now()}`,
-      role: 'faculty',
-      name: 'Faculty User',
-      email: 'faculty@spms.edu',
-    }
-  }
-  if (id === 'student@spms.edu' && pwd === 'student123') {
-    let studentId: string | undefined
+
+  const role = data.user.role
+  const email = data.user.email
+  const name = data.user.username
+
+  let studentId: string | undefined
+  if (role === 'student') {
     try {
       const { listStudents } = await import('../db/students')
       const list = await listStudents()
-      const found = list.find((s) => (s.email ?? '').toLowerCase() === 'student@spms.edu')
+      const found = list.find((s) => (s.email ?? '').toLowerCase() === (email ?? '').toLowerCase())
       studentId = found?.id ?? list[0]?.id
     } catch {
       studentId = undefined
     }
-    return {
-      token: `tk_stu_${Date.now()}`,
-      role: 'student',
-      name: 'Student User',
-      email: 'student@spms.edu',
-      studentId: studentId ?? 'demo-student-id',
-    }
   }
 
-  throw new Error('Invalid email/username or password.')
+  return {
+    token: data.token,
+    role,
+    name,
+    email,
+    studentId,
+  }
 }
 
 export function logout(): void {
@@ -75,12 +76,12 @@ export function logout(): void {
 /** Routes that each role can access (path prefix or exact). */
 export function getAllowedPaths(role: UserRole): string[] {
   switch (role) {
-    case 'registrar':
+    case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-      return ['/', '/faculty', '/students']
+      return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/students']
     case 'student':
-      return ['/', '/student', '/students']
+      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
     default:
       return ['/']
   }
@@ -88,7 +89,7 @@ export function getAllowedPaths(role: UserRole): string[] {
 
 export function getDefaultDashboardPath(role: UserRole): string {
   switch (role) {
-    case 'registrar':
+    case 'admin':
       return '/registrar'
     case 'faculty':
       return '/faculty'
@@ -108,7 +109,7 @@ export function canAccessPath(
 ): boolean {
   const path = pathname.replace(/\/$/, '') || '/'
 
-  if (role === 'registrar') {
+  if (role === 'admin') {
     return true
   }
 
@@ -116,10 +117,13 @@ export function canAccessPath(
     if (path === '/registrar' || path === '/student' || path.startsWith('/students/new'))
       return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
+    if (path.startsWith('/sections')) return false
     return (
       path === '/' ||
       path === '/faculty' ||
-      path.startsWith('/faculty/') ||
+      path === '/faculty/violations' ||
+      path === '/faculty/skills' ||
+      path === '/faculty/sports' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
@@ -133,7 +137,13 @@ export function canAccessPath(
       const id = studentIdFromPath ?? path.replace('/students/', '').replace(/\/edit$/, '')
       return id === authStudentId
     }
-    return path === '/' || path === '/student'
+    return (
+      path === '/' ||
+      path === '/student' ||
+      path === '/student/academic' ||
+      path === '/student/skills' ||
+      path === '/student/violations'
+    )
   }
 
   return false

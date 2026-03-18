@@ -2,11 +2,12 @@ import { useMemo } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { canAccessPath, getDefaultDashboardPath } from '../auth/authService'
+import type { UserRole } from '../auth/types'
 
 type RoleProtectedRouteProps = {
   children: React.ReactNode
   /** Roles that can access this route */
-  allowedRoles: Array<'registrar' | 'faculty' | 'student'>
+  allowedRoles: UserRole[]
 }
 
 /**
