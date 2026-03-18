@@ -29,6 +29,22 @@ export type Sport = {
   updatedAt: string
 }
 
+export type Skill = {
+  id: string
+  name: string
+  category: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type StudentSkill = {
+  id: string
+  studentId: string
+  skillId: string
+  createdAt: string
+}
+
 export type SpmsDb = DBSchema & {
   students: {
     key: string
@@ -40,6 +56,16 @@ export type SpmsDb = DBSchema & {
     value: Sport
     indexes: { 'by-name': string; 'by-updatedAt': string; 'by-active': number }
   }
+  skills: {
+    key: string
+    value: Skill
+    indexes: { 'by-name': string; 'by-category': string; 'by-updatedAt': string; 'by-active': number }
+  }
+  studentSkills: {
+    key: string
+    value: StudentSkill
+    indexes: { 'by-studentId': string; 'by-skillId': string; 'by-createdAt': string }
+  }
   meta: {
     key: string
     value: { key: string; value: string }
@@ -47,7 +73,7 @@ export type SpmsDb = DBSchema & {
 }
 
 const DB_NAME = 'spms-db'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
@@ -62,6 +88,19 @@ export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
         store.createIndex('by-name', 'name')
         store.createIndex('by-updatedAt', 'updatedAt')
         store.createIndex('by-active', 'isActive')
+      }
+      if (!db.objectStoreNames.contains('skills')) {
+        const store = db.createObjectStore('skills', { keyPath: 'id' })
+        store.createIndex('by-name', 'name')
+        store.createIndex('by-category', 'category')
+        store.createIndex('by-updatedAt', 'updatedAt')
+        store.createIndex('by-active', 'isActive')
+      }
+      if (!db.objectStoreNames.contains('studentSkills')) {
+        const store = db.createObjectStore('studentSkills', { keyPath: 'id' })
+        store.createIndex('by-studentId', 'studentId')
+        store.createIndex('by-skillId', 'skillId')
+        store.createIndex('by-createdAt', 'createdAt')
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })

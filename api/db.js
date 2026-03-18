@@ -1,10 +1,14 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import sqlite3 from 'sqlite3'
 import { open } from 'sqlite'
 import bcrypt from 'bcryptjs'
 
-const dataDir = path.resolve(process.cwd(), 'api', 'data')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+// Always resolve relative to the api/ folder, regardless of where node was started from.
+const dataDir = path.resolve(__dirname, 'data')
 const dbPath = path.join(dataDir, 'spms.sqlite')
 
 export async function getDb() {
