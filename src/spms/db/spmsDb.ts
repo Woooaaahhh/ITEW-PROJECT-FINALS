@@ -39,10 +39,6 @@ export type Skill = {
 }
 
 export type StudentSkill = {
-<<<<<<< HEAD
-=======
-  id: string
->>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
   studentId: string
   skillId: string
   createdAt: string
@@ -62,17 +58,10 @@ export type SpmsDb = DBSchema & {
   skills: {
     key: string
     value: Skill
-<<<<<<< HEAD
-    indexes: { 'by-name': string; 'by-updatedAt': string; 'by-active': number; 'by-category': string }
-  }
-  studentSkills: {
-    key: [string, string] // [studentId, skillId]
-=======
     indexes: { 'by-name': string; 'by-category': string; 'by-updatedAt': string; 'by-active': number }
   }
   studentSkills: {
-    key: string
->>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
+    key: [string, string] // [studentId, skillId]
     value: StudentSkill
     indexes: { 'by-studentId': string; 'by-skillId': string; 'by-createdAt': string }
   }
@@ -83,7 +72,7 @@ export type SpmsDb = DBSchema & {
 }
 
 const DB_NAME = 'spms-db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
@@ -106,16 +95,15 @@ export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
         store.createIndex('by-updatedAt', 'updatedAt')
         store.createIndex('by-active', 'isActive')
       }
-      if (!db.objectStoreNames.contains('studentSkills')) {
-<<<<<<< HEAD
-        const store = db.createObjectStore('studentSkills', { keyPath: ['studentId', 'skillId'] })
-=======
-        const store = db.createObjectStore('studentSkills', { keyPath: 'id' })
->>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
-        store.createIndex('by-studentId', 'studentId')
-        store.createIndex('by-skillId', 'skillId')
-        store.createIndex('by-createdAt', 'createdAt')
+      // Ensure studentSkills store uses the correct composite key.
+      // If it was previously created with a different keyPath (e.g. "id"), we must recreate it.
+      if (db.objectStoreNames.contains('studentSkills')) {
+        db.deleteObjectStore('studentSkills')
       }
+      const studentSkills = db.createObjectStore('studentSkills', { keyPath: ['studentId', 'skillId'] })
+      studentSkills.createIndex('by-studentId', 'studentId')
+      studentSkills.createIndex('by-skillId', 'skillId')
+      studentSkills.createIndex('by-createdAt', 'createdAt')
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })
       }

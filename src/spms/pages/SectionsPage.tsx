@@ -5,7 +5,7 @@ export function SectionsPage() {
   )
 }
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 
 type SectionRow = {
@@ -26,17 +26,6 @@ function SectionsManager() {
 
   const [yearLevel, setYearLevel] = useState<'1st' | '2nd' | '3rd' | '4th'>('1st')
   const [section, setSection] = useState('')
-
-  const grouped = useMemo(() => {
-    const m = new Map<string, SectionRow[]>()
-    for (const s of sections) {
-      const key = s.year_level
-      const arr = m.get(key) ?? []
-      arr.push(s)
-      m.set(key, arr)
-    }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [sections])
 
   const fetchSections = async () => {
     setLoading(true)
@@ -250,25 +239,23 @@ function SectionsManager() {
                         </td>
                       </tr>
                     ) : (
-                      grouped.flatMap(([y, rows]) =>
-                        rows.map((s, idx) => (
-                          <tr key={s.section_id}>
-                            <td className="ps-4 py-3">{idx === 0 ? <span className="fw-semibold">{y}</span> : <span className="spms-muted">—</span>}</td>
-                            <td className="py-3 fw-semibold">{s.section}</td>
-                            <td className="py-3 spms-muted small">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
-                            <td className="pe-4 py-3 text-end">
-                              <div className="btn-group btn-group-sm">
-                                <button type="button" className="btn btn-outline-secondary rounded-3" onClick={() => openEdit(s)} disabled={submitting}>
-                                  Edit
-                                </button>
-                                <button type="button" className="btn btn-outline-danger rounded-3" onClick={() => void deleteSection(s)} disabled={submitting}>
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )),
-                      )
+                      sections.map((s) => (
+                        <tr key={s.section_id}>
+                          <td className="ps-4 py-3 fw-semibold">{s.year_level}</td>
+                          <td className="py-3 fw-semibold">{s.section}</td>
+                          <td className="py-3 spms-muted small">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
+                          <td className="pe-4 py-3 text-end">
+                            <div className="btn-group btn-group-sm">
+                              <button type="button" className="btn btn-outline-secondary rounded-3" onClick={() => openEdit(s)} disabled={submitting}>
+                                Edit
+                              </button>
+                              <button type="button" className="btn btn-outline-danger rounded-3" onClick={() => void deleteSection(s)} disabled={submitting}>
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>

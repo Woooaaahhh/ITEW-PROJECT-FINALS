@@ -13,7 +13,6 @@ type FormState = {
   address: string
   email: string
   contactNumber: string
-  yearLevel: '' | '1st' | '2nd' | '3rd' | '4th'
   section: string
 }
 
@@ -26,7 +25,6 @@ const initial: FormState = {
   address: '',
   email: '',
   contactNumber: '',
-  yearLevel: '',
   section: '',
 }
 
@@ -35,7 +33,7 @@ export function AddStudentPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [sections, setSections] = useState<Array<{ section_id: number; year_level: FormState['yearLevel']; section: string }>>([])
+  const [sections, setSections] = useState<Array<{ section_id: number; year_level: '1st' | '2nd' | '3rd' | '4th'; section: string }>>([])
   const [sectionsLoading, setSectionsLoading] = useState(true)
   const [sectionsError, setSectionsError] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -54,7 +52,7 @@ export function AddStudentPage() {
         const mapped = res.data.sections
           .map((s) => ({
             section_id: s.section_id,
-            year_level: (s.year_level as FormState['yearLevel']) ?? '',
+            year_level: s.year_level as '1st' | '2nd' | '3rd' | '4th',
             section: s.section,
           }))
           .filter((s) => !!s.year_level && !!s.section)
@@ -104,7 +102,7 @@ export function AddStudentPage() {
                   address: form.address || null,
                   email: form.email || null,
                   contactNumber: form.contactNumber || null,
-                  yearLevel: form.yearLevel || null,
+                  yearLevel: selectedSection?.year_level ?? null,
                   section: form.section || null,
                 })
                 setSaving(false)
@@ -272,29 +270,6 @@ export function AddStudentPage() {
                 </div>
 
                 <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold">Year Level</label>
-                  <div className="input-group">
-                    <span className="input-group-text">
-                      <i className="bi bi-layers" />
-                    </span>
-                    <select
-                      className="form-select"
-                      value={selectedSection?.year_level ?? form.yearLevel}
-                      onChange={(e) => setForm((f) => ({ ...f, yearLevel: e.target.value as FormState['yearLevel'] }))}
-                      disabled={!!selectedSection || sectionsLoading || sections.length > 0}
-                    >
-                      <option value="">Select</option>
-                      <option>1st</option>
-                      <option>2nd</option>
-                      <option>3rd</option>
-                      <option>4th</option>
-                    </select>
-                  </div>
-                  {sections.length > 0 ? (
-                    <div className="spms-muted small mt-1">Auto-filled based on selected section.</div>
-                  ) : null}
-                </div>
-                <div className="col-12 col-md-6">
                   <label className="form-label fw-semibold">Section</label>
                   <div className="input-group">
                     <span className="input-group-text">
@@ -305,8 +280,7 @@ export function AddStudentPage() {
                       value={form.section}
                       onChange={(e) => {
                         const v = e.target.value
-                        const s = sections.find((x) => x.section === v)
-                        setForm((f) => ({ ...f, section: v, yearLevel: (s?.year_level ?? f.yearLevel) as FormState['yearLevel'] }))
+                        setForm((f) => ({ ...f, section: v }))
                       }}
                       disabled={sectionsLoading}
                     >
@@ -322,6 +296,10 @@ export function AddStudentPage() {
                     <div className="text-danger small mt-1">{sectionsError}</div>
                   ) : sections.length === 0 && !sectionsLoading ? (
                     <div className="spms-muted small mt-1">No sections found. Create sections first in the Sections module.</div>
+                  ) : selectedSection ? (
+                    <div className="spms-muted small mt-1">
+                      Year Level auto-set to <span className="fw-semibold">{selectedSection.year_level}</span>.
+                    </div>
                   ) : null}
                 </div>
 

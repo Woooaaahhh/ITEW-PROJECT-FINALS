@@ -26,6 +26,7 @@ export function FacultySkillsPage() {
   const [assignedSkillIds, setAssignedSkillIds] = useState<string[]>([])
   const [savingAssign, setSavingAssign] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
+  const [savedModalOpen, setSavedModalOpen] = useState(false)
 
   const fetchSkills = async () => {
     setSkillsLoading(true)
@@ -93,7 +94,49 @@ export function FacultySkillsPage() {
   }, [selectedStudent])
 
   return (
-    <div className="row g-4">
+    <>
+      {savedModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div
+                className="modal-content border-0"
+                style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}
+              >
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Saved</h5>
+                  <button type="button" className="btn-close" onClick={() => setSavedModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <div className="d-flex align-items-start gap-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                      style={{ width: 40, height: 40, background: 'rgba(34, 197, 94, .15)', color: '#15803d' }}
+                    >
+                      <i className="bi bi-check2-circle fs-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="fw-semibold">Skill assignments updated successfully.</div>
+                      <div className="spms-muted small">
+                        Student: <span className="fw-semibold text-body">{selectedStudentName}</span> · Assigned:{' '}
+                        <span className="fw-semibold text-body">{assignedSkillIds.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button type="button" className="btn btn-primary rounded-3" onClick={() => setSavedModalOpen(false)}>
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setSavedModalOpen(false)} />
+        </>
+      )}
+
+      <div className="row g-4">
       <div className="col-12 col-xxl-5">
         <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
           <div className="card-body">
@@ -401,6 +444,7 @@ export function FacultySkillsPage() {
                   setAssignError(null)
                   try {
                     await setStudentSkills(selectedStudentId, assignedSkillIds)
+                    setSavedModalOpen(true)
                   } catch (e) {
                     setAssignError(e instanceof Error ? e.message : 'Failed to save assigned skills.')
                   } finally {
@@ -431,6 +475,7 @@ export function FacultySkillsPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

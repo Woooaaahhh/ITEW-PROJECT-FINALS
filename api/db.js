@@ -22,6 +22,13 @@ export async function getDb() {
   await db.exec(`PRAGMA foreign_keys = ON;`)
 
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `)
+
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       user_id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE,
@@ -64,8 +71,9 @@ export async function getDb() {
     );
   `)
 
-  const row = await db.get('SELECT COUNT(1) as count FROM users')
-  if ((row?.count ?? 0) === 0) {
+  const usersSeeded = await db.get('SELECT value FROM meta WHERE key = ?', 'users_seeded')
+  const userCount = await db.get('SELECT COUNT(1) as count FROM users')
+  if (usersSeeded?.value !== 'true' && (userCount?.count ?? 0) === 0) {
     const seed = [
       { username: 'registrar', email: 'registrar@spms.edu', password: 'reg123', role: 'admin' },
       { username: 'faculty', email: 'faculty@spms.edu', password: 'faculty123', role: 'faculty', faculty_type: 'Teacher' },
@@ -94,12 +102,21 @@ export async function getDb() {
         )
       }
     }
+
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'users_seeded', 'true')
+  } else if (usersSeeded?.value !== 'true') {
+    // If DB already had users but no seed flag, set it to avoid reseeding logic later.
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'users_seeded', 'true')
   }
 
+  const sectionsSeeded = await db.get('SELECT value FROM meta WHERE key = ?', 'sections_seeded')
   const sectionCount = await db.get('SELECT COUNT(1) as count FROM sections')
-  if ((sectionCount?.count ?? 0) === 0) {
+  if (sectionsSeeded?.value !== 'true' && (sectionCount?.count ?? 0) === 0) {
     await db.run('INSERT INTO sections (year_level, section) VALUES (?, ?)', '2nd', 'BSIT-2A')
     await db.run('INSERT INTO sections (year_level, section) VALUES (?, ?)', '1st', 'BSBA-1B')
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'sections_seeded', 'true')
+  } else if (sectionsSeeded?.value !== 'true') {
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'sections_seeded', 'true')
   }
 
   return db
