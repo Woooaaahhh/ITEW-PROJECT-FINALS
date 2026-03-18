@@ -1,7 +1,12 @@
 import { nowIso, openSpmsDb, type Skill, type StudentSkill } from './spmsDb'
 
+<<<<<<< HEAD
 function makeId() {
   return `SK-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+=======
+function makeId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
 }
 
 export async function listSkills(options?: { activeOnly?: boolean }): Promise<Skill[]> {
@@ -15,7 +20,11 @@ export async function createSkill(input: { name: string; category: string }): Pr
   const db = await openSpmsDb()
   const ts = nowIso()
   const skill: Skill = {
+<<<<<<< HEAD
     id: makeId(),
+=======
+    id: makeId('SK'),
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
     name: input.name.trim(),
     category: input.category.trim(),
     isActive: true,
@@ -50,6 +59,7 @@ export async function updateSkill(
 
 export async function deleteSkill(id: string): Promise<void> {
   const db = await openSpmsDb()
+<<<<<<< HEAD
   await db.delete('skills', id)
 
   // remove any student assignments for this skill
@@ -95,6 +105,14 @@ export async function setStudentSkills(studentId: string, skillIds: string[]): P
       ),
   )
 
+=======
+  // also remove any assignments to avoid dangling refs
+  const tx = db.transaction(['studentSkills', 'skills'], 'readwrite')
+  const idx = tx.objectStore('studentSkills').index('by-skillId')
+  const assigned = await idx.getAll(id)
+  await Promise.all(assigned.map((r) => tx.objectStore('studentSkills').delete(r.id)))
+  await tx.objectStore('skills').delete(id)
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
   await tx.done
 }
 
@@ -111,9 +129,16 @@ export async function seedSkillsIfEmpty(): Promise<void> {
 
   const ts = nowIso()
   const demo: Skill[] = [
+<<<<<<< HEAD
     { id: makeId(), name: 'Programming - Python', category: 'Technical', isActive: true, createdAt: ts, updatedAt: ts },
     { id: makeId(), name: 'Public Speaking', category: 'Soft Skill', isActive: true, createdAt: ts, updatedAt: ts },
     { id: makeId(), name: 'Leadership', category: 'Soft Skill', isActive: true, createdAt: ts, updatedAt: ts },
+=======
+    { id: makeId('SK'), name: 'Python Programming', category: 'Technical', isActive: true, createdAt: ts, updatedAt: ts },
+    { id: makeId('SK'), name: 'Public Speaking', category: 'Soft Skill', isActive: true, createdAt: ts, updatedAt: ts },
+    { id: makeId('SK'), name: 'Leadership', category: 'Soft Skill', isActive: true, createdAt: ts, updatedAt: ts },
+    { id: makeId('SK'), name: 'Web Development', category: 'Technical', isActive: true, createdAt: ts, updatedAt: ts },
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
   ]
 
   const tx = db.transaction(['skills', 'meta'], 'readwrite')
@@ -122,3 +147,56 @@ export async function seedSkillsIfEmpty(): Promise<void> {
   await tx.done
 }
 
+<<<<<<< HEAD
+=======
+export async function listStudentSkills(studentId: string): Promise<StudentSkill[]> {
+  const db = await openSpmsDb()
+  const idx = db.transaction('studentSkills').store.index('by-studentId')
+  const all = await idx.getAll(studentId)
+  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+/**
+ * Sets the student's skill assignments to exactly the provided set of skill ids.
+ * Returns the final assignments.
+ */
+export async function setStudentSkills(studentId: string, skillIds: string[]): Promise<StudentSkill[]> {
+  const db = await openSpmsDb()
+  const desired = Array.from(new Set(skillIds))
+  const tx = db.transaction(['studentSkills'], 'readwrite')
+  const store = tx.objectStore('studentSkills')
+  const idx = store.index('by-studentId')
+  const existing = await idx.getAll(studentId)
+
+  const existingBySkillId = new Map(existing.map((r) => [r.skillId, r]))
+
+  // delete removed
+  const desiredSet = new Set(desired)
+  await Promise.all(
+    existing
+      .filter((r) => !desiredSet.has(r.skillId))
+      .map((r) => store.delete(r.id)),
+  )
+
+  // add new
+  const ts = nowIso()
+  await Promise.all(
+    desired
+      .filter((sid) => !existingBySkillId.has(sid))
+      .map((sid) =>
+        store.put({
+          id: makeId('SS'),
+          studentId,
+          skillId: sid,
+          createdAt: ts,
+        } satisfies StudentSkill),
+      ),
+  )
+
+  await tx.done
+
+  // re-read for consistent ordering
+  return listStudentSkills(studentId)
+}
+
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd

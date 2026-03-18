@@ -39,6 +39,10 @@ export type Skill = {
 }
 
 export type StudentSkill = {
+<<<<<<< HEAD
+=======
+  id: string
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
   studentId: string
   skillId: string
   createdAt: string
@@ -58,10 +62,17 @@ export type SpmsDb = DBSchema & {
   skills: {
     key: string
     value: Skill
+<<<<<<< HEAD
     indexes: { 'by-name': string; 'by-updatedAt': string; 'by-active': number; 'by-category': string }
   }
   studentSkills: {
     key: [string, string] // [studentId, skillId]
+=======
+    indexes: { 'by-name': string; 'by-category': string; 'by-updatedAt': string; 'by-active': number }
+  }
+  studentSkills: {
+    key: string
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
     value: StudentSkill
     indexes: { 'by-studentId': string; 'by-skillId': string; 'by-createdAt': string }
   }
@@ -96,7 +107,11 @@ export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
         store.createIndex('by-active', 'isActive')
       }
       if (!db.objectStoreNames.contains('studentSkills')) {
+<<<<<<< HEAD
         const store = db.createObjectStore('studentSkills', { keyPath: ['studentId', 'skillId'] })
+=======
+        const store = db.createObjectStore('studentSkills', { keyPath: 'id' })
+>>>>>>> c3ead31561f6c7cec8811b9d86271761a50150cd
         store.createIndex('by-studentId', 'studentId')
         store.createIndex('by-skillId', 'skillId')
         store.createIndex('by-createdAt', 'createdAt')
