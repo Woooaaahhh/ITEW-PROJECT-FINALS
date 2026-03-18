@@ -50,6 +50,16 @@ export async function getDb() {
     );
   `)
 
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS sections (
+      section_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      year_level TEXT NOT NULL,
+      section TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(year_level, section)
+    );
+  `)
+
   const row = await db.get('SELECT COUNT(1) as count FROM users')
   if ((row?.count ?? 0) === 0) {
     const seed = [
@@ -80,6 +90,12 @@ export async function getDb() {
         )
       }
     }
+  }
+
+  const sectionCount = await db.get('SELECT COUNT(1) as count FROM sections')
+  if ((sectionCount?.count ?? 0) === 0) {
+    await db.run('INSERT INTO sections (year_level, section) VALUES (?, ?)', '2nd', 'BSIT-2A')
+    await db.run('INSERT INTO sections (year_level, section) VALUES (?, ?)', '1st', 'BSBA-1B')
   }
 
   return db

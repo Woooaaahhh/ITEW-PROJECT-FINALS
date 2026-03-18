@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
+import axios from 'axios'
 import { createStudent } from '../db/students'
 
 type FormState = {
@@ -34,10 +35,49 @@ export function AddStudentPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [sections, setSections] = useState<Array<{ section_id: number; year_level: FormState['yearLevel']; section: string }>>([])
+  const [sectionsLoading, setSectionsLoading] = useState(true)
+  const [sectionsError, setSectionsError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const preview = fileUrl ?? avatarUrl
   const previewClass = useMemo(() => `spms-profile-pic${fileUrl ? '' : ' opacity-50'}`, [fileUrl])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setSectionsLoading(true)
+      setSectionsError(null)
+      try {
+        const res = await axios.get<{ sections: Array<{ section_id: number; year_level: string; section: string }> }>('/api/sections')
+        if (!alive) return
+        const mapped = res.data.sections
+          .map((s) => ({
+            section_id: s.section_id,
+            year_level: (s.year_level as FormState['yearLevel']) ?? '',
+            section: s.section,
+          }))
+          .filter((s) => !!s.year_level && !!s.section)
+        setSections(mapped)
+      } catch (e: unknown) {
+        const msg =
+          axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+        if (!alive) return
+        setSectionsError(msg || 'Failed to load sections.')
+      } finally {
+        if (!alive) return
+        setSectionsLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const selectedSection = useMemo(() => {
+    if (!form.section) return null
+    return sections.find((s) => s.section === form.section) ?? null
+  }, [sections, form.section])
 
   return (
     <div className="row g-3">
@@ -239,8 +279,9 @@ export function AddStudentPage() {
                     </span>
                     <select
                       className="form-select"
-                      value={form.yearLevel}
+                      value={selectedSection?.year_level ?? form.yearLevel}
                       onChange={(e) => setForm((f) => ({ ...f, yearLevel: e.target.value as FormState['yearLevel'] }))}
+                      disabled={!!selectedSection || sectionsLoading || sections.length > 0}
                     >
                       <option value="">Select</option>
                       <option>1st</option>
@@ -249,6 +290,9 @@ export function AddStudentPage() {
                       <option>4th</option>
                     </select>
                   </div>
+                  {sections.length > 0 ? (
+                    <div className="spms-muted small mt-1">Auto-filled based on selected section.</div>
+                  ) : null}
                 </div>
                 <div className="col-12 col-md-6">
                   <label className="form-label fw-semibold">Section</label>
@@ -259,15 +303,26 @@ export function AddStudentPage() {
                     <select
                       className="form-select"
                       value={form.section}
-                      onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        const s = sections.find((x) => x.section === v)
+                        setForm((f) => ({ ...f, section: v, yearLevel: (s?.year_level ?? f.yearLevel) as FormState['yearLevel'] }))
+                      }}
+                      disabled={sectionsLoading}
                     >
-                      <option value="">Select</option>
-                      <option>BSIT-2A</option>
-                      <option>BSBA-1B</option>
-                      <option>BSED-3C</option>
-                      <option>BSIT-4A</option>
+                      <option value="">{sectionsLoading ? 'Loading...' : 'Select'}</option>
+                      {sections.map((s) => (
+                        <option key={s.section_id} value={s.section}>
+                          {s.section} ({s.year_level})
+                        </option>
+                      ))}
                     </select>
                   </div>
+                  {sectionsError ? (
+                    <div className="text-danger small mt-1">{sectionsError}</div>
+                  ) : sections.length === 0 && !sectionsLoading ? (
+                    <div className="spms-muted small mt-1">No sections found. Create sections first in the Sections module.</div>
+                  ) : null}
                 </div>
 
                 <div className="col-12">

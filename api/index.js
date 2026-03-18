@@ -86,6 +86,41 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   return res.json({ user: row })
 })
 
+app.get('/api/sections', authMiddleware, async (_req, res) => {
+  const db = await getDb()
+  const rows = await db.all(
+    'SELECT section_id, year_level, section, created_at FROM sections ORDER BY year_level ASC, section ASC',
+  )
+  return res.json({ sections: rows })
+})
+
+const createSectionSchema = z.object({
+  year_level: z.string().trim().min(1).max(20),
+  section: z.string().trim().min(1).max(40),
+})
+
+app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
+  const parsed = createSectionSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const { year_level, section } = parsed.data
+  const db = await getDb()
+  try {
+    const result = await db.run(
+      'INSERT INTO sections (year_level, section) VALUES (?, ?)',
+      year_level,
+      section,
+    )
+    const created = await db.get(
+      'SELECT section_id, year_level, section, created_at FROM sections WHERE section_id = ?',
+      result.lastID,
+    )
+    return res.status(201).json({ section: created })
+  } catch {
+    return res.status(409).json({ message: 'Section already exists for this year level' })
+  }
+})
+
 const facultyTypeSchema = z
   .string()
   .trim()
