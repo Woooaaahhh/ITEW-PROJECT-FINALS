@@ -1,4 +1,4 @@
-export type UserRole = 'registrar' | 'faculty' | 'student'
+export type UserRole = 'admin' | 'faculty' | 'student'
 
 export type AuthUser = {
   token: string
@@ -10,7 +10,7 @@ export type AuthUser = {
 }
 
 export const ROLES: Record<UserRole, string> = {
-  registrar: 'Registrar',
+  admin: 'Registrar',
   faculty: 'Faculty',
   student: 'Student',
 }

@@ -15,7 +15,7 @@ export function StudentProfilePage() {
   const { user } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
-  const canEdit = user?.role === 'registrar'
+  const canEdit = user?.role === 'admin'
   const isOwnProfile = user?.role === 'student' && user?.studentId === id
 
   useEffect(() => {

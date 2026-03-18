@@ -34,8 +34,8 @@ export function StudentsPage() {
   const [section, setSection] = useState('')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-  const canEdit = user?.role === 'registrar'
-  const canDelete = user?.role === 'registrar'
+  const canEdit = user?.role === 'admin'
+  const canDelete = user?.role === 'admin'
 
   const q = useMemo(() => normalize(query), [query])
   const y = useMemo(() => normalize(year), [year])

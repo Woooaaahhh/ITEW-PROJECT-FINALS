@@ -18,6 +18,7 @@ import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
 import { StudentViolationsPage } from './pages/StudentViolationsPage'
+import { UsersPage } from './pages/UsersPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
 import { Link } from 'react-router-dom'
@@ -121,6 +122,11 @@ const sectionsHandle: PageMeta = {
   subtitle: 'Manage class sections',
 }
 
+const usersHandle: PageMeta = {
+  title: 'Account Management',
+  subtitle: 'Create and manage user accounts',
+}
+
 const notFoundHandle: PageMeta = {
   title: 'Not Found',
   subtitle: 'Missing route',
@@ -140,7 +146,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/registrar',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar']}>
+          <RoleProtectedRoute allowedRoles={['admin']}>
             <RegistrarDashboard />
           </RoleProtectedRoute>
         ),
@@ -212,7 +218,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/students',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar', 'faculty']}>
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty']}>
             <StudentsPage />
           </RoleProtectedRoute>
         ),
@@ -221,7 +227,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/students/new',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar']}>
+          <RoleProtectedRoute allowedRoles={['admin']}>
             <AddStudentPage />
           </RoleProtectedRoute>
         ),
@@ -230,7 +236,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/students/:id',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar', 'faculty', 'student']}>
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty', 'student']}>
             <StudentProfilePage />
           </RoleProtectedRoute>
         ),
@@ -239,7 +245,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/students/:id/edit',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar']}>
+          <RoleProtectedRoute allowedRoles={['admin']}>
             <EditStudentPage />
           </RoleProtectedRoute>
         ),
@@ -248,7 +254,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/reports',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar']}>
+          <RoleProtectedRoute allowedRoles={['admin']}>
             <ReportsPage />
           </RoleProtectedRoute>
         ),
@@ -257,11 +263,20 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/sections',
         element: (
-          <RoleProtectedRoute allowedRoles={['registrar']}>
+          <RoleProtectedRoute allowedRoles={['admin']}>
             <SectionsPage />
           </RoleProtectedRoute>
         ),
         handle: sectionsHandle,
+      },
+      {
+        path: '/users',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin']}>
+            <UsersPage />
+          </RoleProtectedRoute>
+        ),
+        handle: usersHandle,
       },
       { path: '*', element: <NotFoundPage />, handle: notFoundHandle },
     ],
