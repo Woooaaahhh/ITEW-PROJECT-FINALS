@@ -35,6 +35,7 @@ export function FacultyDashboard() {
     { to: '/students', icon: 'bi-people', label: 'View Student List', desc: 'Browse all students' },
     { to: '/faculty/violations', icon: 'bi-exclamation-triangle', label: 'Add Violation Record', desc: 'Record student violation' },
     { to: '/faculty/skills', icon: 'bi-award', label: 'Assign Student Skill', desc: 'Add student skill' },
+    { to: '/faculty/sports', icon: 'bi-dribbble', label: 'Manage Sports List', desc: 'Sports affiliations & clearance' },
   ]
 
   return (

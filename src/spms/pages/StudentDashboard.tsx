@@ -57,6 +57,7 @@ export function StudentDashboard() {
 
   const yearLevel = student?.yearLevel ?? '—'
   const section = student?.section ?? '—'
+  const sportCount = Array.isArray(student?.sportsAffiliations) ? student?.sportsAffiliations.length : 0
   const totalSkills = MOCK_SKILLS.length
   const totalViolations = MOCK_VIOLATIONS.length
 
@@ -78,6 +79,13 @@ export function StudentDashboard() {
               icon="bi-diagram-3"
               value={loading ? '—' : section}
               label="Section"
+            />
+          </div>
+          <div className="col-6 col-lg-3">
+            <InsightCard
+              icon="bi-dribbble"
+              value={loading ? '—' : sportCount}
+              label="Sports Affiliations"
             />
           </div>
           <div className="col-6 col-lg-3">

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Navigate, useLocation, useParams } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { canAccessPath, getDefaultDashboardPath } from '../auth/authService'
 
@@ -17,7 +17,6 @@ type RoleProtectedRouteProps = {
 export function RoleProtectedRoute({ children, allowedRoles }: RoleProtectedRouteProps) {
   const { user, isAuthenticated } = useAuth()
   const location = useLocation()
-  const params = useParams()
   const pathname = location.pathname
 
   const studentIdFromPath = useMemo(() => {
