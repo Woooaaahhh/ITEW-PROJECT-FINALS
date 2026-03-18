@@ -2,7 +2,6 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppShell, type PageMeta } from './components/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
-import { DashboardPage } from './pages/DashboardPage'
 import { RedirectToRoleDashboard } from './pages/RedirectToRoleDashboard'
 import { RegistrarDashboard } from './pages/RegistrarDashboard'
 import { FacultyDashboard } from './pages/FacultyDashboard'
@@ -15,6 +14,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { SectionsPage } from './pages/SectionsPage'
 import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
+import { FacultySportsPage } from './pages/FacultySportsPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
 import { StudentViolationsPage } from './pages/StudentViolationsPage'
@@ -48,6 +48,11 @@ const facultyViolationsHandle: PageMeta = {
 const facultySkillsHandle: PageMeta = {
   title: 'Skills',
   subtitle: 'Assign and manage student skills',
+}
+
+const facultySportsHandle: PageMeta = {
+  title: 'Sports',
+  subtitle: 'Manage sports list and eligibility fields',
 }
 
 const studentHandle: PageMeta = {
@@ -178,6 +183,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: facultySkillsHandle,
+      },
+      {
+        path: '/faculty/sports',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultySportsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultySportsHandle,
       },
       {
         path: '/student',
