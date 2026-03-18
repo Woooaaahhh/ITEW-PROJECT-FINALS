@@ -79,7 +79,6 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-case 'faculty':
       return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/students']
     case 'student':
       return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
