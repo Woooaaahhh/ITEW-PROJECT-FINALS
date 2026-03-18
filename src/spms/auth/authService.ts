@@ -39,9 +39,19 @@ export async function login(identifier: string, password: string): Promise<AuthU
     const res = await axios.post<ApiLoginResponse>('/api/login', { identifier, password })
     data = res.data
   } catch (err: unknown) {
-    const message =
-      axios.isAxiosError(err) ? (err.response?.data as { message?: string } | undefined)?.message : undefined
-    throw new Error(message || 'Invalid username/email or password')
+    if (axios.isAxiosError(err)) {
+      // If there's no response, it's usually a network/server issue (API not running).
+      if (!err.response) {
+        throw new Error('Cannot reach API server. Start it with: npm run dev:all (or npm run dev:api)')
+      }
+      // Vite dev proxy returns 5xx when the target (API) is down (ECONNREFUSED).
+      if (err.response.status >= 500) {
+        throw new Error('API server is not running. Start it with: npm run dev:all (or npm run dev:api)')
+      }
+      const message = (err.response?.data as { message?: string } | undefined)?.message
+      throw new Error(message || 'Invalid username/email or password')
+    }
+    throw new Error('Login failed. Please try again.')
   }
 
   const role = data.user.role

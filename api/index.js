@@ -121,6 +121,42 @@ app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
   }
 })
 
+app.put('/api/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid section id' })
+
+  const parsed = createSectionSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const db = await getDb()
+  const existing = await db.get('SELECT section_id FROM sections WHERE section_id = ? LIMIT 1', id)
+  if (!existing) return res.status(404).json({ message: 'Section not found' })
+
+  try {
+    await db.run('UPDATE sections SET year_level = ?, section = ? WHERE section_id = ?', parsed.data.year_level, parsed.data.section, id)
+  } catch {
+    return res.status(409).json({ message: 'Section already exists for this year level' })
+  }
+
+  const updated = await db.get(
+    'SELECT section_id, year_level, section, created_at FROM sections WHERE section_id = ?',
+    id,
+  )
+  return res.json({ section: updated })
+})
+
+app.delete('/api/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid section id' })
+
+  const db = await getDb()
+  const existing = await db.get('SELECT section_id FROM sections WHERE section_id = ? LIMIT 1', id)
+  if (!existing) return res.status(404).json({ message: 'Section not found' })
+
+  await db.run('DELETE FROM sections WHERE section_id = ?', id)
+  return res.json({ ok: true })
+})
+
 const facultyTypeSchema = z
   .string()
   .trim()
