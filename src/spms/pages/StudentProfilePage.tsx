@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
-import { getStudent, updateStudent, type Student } from '../db/students'
+import { getStudent, type Student } from '../db/students'
 import { getStudentRecords } from '../db/studentRecords'
-import { listSports, seedSportsIfEmpty } from '../db/sports'
-import type { Sport } from '../db/spmsDb'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -17,14 +15,8 @@ export function StudentProfilePage() {
   const { user } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
-  const canEditProfile = user?.role === 'admin'
-  const canEditEligibility = user?.role === 'faculty'
+  const canEdit = user?.role === 'admin'
   const isOwnProfile = user?.role === 'student' && user?.studentId === id
-  const [sports, setSports] = useState<Sport[]>([])
-  const [savingEligibility, setSavingEligibility] = useState(false)
-  const [eligibilityError, setEligibilityError] = useState<string | null>(null)
-
-  const [draftSportsIds, setDraftSportsIds] = useState<string[]>([])
 
   useEffect(() => {
     let alive = true
@@ -41,38 +33,8 @@ export function StudentProfilePage() {
     }
   }, [id])
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        await seedSportsIfEmpty()
-        const all = await listSports({ activeOnly: false })
-        if (!alive) return
-        setSports(all)
-      } catch {
-        // ignore; UI will show empty options
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!student) return
-    setDraftSportsIds(Array.isArray(student.sportsAffiliations) ? student.sportsAffiliations : [])
-  }, [student])
-
   const name = useMemo(() => (student ? fullName(student) : 'Student'), [student])
   const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student])
-
-  const selectedSportNames = useMemo(() => {
-    if (!student) return []
-    const byId = new Map(sports.map((s) => [s.id, s.name]))
-    return (student.sportsAffiliations ?? []).map((sid: string) => byId.get(sid) ?? sid)
-  }, [sports, student])
-
-  const hasSportsAffiliations = (student?.sportsAffiliations ?? []).length > 0
 
   if (loading) {
     return (
@@ -147,7 +109,7 @@ export function StudentProfilePage() {
           </div>
 
           <div className="d-flex gap-2 mt-3 spms-no-print">
-            {canEditProfile && (
+            {canEdit && (
               <Link to={`/students/${student.id}/edit`} className="btn btn-primary rounded-4 px-4">
                 <i className="bi bi-pencil me-1" /> Edit
               </Link>
@@ -299,125 +261,14 @@ export function StudentProfilePage() {
                   <div className="fw-bold">
                     <i className="bi bi-dribbble me-2" /> Sports Participation
                   </div>
-                  <span className="spms-chip">
-                    <i className="bi bi-check-circle" /> {hasSportsAffiliations ? 'Assigned' : 'None'}
-                  </span>
+                  <span className="spms-chip"><i className="bi bi-check-circle" /> Cleared</span>
                 </div>
                 <div className="card-body">
-                  {selectedSportNames.length === 0 ? (
-                    emptySection('No sports affiliations recorded.')
-                  ) : (
-                    <div className="d-flex flex-wrap gap-2">
-                      {selectedSportNames.map((n) => (
-                        <span key={n} className="spms-chip">
-                          <i className="bi bi-dribbble" /> {n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {emptySection('No sports participation recorded.')}
                 </div>
               </div>
             </div>
           </div>
-
-          {(canEditEligibility || user?.role === 'registrar' || isOwnProfile) ? (
-            <div className="spms-card card mt-3">
-              <div className="card-header d-flex align-items-center justify-content-between">
-                <div className="fw-bold">
-                  <i className="bi bi-check2-square me-2" /> Sports Affiliations
-                </div>
-                <span className="spms-chip"><i className="bi bi-lock" /> Role-based</span>
-              </div>
-              <div className="card-body">
-                {!canEditEligibility ? (
-                  <div className="spms-muted small mb-3">
-                    View-only. Faculty maintains sports affiliations.
-                  </div>
-                ) : null}
-
-                <div className="row g-3">
-                  <div className="col-12">
-                    <div className="fw-semibold mb-1">Sports affiliations</div>
-                    <div className="spms-muted small mb-2">Select all sports the student is trying out for / affiliated with.</div>
-                    <div className="d-flex flex-wrap gap-2">
-                      {sports.length === 0 ? (
-                        <div className="spms-muted small">No sports configured yet. Add sports in the Faculty Sports page.</div>
-                      ) : (
-                        sports.map((sp) => (
-                          <label key={sp.id} className={`btn btn-sm rounded-4 ${draftSportsIds.includes(sp.id) ? 'btn-primary' : 'btn-outline-primary'}`}>
-                            <input
-                              type="checkbox"
-                              className="d-none"
-                              checked={draftSportsIds.includes(sp.id)}
-                              disabled={!canEditEligibility || !sp.isActive}
-                              onChange={(e) => {
-                                const checked = e.currentTarget.checked
-                                setDraftSportsIds((prev) => {
-                                  const set = new Set(prev)
-                                  if (checked) set.add(sp.id)
-                                  else set.delete(sp.id)
-                                  return Array.from(set)
-                                })
-                              }}
-                            />
-                            {sp.name}
-                            {!sp.isActive ? ' (inactive)' : ''}
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {eligibilityError ? (
-                  <div className="alert alert-danger mt-3 mb-0" role="alert">
-                    {eligibilityError}
-                  </div>
-                ) : null}
-
-                {canEditEligibility ? (
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    <button
-                      type="button"
-                      className="btn btn-primary rounded-4 px-4"
-                      disabled={savingEligibility}
-                      onClick={async () => {
-                        if (!student) return
-                        setSavingEligibility(true)
-                        setEligibilityError(null)
-                        try {
-                          const updated = await updateStudent(student.id, {
-                            sportsAffiliations: draftSportsIds,
-                          })
-                          setStudent(updated)
-                        } catch (e) {
-                          setEligibilityError(e instanceof Error ? e.message : 'Failed to save eligibility fields')
-                        } finally {
-                          setSavingEligibility(false)
-                        }
-                      }}
-                    >
-                      <i className="bi bi-save me-1" /> Save
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary rounded-4 px-4"
-                      disabled={savingEligibility}
-                      onClick={() => {
-                        setDraftSportsIds(Array.isArray(student.sportsAffiliations) ? student.sportsAffiliations : [])
-                        setEligibilityError(null)
-                      }}
-                    >
-                      Reset
-                    </button>
-                    <Link to="/faculty/sports" className="btn btn-outline-primary rounded-4 px-4">
-                      Manage Sports List
-                    </Link>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
 
           <div className="spms-card card mt-3">
             <div className="card-header d-flex align-items-center justify-content-between">

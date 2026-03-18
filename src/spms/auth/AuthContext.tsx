@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { AuthUser } from './types'
 import { getStoredAuth, setStoredAuth, clearStoredAuth, login as doLogin, logout as doLogout } from './authService'

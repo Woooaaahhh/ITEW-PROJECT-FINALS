@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 type StatCardProps = {
   icon: string
   value: string | number

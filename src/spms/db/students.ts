@@ -1,12 +1,54 @@
-import { nowIso, openSpmsDb, type Student } from './spmsDb'
+import { openDB, type DBSchema } from 'idb'
 
-export type { Student } from './spmsDb'
+export type Student = {
+  id: string
+  profilePictureDataUrl?: string | null
+  firstName: string
+  middleName?: string | null
+  lastName: string
+  birthdate?: string | null
+  gender?: string | null
+  address?: string | null
+  email?: string | null
+  contactNumber?: string | null
+  yearLevel?: '1st' | '2nd' | '3rd' | '4th' | string | null
+  section?: string | null
+  createdAt: string
+  updatedAt: string
+}
 
-function withEligibilityDefaults(s: Student): Student {
-  return {
-    ...s,
-    sportsAffiliations: Array.isArray(s.sportsAffiliations) ? s.sportsAffiliations : [],
+type SpmsDb = DBSchema & {
+  students: {
+    key: string
+    value: Student
+    indexes: { 'by-updatedAt': string; 'by-lastName': string }
   }
+  meta: {
+    key: string
+    value: { key: string; value: string }
+  }
+}
+
+const DB_NAME = 'spms-db'
+const DB_VERSION = 1
+
+async function getDb() {
+  return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains('students')) {
+        const store = db.createObjectStore('students', { keyPath: 'id' })
+        store.createIndex('by-updatedAt', 'updatedAt')
+        store.createIndex('by-lastName', 'lastName')
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' })
+      }
+    },
+  })
+}
+
+function nowIso() {
+  return new Date().toISOString()
 }
 
 function makeId() {
@@ -15,21 +57,18 @@ function makeId() {
 }
 
 export async function listStudents(): Promise<Student[]> {
-  const db = await openSpmsDb()
+  const db = await getDb()
   const all = await db.getAll('students')
-  return all
-    .map(withEligibilityDefaults)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 export async function getStudent(id: string): Promise<Student | undefined> {
-  const db = await openSpmsDb()
-  const s = await db.get('students', id)
-  return s ? withEligibilityDefaults(s) : undefined
+  const db = await getDb()
+  return db.get('students', id)
 }
 
 export async function createStudent(input: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> {
-  const db = await openSpmsDb()
+  const db = await getDb()
   const ts = nowIso()
   const student: Student = {
     id: makeId(),
@@ -38,28 +77,28 @@ export async function createStudent(input: Omit<Student, 'id' | 'createdAt' | 'u
     ...input,
   }
   await db.put('students', student)
-  return withEligibilityDefaults(student)
+  return student
 }
 
 export async function updateStudent(
   id: string,
   patch: Partial<Omit<Student, 'id' | 'createdAt' | 'updatedAt'>>,
 ): Promise<Student> {
-  const db = await openSpmsDb()
+  const db = await getDb()
   const existing = await db.get('students', id)
   if (!existing) throw new Error('Student not found')
   const updated: Student = { ...existing, ...patch, updatedAt: nowIso() }
   await db.put('students', updated)
-  return withEligibilityDefaults(updated)
+  return updated
 }
 
 export async function deleteStudent(id: string): Promise<void> {
-  const db = await openSpmsDb()
+  const db = await getDb()
   await db.delete('students', id)
 }
 
 export async function seedIfEmpty(): Promise<void> {
-  const db = await openSpmsDb()
+  const db = await getDb()
   const seeded = await db.get('meta', 'seeded')
   if (seeded?.value === 'true') return
 
@@ -84,7 +123,6 @@ export async function seedIfEmpty(): Promise<void> {
       yearLevel: '2nd',
       section: 'BSIT-2A',
       profilePictureDataUrl: null,
-      sportsAffiliations: [],
       createdAt: ts,
       updatedAt: ts,
     },
@@ -101,7 +139,6 @@ export async function seedIfEmpty(): Promise<void> {
       yearLevel: '1st',
       section: 'BSBA-1B',
       profilePictureDataUrl: null,
-      sportsAffiliations: [],
       createdAt: ts,
       updatedAt: ts,
     },
@@ -118,7 +155,6 @@ export async function seedIfEmpty(): Promise<void> {
       yearLevel: '2nd',
       section: 'BSIT-2A',
       profilePictureDataUrl: null,
-      sportsAffiliations: [],
       createdAt: ts,
       updatedAt: ts,
     },

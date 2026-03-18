@@ -114,16 +114,16 @@ export function canAccessPath(
   }
 
   if (role === 'faculty') {
-    if (path === '/registrar' || path === '/student' || path.startsWith('/students/new'))
+    if (path === '/registrar' || path === '/student' || path.startsWith('/students/new') || path === '/reports')
       return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
+if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/sections')) return false
     return (
       path === '/' ||
       path === '/faculty' ||
       path === '/faculty/violations' ||
       path === '/faculty/skills' ||
-      path === '/faculty/sports' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
