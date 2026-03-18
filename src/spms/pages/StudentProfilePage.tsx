@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { getStudent, updateStudent, type Student } from '../db/students'
 import { getStudentRecords } from '../db/studentRecords'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
+import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
 import type { Sport } from '../db/spmsDb'
 
 function fullName(s: Student) {
@@ -26,6 +27,9 @@ export function StudentProfilePage() {
 
   const [draftSportsIds, setDraftSportsIds] = useState<string[]>([])
 
+  const [skills, setSkills] = useState<{ id: string; name: string; category: string; isActive: boolean }[]>([])
+  const [studentSkillIds, setStudentSkillIds] = useState<string[]>([])
+
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -35,6 +39,30 @@ export function StudentProfilePage() {
       if (!alive) return
       setStudent(s ?? null)
       setLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [id])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!id) return
+      try {
+        await seedSkillsIfEmpty()
+        const [allSkills, rows] = await Promise.all([
+          listSkills({ activeOnly: false }),
+          listStudentSkills(id),
+        ])
+        if (!alive) return
+        setSkills(allSkills)
+        setStudentSkillIds(rows.map((r) => r.skillId))
+      } catch {
+        if (!alive) return
+        setSkills([])
+        setStudentSkillIds([])
+      }
     })()
     return () => {
       alive = false
@@ -73,6 +101,15 @@ export function StudentProfilePage() {
   }, [sports, student])
 
   const hasSportsAffiliations = (student?.sportsAffiliations ?? []).length > 0
+
+  const skillsById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills])
+  const skillChips = useMemo(() => {
+    return studentSkillIds
+      .map((sid) => skillsById.get(sid))
+      .filter(Boolean)
+      .map((sk) => sk!)
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+  }, [studentSkillIds, skillsById])
 
   if (loading) {
     return (
@@ -320,7 +357,7 @@ export function StudentProfilePage() {
             </div>
           </div>
 
-          {(canEditEligibility || user?.role === 'registrar' || isOwnProfile) ? (
+          {(canEditEligibility || user?.role === 'admin' || isOwnProfile) ? (
             <div className="spms-card card mt-3">
               <div className="card-header d-flex align-items-center justify-content-between">
                 <div className="fw-bold">
@@ -428,8 +465,26 @@ export function StudentProfilePage() {
             </div>
             <div className="card-body">
               <div className="d-flex flex-wrap gap-2">
-                {emptySection('No skills recorded yet.')}
+                {skillChips.length === 0 ? (
+                  emptySection('No skills recorded yet.')
+                ) : (
+                  skillChips.map((sk) => (
+                    <span
+                      key={sk.id}
+                      className={`spms-chip ${sk.isActive ? '' : 'opacity-50'}`}
+                      title={sk.isActive ? 'Active skill' : 'Inactive skill'}
+                    >
+                      <i className="bi bi-award" /> {sk.name}
+                      <span className="ms-1 spms-muted">({sk.category})</span>
+                    </span>
+                  ))
+                )}
               </div>
+              {user?.role === 'faculty' ? (
+                <div className="spms-muted small mt-2">
+                  To edit skills for this student, go to <Link to="/faculty/skills" className="fw-semibold">Faculty Skills</Link>.
+                </div>
+              ) : null}
             </div>
           </div>
 
