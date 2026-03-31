@@ -32,6 +32,26 @@ body {
   border-right: 1px solid rgba(255,255,255,.08);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  transition:
+    width .26s ease,
+    opacity .22s ease,
+    transform .26s ease,
+    border-color .22s ease;
+}
+
+@media (min-width: 992px) {
+  .spms-sidebar-desktop-hidden {
+    width: 0 !important;
+    opacity: 0;
+    transform: translateX(-14px);
+    border-right-color: transparent;
+    pointer-events: none;
+  }
+}
+
+.spms-main {
+  transition: width .26s ease;
 }
 
 .spms-brand {
@@ -106,6 +126,36 @@ body {
 
 .spms-page-title {
   letter-spacing: -0.02em;
+}
+
+.spms-breadcrumb-wrap {
+  margin-bottom: 14px;
+}
+
+.spms-breadcrumb {
+  padding: 10px 14px;
+  border: 1px solid var(--spms-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.spms-breadcrumb .breadcrumb-item {
+  font-size: .9rem;
+}
+
+.spms-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  color: #94a3b8;
+}
+
+.spms-breadcrumb .breadcrumb-item a {
+  color: var(--spms-primary);
+}
+
+.spms-breadcrumb .breadcrumb-item.active {
+  color: var(--spms-text);
+  font-weight: 600;
 }
 
 .spms-card {

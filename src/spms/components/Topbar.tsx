@@ -63,7 +63,7 @@ export function Topbar({
             {onToggleSidebar && (
               <button
                 type="button"
-                className="btn btn-outline-secondary d-lg-none rounded-3 px-3"
+                className="btn btn-outline-secondary rounded-3 px-3"
                 onClick={onToggleSidebar}
                 aria-label="Toggle sidebar"
               >

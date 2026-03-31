@@ -268,7 +268,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/reports',
         element: (
-          <RoleProtectedRoute allowedRoles={['admin']}>
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty']}>
             <ReportsPage />
           </RoleProtectedRoute>
         ),

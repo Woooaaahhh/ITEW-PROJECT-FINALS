@@ -47,9 +47,5 @@ export function RoleProtectedRoute({ children, allowedRoles }: RoleProtectedRout
     return <Navigate to={to} replace />
   }
 
-  if (user.role === 'student' && studentIdFromPath && user.studentId !== studentIdFromPath) {
-    return <Navigate to="/student" replace />
-  }
-
   return <>{children}</>
 }

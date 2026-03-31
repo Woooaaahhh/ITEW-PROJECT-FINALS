@@ -189,7 +189,7 @@ export function StudentProfilePage() {
                 <i className="bi bi-pencil me-1" /> Edit
               </Link>
             )}
-            {isOwnProfile ? (
+            {user?.role === 'student' ? (
               <Link to="/student" className="btn btn-outline-primary rounded-4 px-4">
                 Back to dashboard
               </Link>
