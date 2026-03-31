@@ -52,6 +52,9 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
                 <NavLink className={navClass} to="/faculty/violations">
                   <i className="bi bi-exclamation-triangle" /> Violations
                 </NavLink>
+                <NavLink className={navClass} to="/faculty/achievements">
+                  <i className="bi bi-journal-bookmark" /> Achievements
+                </NavLink>
                 <NavLink className={navClass} to="/faculty/skills">
                   <i className="bi bi-award" /> Skills
                 </NavLink>
@@ -89,6 +92,9 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
             </NavLink>
             <NavLink className={navClass} to="/student/violations">
               <i className="bi bi-exclamation-triangle" /> Violations
+            </NavLink>
+            <NavLink className={navClass} to="/student/achievements">
+              <i className="bi bi-journal-bookmark" /> Achievements
             </NavLink>
           </>
         )}

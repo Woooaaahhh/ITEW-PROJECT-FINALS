@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { getStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
+import { getStudentRecords } from '../db/studentRecords'
 import { InsightCard } from '../components/InsightCard'
 import { AcademicTable, type AcademicRow } from '../components/AcademicTable'
 import { SkillCard } from '../components/SkillCard'
@@ -16,7 +17,6 @@ const MOCK_SKILLS = [
   { name: 'Programming - Python', levelOrDescription: 'Intermediate', dateAdded: 'Feb 1, 2025', icon: 'bi-code-slash' },
   { name: 'Leadership', levelOrDescription: 'Workshop completed', dateAdded: 'Jan 15, 2025', icon: 'bi-people' },
 ]
-const MOCK_VIOLATIONS: ViolationRow[] = []
 const MOCK_ACTIVITY: ActivityItem[] = [
   { text: 'Skill added: Programming - Python', date: 'Feb 1, 2025', icon: 'bi-award' },
   { text: 'Academic record updated', date: 'Jan 20, 2025', icon: 'bi-journal-text' },
@@ -58,7 +58,21 @@ export function StudentDashboard() {
   const yearLevel = student?.yearLevel ?? '—'
   const section = student?.section ?? '—'
   const totalSkills = MOCK_SKILLS.length
-  const totalViolations = MOCK_VIOLATIONS.length
+
+  const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student])
+  const violationRows: ViolationRow[] = useMemo(
+    () =>
+      (records?.violations ?? []).map((v) => ({
+        id: v.id,
+        violationType: v.violation_type,
+        description: v.description,
+        dateRecorded: new Date(v.date).toLocaleDateString(),
+        status: v.status,
+      })),
+    [records],
+  )
+  const totalViolations = violationRows.length
+  const totalAchievements = records?.achievements.length ?? 0
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -94,6 +108,13 @@ export function StudentDashboard() {
               label="Total Violations"
             />
           </div>
+          <div className="col-6 col-lg-3">
+            <InsightCard
+              icon="bi-journal-bookmark"
+              value={loading ? '—' : totalAchievements}
+              label="Achievements"
+            />
+          </div>
         </div>
       </section>
 
@@ -121,7 +142,7 @@ export function StudentDashboard() {
         </div>
         <div className="col-12 col-lg-6">
           <h6 className="text-secondary fw-semibold mb-3">Violations</h6>
-          <ViolationTable rows={MOCK_VIOLATIONS} loading={loading} />
+          <ViolationTable rows={violationRows} loading={loading} />
         </div>
       </div>
 

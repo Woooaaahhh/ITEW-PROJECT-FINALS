@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { addAchievement, addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
 
-type RecordKind = 'violation' | 'achievement'
+type FacultyRecordsVariant = 'violations' | 'achievements'
 
 type ViolationPayload = {
   violation_type: string
@@ -40,8 +40,7 @@ function fullName(s: Student) {
   return parts.replace(/\s+/g, ' ').trim()
 }
 
-export function FacultyViolationsPage() {
-  const [activeKind, setActiveKind] = useState<RecordKind>('violation')
+function FacultyStudentRecordsPage({ variant }: { variant: FacultyRecordsVariant }) {
   const [students, setStudents] = useState<Student[]>([])
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
@@ -132,7 +131,7 @@ export function FacultyViolationsPage() {
 
     try {
       setSubmitting(true)
-      if (activeKind === 'violation') {
+      if (variant === 'violations') {
         const created = addViolation(selectedStudentId, { ...violationForm })
         const newItem: ApiViolation = {
           id: created.id,
@@ -174,6 +173,8 @@ export function FacultyViolationsPage() {
     }
   }
 
+  const isViolations = variant === 'violations'
+
   return (
     <div className="space-y-6">
       <div
@@ -181,19 +182,30 @@ export function FacultyViolationsPage() {
         style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
       >
         <div className="card-body">
-          <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div>
-              <h5 className="fw-bold mb-1">Student Conduct &amp; Participation</h5>
+              <h5 className="fw-bold mb-1">
+                {isViolations ? 'Violations' : 'Non-academic achievements'}
+              </h5>
               <p className="spms-muted small mb-0">
-                Record violations and non-academic achievements for a selected student.
+                {isViolations
+                  ? 'Record behavior incidents for a selected student.'
+                  : 'Record non-academic achievements and participation for a selected student.'}
               </p>
             </div>
-            <div className="d-flex gap-2">
+            <div className="d-flex flex-wrap gap-2">
+              <Link
+                to={isViolations ? '/faculty/achievements' : '/faculty/violations'}
+                className="btn btn-outline-primary btn-sm rounded-3"
+              >
+                <i className={`bi ${isViolations ? 'bi-journal-bookmark' : 'bi-exclamation-triangle'} me-1`} />
+                {isViolations ? 'Achievements' : 'Violations'}
+              </Link>
               <Link to="/students" className="btn btn-outline-secondary btn-sm rounded-3">
                 <i className="bi bi-people me-1" /> View Students
               </Link>
               <Link to="/faculty" className="btn btn-outline-secondary btn-sm rounded-3">
-                Back to Dashboard
+                Dashboard
               </Link>
             </div>
           </div>
@@ -235,33 +247,6 @@ export function FacultyViolationsPage() {
             </div>
           </div>
 
-          <div className="mb-3">
-            <div className="inline-flex rounded-full bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => setActiveKind('violation')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
-                  activeKind === 'violation'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Violation
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveKind('achievement')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
-                  activeKind === 'achievement'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Achievement
-              </button>
-            </div>
-          </div>
-
           {error && (
             <div className="alert alert-danger rounded-3 py-2 small mb-3" role="alert">
               {error}
@@ -274,7 +259,7 @@ export function FacultyViolationsPage() {
           )}
 
           <form onSubmit={handleSubmit} className="row g-3">
-            {activeKind === 'violation' ? (
+            {isViolations ? (
               <>
                 <div className="col-md-6">
                   <label className="form-label small fw-semibold">Violation Type</label>
@@ -387,7 +372,7 @@ export function FacultyViolationsPage() {
                 className="btn btn-primary btn-sm rounded-3 px-4"
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Record'}
+                {submitting ? 'Saving...' : isViolations ? 'Save Violation' : 'Save Achievement'}
               </button>
             </div>
           </form>
@@ -395,115 +380,106 @@ export function FacultyViolationsPage() {
       </div>
 
       <div className="row g-3">
-        <div className="col-12 col-xl-6">
+        <div className="col-12">
           <div
-            className="spms-card card border-0 overflow-hidden h-100"
+            className="spms-card card border-0 overflow-hidden"
             style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
           >
             <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="fw-semibold mb-0">Violations</h6>
-              <span className="spms-muted small">{sortedViolations.length} record(s)</span>
+              <h6 className="fw-semibold mb-0">
+                {isViolations ? 'Violations for this student' : 'Achievements for this student'}
+              </h6>
+              <span className="spms-muted small">
+                {(isViolations ? sortedViolations : sortedAchievements).length} record(s)
+              </span>
             </div>
             <div className="card-body p-0">
               <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0 spms-table">
-                  <thead>
-                    <tr className="spms-muted small">
-                      <th className="ps-4 py-3 fw-semibold">Violation Type</th>
-                      <th className="py-3 fw-semibold">Description</th>
-                      <th className="py-3 fw-semibold">Status</th>
-                      <th className="pe-4 py-3 fw-semibold text-end">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedViolations.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
-                          No violations recorded.
-                        </td>
+                {isViolations ? (
+                  <table className="table table-hover align-middle mb-0 spms-table">
+                    <thead>
+                      <tr className="spms-muted small">
+                        <th className="ps-4 py-3 fw-semibold">Violation Type</th>
+                        <th className="py-3 fw-semibold">Description</th>
+                        <th className="py-3 fw-semibold">Status</th>
+                        <th className="pe-4 py-3 fw-semibold text-end">Date</th>
                       </tr>
-                    ) : (
-                      sortedViolations.map((v) => (
-                        <tr key={v.id}>
-                          <td className="ps-4 py-3">{v.violation_type}</td>
-                          <td className="py-3">{v.description}</td>
-                          <td className="py-3">
-                            <span
-                              className="badge rounded-pill"
-                              style={{
-                                background:
-                                  v.status.toLowerCase() === 'resolved'
-                                    ? 'rgba(34, 197, 94, .15)'
-                                    : 'rgba(234, 179, 8, .15)',
-                                color:
-                                  v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
-                              }}
-                            >
-                              {v.status}
-                            </span>
-                          </td>
-                          <td className="pe-4 py-3 text-end spms-muted small">
-                            {new Date(v.date).toLocaleDateString()}
+                    </thead>
+                    <tbody>
+                      {sortedViolations.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
+                            No violations recorded.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-xl-6">
-          <div
-            className="spms-card card border-0 overflow-hidden h-100"
-            style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
-          >
-            <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="fw-semibold mb-0">Non-Academic Achievements</h6>
-              <span className="spms-muted small">{sortedAchievements.length} record(s)</span>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0 spms-table">
-                  <thead>
-                    <tr className="spms-muted small">
-                      <th className="ps-4 py-3 fw-semibold">Title</th>
-                      <th className="py-3 fw-semibold">Description</th>
-                      <th className="py-3 fw-semibold">Category</th>
-                      <th className="pe-4 py-3 fw-semibold text-end">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedAchievements.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
-                          No achievements recorded.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedAchievements.map((a) => (
-                        <tr key={a.id}>
-                          <td className="ps-4 py-3">{a.title}</td>
-                          <td className="py-3">{a.description}</td>
-                          <td className="py-3">
-                            {a.category ? (
-                              <span className="badge rounded-pill bg-primary-subtle text-primary">
-                                {a.category}
+                      ) : (
+                        sortedViolations.map((v) => (
+                          <tr key={v.id}>
+                            <td className="ps-4 py-3">{v.violation_type}</td>
+                            <td className="py-3">{v.description}</td>
+                            <td className="py-3">
+                              <span
+                                className="badge rounded-pill"
+                                style={{
+                                  background:
+                                    v.status.toLowerCase() === 'resolved'
+                                      ? 'rgba(34, 197, 94, .15)'
+                                      : 'rgba(234, 179, 8, .15)',
+                                  color:
+                                    v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
+                                }}
+                              >
+                                {v.status}
                               </span>
-                            ) : (
-                              <span className="spms-muted small">—</span>
-                            )}
-                          </td>
-                          <td className="pe-4 py-3 text-end spms-muted small">
-                            {new Date(a.date).toLocaleDateString()}
+                            </td>
+                            <td className="pe-4 py-3 text-end spms-muted small">
+                              {new Date(v.date).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="table table-hover align-middle mb-0 spms-table">
+                    <thead>
+                      <tr className="spms-muted small">
+                        <th className="ps-4 py-3 fw-semibold">Title</th>
+                        <th className="py-3 fw-semibold">Description</th>
+                        <th className="py-3 fw-semibold">Category</th>
+                        <th className="pe-4 py-3 fw-semibold text-end">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedAchievements.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
+                            No achievements recorded.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        sortedAchievements.map((a) => (
+                          <tr key={a.id}>
+                            <td className="ps-4 py-3">{a.title}</td>
+                            <td className="py-3">{a.description}</td>
+                            <td className="py-3">
+                              {a.category ? (
+                                <span className="badge rounded-pill bg-primary-subtle text-primary">
+                                  {a.category}
+                                </span>
+                              ) : (
+                                <span className="spms-muted small">—</span>
+                              )}
+                            </td>
+                            <td className="pe-4 py-3 text-end spms-muted small">
+                              {new Date(a.date).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>
@@ -511,4 +487,12 @@ export function FacultyViolationsPage() {
       </div>
     </div>
   )
+}
+
+export function FacultyViolationsPage() {
+  return <FacultyStudentRecordsPage variant="violations" />
+}
+
+export function FacultyAchievementsPage() {
+  return <FacultyStudentRecordsPage variant="achievements" />
 }

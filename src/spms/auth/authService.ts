@@ -39,9 +39,19 @@ export async function login(identifier: string, password: string): Promise<AuthU
     const res = await axios.post<ApiLoginResponse>('/api/login', { identifier, password })
     data = res.data
   } catch (err: unknown) {
-    const message =
-      axios.isAxiosError(err) ? (err.response?.data as { message?: string } | undefined)?.message : undefined
-    throw new Error(message || 'Invalid username/email or password')
+    if (axios.isAxiosError(err)) {
+      // If there's no response, it's usually a network/server issue (API not running).
+      if (!err.response) {
+        throw new Error('Cannot reach API server. Start it with: npm run dev:all (or npm run dev:api)')
+      }
+      // Vite dev proxy returns 5xx when the target (API) is down (ECONNREFUSED).
+      if (err.response.status >= 500) {
+        throw new Error('API server is not running. Start it with: npm run dev:all (or npm run dev:api)')
+      }
+      const message = (err.response?.data as { message?: string } | undefined)?.message
+      throw new Error(message || 'Invalid username/email or password')
+    }
+    throw new Error('Login failed. Please try again.')
   }
 
   const role = data.user.role
@@ -79,10 +89,17 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-case 'faculty':
-      return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/students']
+      return ['/', '/faculty', '/faculty/violations', '/faculty/achievements', '/faculty/skills', '/students']
     case 'student':
-      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
+      return [
+        '/',
+        '/student',
+        '/student/academic',
+        '/student/skills',
+        '/student/violations',
+        '/student/achievements',
+        '/students',
+      ]
     default:
       return ['/']
   }
@@ -115,16 +132,17 @@ export function canAccessPath(
   }
 
   if (role === 'faculty') {
-    if (path === '/registrar' || path === '/student' || path.startsWith('/students/new') || path === '/reports')
+    if (path === '/registrar' || path === '/student' || path.startsWith('/students/new'))
       return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
-if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/sections')) return false
     return (
       path === '/' ||
       path === '/faculty' ||
       path === '/faculty/violations' ||
+      path === '/faculty/achievements' ||
       path === '/faculty/skills' ||
+      path === '/faculty/sports' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
@@ -143,7 +161,8 @@ if (path.startsWith('/students/') && path.endsWith('/edit')) return false
       path === '/student' ||
       path === '/student/academic' ||
       path === '/student/skills' ||
-      path === '/student/violations'
+      path === '/student/violations' ||
+      path === '/student/achievements'
     )
   }
 

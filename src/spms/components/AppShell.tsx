@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useMatches, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useMatch, useMatches } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -17,9 +17,23 @@ export function AppShell() {
   const location = useLocation()
   const matches = useMatches()
   const meta = (matches[matches.length - 1]?.handle as PageMeta | undefined) ?? { title: 'SPMS' }
+  const studentProfileMatch = useMatch({ path: '/students/:id', end: true })
+  const profileStudentId = studentProfileMatch?.params?.id
+
+  const profileHeaderRight =
+    profileStudentId && user?.role === 'student' ? (
+      <Link className="btn btn-outline-primary rounded-4 px-3" to="/student">
+        <i className="bi bi-arrow-left me-1" /> Back
+      </Link>
+    ) : profileStudentId && (user?.role === 'admin' || user?.role === 'faculty') ? (
+      <Link className="btn btn-outline-primary rounded-4 px-3" to="/students">
+        <i className="bi bi-arrow-left me-1" /> Back
+      </Link>
+    ) : null
 
   const headerRight =
-    location.pathname === '/students' && user?.role !== 'admin' ? null : meta.right
+    profileHeaderRight ??
+    (location.pathname === '/students' && user?.role !== 'admin' ? null : meta.right)
 
   const overlayClass = useMemo(() => `spms-overlay${mobileOpen ? ' show' : ''}`, [mobileOpen])
   const showSearch = meta.showSearch === true
