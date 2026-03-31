@@ -97,7 +97,22 @@ export function StudentProfilePage() {
   const selectedSportNames = useMemo(() => {
     if (!student) return []
     const byId = new Map(sports.map((s) => [s.id, s.name]))
-    return (student.sportsAffiliations ?? []).map((sid: string) => byId.get(sid) ?? sid)
+    const byNameLower = new Set(sports.map((s) => s.name.toLowerCase().trim()))
+
+    // Supports both current IDs and any older name-based saved values.
+    const resolved = (student.sportsAffiliations ?? [])
+      .map((value: string) => {
+        const fromId = byId.get(value)
+        if (fromId) return fromId
+        const raw = String(value ?? '').trim()
+        if (!raw) return ''
+        if (byNameLower.has(raw.toLowerCase())) return raw
+        return raw
+      })
+      .filter(Boolean)
+
+    // Deduplicate while preserving order.
+    return Array.from(new Set(resolved))
   }, [sports, student])
 
   const hasSportsAffiliations = (student?.sportsAffiliations ?? []).length > 0
@@ -344,12 +359,17 @@ export function StudentProfilePage() {
                   {selectedSportNames.length === 0 ? (
                     emptySection('No sports affiliations recorded.')
                   ) : (
-                    <div className="d-flex flex-wrap gap-2">
-                      {selectedSportNames.map((n) => (
+                    <div className="d-flex flex-column gap-2">
+                      <div className="spms-muted small">
+                        Total selected sports: <span className="fw-semibold text-body">{selectedSportNames.length}</span>
+                      </div>
+                      <div className="d-flex flex-wrap gap-2">
+                        {selectedSportNames.map((n) => (
                         <span key={n} className="spms-chip">
                           <i className="bi bi-dribbble" /> {n}
                         </span>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -357,7 +377,7 @@ export function StudentProfilePage() {
             </div>
           </div>
 
-          {(canEditEligibility || user?.role === 'admin' || isOwnProfile) ? (
+          {(canEditEligibility || user?.role === 'admin') ? (
             <div className="spms-card card mt-3">
               <div className="card-header d-flex align-items-center justify-content-between">
                 <div className="fw-bold">
