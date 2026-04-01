@@ -42,6 +42,53 @@ export function FacultySkillsPage() {
   const [qualificationLoading, setQualificationLoading] = useState(false)
   const [qualificationError, setQualificationError] = useState<string | null>(null)
 
+  const qualificationKeywords: Record<Exclude<QualificationCategory, 'other'>, string[]> = {
+    programming: ['program', 'coding', 'code', 'software', 'developer', 'web', 'app', 'technical', 'it', 'computer'],
+    sports: ['sport', 'athlet', 'basketball', 'volleyball', 'football', 'soccer', 'badminton', 'swim', 'track', 'chess'],
+    academic: ['academic', 'study', 'research', 'math', 'science', 'english', 'history', 'quiz', 'debate', 'scholar'],
+    creative: ['creative', 'art', 'music', 'design', 'draw', 'paint', 'dance', 'theater', 'media', 'photo'],
+  }
+
+  const getQualifiedStudentsFromLocal = async (
+    selectedCategory: QualificationCategory,
+    otherCategoryValue: string,
+    allSkills: Skill[],
+    allStudents: Student[],
+  ): Promise<QualifiedStudent[]> => {
+    const otherValue = otherCategoryValue.trim().toLowerCase()
+    const keywords =
+      selectedCategory === 'other'
+        ? otherValue
+          ? [otherValue]
+          : []
+        : qualificationKeywords[selectedCategory]
+    if (keywords.length === 0) return []
+
+    const activeById = new Map(allSkills.filter((sk) => sk.isActive).map((sk) => [sk.id, sk]))
+    const rows = await Promise.all(
+      allStudents.map(async (st) => {
+        const assigned = await listStudentSkills(st.id)
+        const matched = assigned
+          .map((row) => activeById.get(row.skillId))
+          .filter((sk): sk is Skill => Boolean(sk))
+          .filter((sk) => {
+            const categoryLower = (sk.category ?? '').toLowerCase()
+            const nameLower = (sk.name ?? '').toLowerCase()
+            return keywords.some((kw) => categoryLower.includes(kw) || nameLower.includes(kw))
+          })
+        if (matched.length === 0) return null
+        const name = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+        return {
+          student_id: Number(st.id.replace(/\D+/g, '')) || 0,
+          user_id: 0,
+          name,
+          skills: matched.map((sk) => ({ category: sk.category, name: sk.name })),
+        } satisfies QualifiedStudent
+      }),
+    )
+    return rows.filter((row): row is QualifiedStudent => Boolean(row))
+  }
+
   const fetchSkills = async () => {
     setSkillsLoading(true)
     setSkillsError(null)
@@ -115,36 +162,31 @@ export function FacultySkillsPage() {
           params: { category: rawCategory },
         })
         if (!alive) return
-        setQualifiedStudents(res.data.students ?? [])
+        const apiStudents = res.data.students ?? []
+        if (apiStudents.length > 0) {
+          setQualifiedStudents(apiStudents)
+        } else {
+          const localRows = await getQualifiedStudentsFromLocal(
+            qualificationCategory,
+            qualificationCategoryOther,
+            skills,
+            students,
+          )
+          if (!alive) return
+          setQualifiedStudents(localRows)
+        }
       } catch (e: unknown) {
         // Fallback to local IndexedDB data so this section still works
         // when the API server is unavailable.
         try {
-          const normalizedCategory = rawCategory.toLowerCase()
-          const activeById = new Map(skills.filter((sk) => sk.isActive).map((sk) => [sk.id, sk]))
-          const rows = await Promise.all(
-            students.map(async (st) => {
-              const assigned = await listStudentSkills(st.id)
-              const matched = assigned
-                .map((row) => activeById.get(row.skillId))
-                .filter((sk): sk is Skill => Boolean(sk))
-                .filter((sk) => {
-                  const categoryLower = (sk.category ?? '').toLowerCase()
-                  const nameLower = (sk.name ?? '').toLowerCase()
-                  return categoryLower.includes(normalizedCategory) || nameLower.includes(normalizedCategory)
-                })
-              if (matched.length === 0) return null
-              const name = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
-              return {
-                student_id: Number(st.id.replace(/\D+/g, '')) || 0,
-                user_id: 0,
-                name,
-                skills: matched.map((sk) => ({ category: sk.category, name: sk.name })),
-              } satisfies QualifiedStudent
-            }),
+          const localRows = await getQualifiedStudentsFromLocal(
+            qualificationCategory,
+            qualificationCategoryOther,
+            skills,
+            students,
           )
           if (!alive) return
-          setQualifiedStudents(rows.filter((row): row is QualifiedStudent => Boolean(row)))
+          setQualifiedStudents(localRows)
           setQualificationError(null)
         } catch {
           if (!alive) return
