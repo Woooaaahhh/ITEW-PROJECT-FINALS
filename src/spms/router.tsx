@@ -18,10 +18,7 @@ import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
-import { StudentAcademicPage } from './pages/StudentAcademicPage'
-import { StudentSkillsPage } from './pages/StudentSkillsPage'
-import { StudentAchievementsPage } from './pages/StudentAchievementsPage'
-import { StudentViolationsPage } from './pages/StudentViolationsPage'
+import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
@@ -77,27 +74,7 @@ const facultyAcademicHandle: PageMeta = {
 
 const studentHandle: PageMeta = {
   title: 'Student Dashboard',
-  subtitle: 'View your profile and academic info',
-}
-
-const studentAcademicHandle: PageMeta = {
-  title: 'Academic History',
-  subtitle: 'View your academic records',
-}
-
-const studentSkillsHandle: PageMeta = {
-  title: 'Skills',
-  subtitle: 'View your recorded skills',
-}
-
-const studentViolationsHandle: PageMeta = {
-  title: 'Violations',
-  subtitle: 'Your official violation records',
-}
-
-const studentAchievementsHandle: PageMeta = {
-  title: 'Achievements',
-  subtitle: 'Your non-academic achievements',
+  subtitle: 'Browse students and open a profile for full details',
 }
 
 const studentsHandle: PageMeta = {
@@ -123,13 +100,6 @@ const addHandle: PageMeta = {
 const profileHandle: PageMeta = {
   title: 'Student Profile',
   subtitle: 'View complete student information',
-  right: (
-    <div className="d-flex gap-2">
-      <Link className="btn btn-outline-primary rounded-4 px-3" to="/students">
-        <i className="bi bi-arrow-left me-1" /> Back
-      </Link>
-    </div>
-  ),
 }
 
 const editHandle: PageMeta = {
@@ -258,37 +228,37 @@ export const spmsRouter = createBrowserRouter([
         path: '/student/academic',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
-            <StudentAcademicPage />
+            <StudentLegacyProfileRedirect />
           </RoleProtectedRoute>
         ),
-        handle: studentAcademicHandle,
+        handle: studentHandle,
       },
       {
         path: '/student/skills',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
-            <StudentSkillsPage />
+            <StudentLegacyProfileRedirect />
           </RoleProtectedRoute>
         ),
-        handle: studentSkillsHandle,
+        handle: studentHandle,
       },
       {
         path: '/student/violations',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
-            <StudentViolationsPage />
+            <StudentLegacyProfileRedirect />
           </RoleProtectedRoute>
         ),
-        handle: studentViolationsHandle,
+        handle: studentHandle,
       },
       {
         path: '/student/achievements',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
-            <StudentAchievementsPage />
+            <StudentLegacyProfileRedirect />
           </RoleProtectedRoute>
         ),
-        handle: studentAchievementsHandle,
+        handle: studentHandle,
       },
       {
         path: '/students',

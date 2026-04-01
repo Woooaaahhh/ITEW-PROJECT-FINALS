@@ -99,14 +99,7 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/reports',
       ]
     case 'student':
-      return [
-        '/',
-        '/student',
-        '/student/academic',
-        '/student/skills',
-        '/student/violations',
-        '/student/achievements',
-      ]
+      return ['/', '/student']
     default:
       return ['/']
   }
@@ -165,14 +158,16 @@ export function canAccessPath(
       // Student users browse profiles from the dashboard grid; allow any student id (view-only in UI).
       return Boolean(studentIdFromPath)
     }
-    return (
-      path === '/' ||
-      path === '/student' ||
+    // Legacy sidebar URLs redirect to unified profile
+    if (
       path === '/student/academic' ||
       path === '/student/skills' ||
       path === '/student/violations' ||
       path === '/student/achievements'
-    )
+    ) {
+      return true
+    }
+    return path === '/' || path === '/student'
   }
 
   return false

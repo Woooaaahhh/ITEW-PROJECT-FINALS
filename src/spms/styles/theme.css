@@ -32,7 +32,9 @@ body {
   border-right: 1px solid rgba(255,255,255,.08);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition:
     width .26s ease,
     opacity .22s ease,
@@ -41,6 +43,26 @@ body {
 }
 
 @media (min-width: 992px) {
+  /* Lock app to viewport: only main content scrolls; sidebar stays fixed */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .spms-app {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .spms-main {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .spms-sidebar-desktop-hidden {
     width: 0 !important;
     opacity: 0;
@@ -108,6 +130,7 @@ body {
 .spms-main {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -276,6 +299,167 @@ body {
   margin-top: -46px;
   object-fit: cover;
   background: rgba(148, 163, 184, .22);
+}
+
+/* Student profile page — structured layout */
+.spms-profile-page {
+  --spms-profile-border: rgba(15, 23, 42, .08);
+}
+
+.spms-profile-hero-wrap {
+  position: relative;
+  margin-bottom: 1.75rem;
+}
+
+.spms-profile-cover {
+  height: 168px;
+  border-radius: 20px;
+}
+
+.spms-profile-hero-card {
+  margin: -76px 0 0;
+  border-radius: 20px;
+  border: 1px solid var(--spms-profile-border);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, .08);
+  position: relative;
+  z-index: 1;
+  background: #fff;
+}
+
+.spms-profile-hero-inner {
+  padding: 1.35rem 1.5rem 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+  .spms-profile-hero-inner {
+    padding: 1.1rem 1rem 1.25rem;
+  }
+}
+
+.spms-profile-hero-pic {
+  width: 112px;
+  height: 112px;
+  min-width: 112px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .12);
+  background: rgba(148, 163, 184, .18);
+}
+
+.spms-profile-name {
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  letter-spacing: -0.02em;
+}
+
+.spms-profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  border: 1px solid rgba(15, 23, 42, .1);
+  background: rgba(248, 250, 252, .95);
+  color: var(--spms-text, #0f172a);
+}
+
+.spms-profile-pill--active {
+  background: rgba(34, 197, 94, .12);
+  border-color: rgba(34, 197, 94, .28);
+  color: rgb(21, 128, 61);
+}
+
+.spms-profile-contact-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: .9rem;
+  color: rgba(15, 23, 42, .72);
+  max-width: 100%;
+}
+
+.spms-profile-contact-line i {
+  margin-top: 3px;
+  opacity: .55;
+  flex-shrink: 0;
+}
+
+.spms-profile-section-card {
+  border-radius: 16px;
+  border: 1px solid var(--spms-profile-border);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, .04);
+  overflow: hidden;
+  background: #fff;
+}
+
+.spms-profile-section-card .card-header {
+  background: rgba(248, 250, 252, .85);
+  border-bottom: 1px solid var(--spms-profile-border);
+  padding: 0.85rem 1.15rem;
+  font-weight: 600;
+  font-size: .95rem;
+}
+
+.spms-profile-section-card .card-body {
+  padding: 1.1rem 1.15rem;
+}
+
+.spms-profile-card-action {
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, .22);
+  background: rgba(37, 99, 235, .06);
+  color: rgb(29, 78, 216);
+}
+
+.spms-profile-kv {
+  display: grid;
+  grid-template-columns: minmax(100px, 38%) 1fr;
+  gap: 0.35rem 1rem;
+  font-size: .875rem;
+}
+
+.spms-profile-kv dt {
+  margin: 0;
+  color: rgba(15, 23, 42, .48);
+  font-weight: 500;
+}
+
+.spms-profile-kv dd {
+  margin: 0 0 0.65rem;
+  font-weight: 500;
+  color: rgba(15, 23, 42, .88);
+}
+
+.spms-profile-kv dd:last-of-type {
+  margin-bottom: 0;
+}
+
+.spms-profile-meta-foot {
+  font-size: .75rem;
+  color: rgba(15, 23, 42, .45);
+  border-top: 1px solid var(--spms-profile-border);
+  margin: 1rem -1.15rem -1.1rem;
+  padding: 0.65rem 1.15rem;
+  background: rgba(248, 250, 252, .5);
+}
+
+.spms-violation-item + .spms-violation-item {
+  border-top: 1px solid var(--spms-profile-border);
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.spms-achievement-item + .spms-achievement-item {
+  border-top: 1px solid var(--spms-profile-border);
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
 }
 
 @media (max-width: 991.98px){

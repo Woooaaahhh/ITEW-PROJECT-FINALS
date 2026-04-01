@@ -71,18 +71,6 @@ function buildCrumbs(pathname: string, role: string | undefined): Crumb[] {
       { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
       { label: 'Academic', icon: 'bi bi-mortarboard' },
     ],
-    '/student/academic': [
-      { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
-      { label: 'Academic History', icon: 'bi bi-journal-text' },
-    ],
-    '/student/skills': [
-      { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
-      { label: 'Skills', icon: 'bi bi-award' },
-    ],
-    '/student/violations': [
-      { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
-      { label: 'Violations', icon: 'bi bi-exclamation-triangle' },
-    ],
     '/users': [
       { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
       { label: 'Faculty', icon: 'bi bi-person-badge' },

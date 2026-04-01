@@ -94,28 +94,6 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             )}
           </>
         )}
-
-        {isStudent && (
-          <>
-            {user?.studentId && (
-              <NavLink className={navClass} to={`/students/${user.studentId}`}>
-                <i className="bi bi-person-badge" /> My Profile
-              </NavLink>
-            )}
-            <NavLink className={navClass} to="/student/academic">
-              <i className="bi bi-journal-text" /> Academic History
-            </NavLink>
-            <NavLink className={navClass} to="/student/skills">
-              <i className="bi bi-award" /> Skills
-            </NavLink>
-            <NavLink className={navClass} to="/student/violations">
-              <i className="bi bi-exclamation-triangle" /> Violations
-            </NavLink>
-            <NavLink className={navClass} to="/student/achievements">
-              <i className="bi bi-journal-bookmark" /> Achievements
-            </NavLink>
-          </>
-        )}
       </nav>
 
       <div className="mt-auto spms-sidebar-footer">

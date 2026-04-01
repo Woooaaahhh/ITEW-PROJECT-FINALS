@@ -78,9 +78,15 @@ export function ProfileCurrentAcademicBanner({ studentId }: { studentId: string 
 type AcademicHistoryCardProps = {
   studentId: string
   showFacultyForm: boolean
+  /** Root card class (default `spms-card` for faculty pages; use `spms-profile-section-card` on student profile). */
+  cardClassName?: string
 }
 
-export function ProfileAcademicHistoryCard({ studentId, showFacultyForm }: AcademicHistoryCardProps) {
+export function ProfileAcademicHistoryCard({
+  studentId,
+  showFacultyForm,
+  cardClassName = 'spms-card',
+}: AcademicHistoryCardProps) {
   const [tick, setTick] = useState(0)
   const records = useMemo(() => listAcademicRecordsSortedNewestFirst(studentId), [studentId, tick])
 
@@ -149,10 +155,10 @@ export function ProfileAcademicHistoryCard({ studentId, showFacultyForm }: Acade
   }
 
   return (
-    <div className="spms-card card">
+    <div className={`${cardClassName} card`}>
       <div className="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div className="fw-bold">
-          <i className="bi bi-mortarboard me-2" /> Academic History
+          <i className="bi bi-mortarboard me-2 text-primary" /> Academic history
         </div>
         <span className="spms-chip">
           <i className="bi bi-graph-up" /> Performance
