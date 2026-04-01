@@ -71,6 +71,12 @@ export function RegistrarDashboard() {
 
   const quickActions = [
     {
+      to: '/registrar/records',
+      icon: 'bi-clipboard-check',
+      label: 'Behavior & achievements',
+      desc: 'Review violations and non-academic records for all students',
+    },
+    {
       to: '/students',
       icon: 'bi-people',
       label: 'View Student List',

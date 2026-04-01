@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Student } from '../db/students'
-import { addViolation, getViolations, type ViolationRecord } from '../db/violations'
+import { addAchievement, getAchievements, type AchievementRecord } from '../db/achievements'
 import { useFacultyTargetStudent } from '../hooks/useFacultyTargetStudent'
 
 function fullName(s: Student) {
@@ -9,24 +9,24 @@ function fullName(s: Student) {
   return parts.replace(/\s+/g, ' ').trim()
 }
 
-type ViolationPayload = {
-  violation_type: string
+type AchievementPayload = {
+  title: string
   description: string
   date: string
-  status: string
+  category: string
 }
 
-export function FacultyViolationsPage() {
+export function FacultyAchievementsPage() {
   const { students, loadingStudents, selectedStudentId, setSelectedStudentId } = useFacultyTargetStudent()
-  const [rows, setRows] = useState<ViolationRecord[]>([])
+  const [rows, setRows] = useState<AchievementRecord[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [form, setForm] = useState<ViolationPayload>({
-    violation_type: '',
+  const [form, setForm] = useState<AchievementPayload>({
+    title: '',
     description: '',
     date: '',
-    status: 'Pending',
+    category: '',
   })
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export function FacultyViolationsPage() {
       setRows([])
       return
     }
-    setRows(getViolations(selectedStudentId))
+    setRows(getAchievements(selectedStudentId))
   }, [selectedStudentId])
 
   const sortedRows = useMemo(() => [...rows].sort((a, b) => (a.date < b.date ? 1 : -1)), [rows])
@@ -49,10 +49,10 @@ export function FacultyViolationsPage() {
     }
     try {
       setSubmitting(true)
-      const created = addViolation(selectedStudentId, { ...form })
+      const created = addAchievement(selectedStudentId, { ...form })
       setRows((prev) => [created, ...prev])
-      setForm({ violation_type: '', description: '', date: '', status: 'Pending' })
-      setSuccess('Violation saved successfully.')
+      setForm({ title: '', description: '', date: '', category: '' })
+      setSuccess('Achievement saved successfully.')
     } catch {
       setError('Unable to save record. Please check the form and try again.')
     } finally {
@@ -69,13 +69,15 @@ export function FacultyViolationsPage() {
         <div className="card-body">
           <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div>
-              <h5 className="fw-bold mb-1">Violations</h5>
-              <p className="spms-muted small mb-0">Record behavior incidents for a selected student.</p>
+              <h5 className="fw-bold mb-1">Non-academic achievements</h5>
+              <p className="spms-muted small mb-0">
+                Record non-academic achievements and participation for a selected student.
+              </p>
             </div>
             <div className="d-flex flex-wrap gap-2">
-              <Link to="/faculty/achievements" className="btn btn-outline-primary btn-sm rounded-3">
-                <i className="bi bi-journal-bookmark me-1" />
-                Achievements
+              <Link to="/faculty/violations" className="btn btn-outline-primary btn-sm rounded-3">
+                <i className="bi bi-exclamation-triangle me-1" />
+                Violations
               </Link>
               <Link to="/students" className="btn btn-outline-secondary btn-sm rounded-3">
                 <i className="bi bi-people me-1" /> View Students
@@ -136,13 +138,13 @@ export function FacultyViolationsPage() {
 
           <form onSubmit={handleSubmit} className="row g-3">
             <div className="col-md-6">
-              <label className="form-label small fw-semibold">Violation Type</label>
+              <label className="form-label small fw-semibold">Achievement Title</label>
               <input
                 type="text"
                 className="form-control form-control-sm rounded-3"
-                placeholder="e.g. Uniform, Attendance, Cheating"
-                value={form.violation_type}
-                onChange={(e) => setForm((prev) => ({ ...prev, violation_type: e.target.value }))}
+                placeholder="e.g. Programming Contest Winner"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
                 required
               />
             </div>
@@ -157,22 +159,21 @@ export function FacultyViolationsPage() {
               />
             </div>
             <div className="col-md-3">
-              <label className="form-label small fw-semibold">Status</label>
-              <select
-                className="form-select form-select-sm rounded-3"
-                value={form.status}
-                onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-              >
-                <option value="Pending">Pending</option>
-                <option value="Resolved">Resolved</option>
-              </select>
+              <label className="form-label small fw-semibold">Category</label>
+              <input
+                type="text"
+                className="form-control form-control-sm rounded-3"
+                placeholder="e.g. Sports, Programming, Leadership"
+                value={form.category}
+                onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+              />
             </div>
             <div className="col-12">
               <label className="form-label small fw-semibold">Description</label>
               <textarea
                 rows={3}
                 className="form-control form-control-sm rounded-3"
-                placeholder="Provide brief details of the violation."
+                placeholder="Provide brief details of the achievement or recognition."
                 value={form.description}
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 required
@@ -180,7 +181,7 @@ export function FacultyViolationsPage() {
             </div>
             <div className="col-12 d-flex justify-content-end gap-2 mt-2">
               <button type="submit" className="btn btn-primary btn-sm rounded-3 px-4" disabled={submitting}>
-                {submitting ? 'Saving...' : 'Save Violation'}
+                {submitting ? 'Saving...' : 'Save Achievement'}
               </button>
             </div>
           </form>
@@ -194,7 +195,7 @@ export function FacultyViolationsPage() {
             style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
           >
             <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="fw-semibold mb-0">Violations for this student</h6>
+              <h6 className="fw-semibold mb-0">Achievements for this student</h6>
               <span className="spms-muted small">{sortedRows.length} record(s)</span>
             </div>
             <div className="card-body p-0">
@@ -202,9 +203,9 @@ export function FacultyViolationsPage() {
                 <table className="table table-hover align-middle mb-0 spms-table">
                   <thead>
                     <tr className="spms-muted small">
-                      <th className="ps-4 py-3 fw-semibold">Violation Type</th>
+                      <th className="ps-4 py-3 fw-semibold">Title</th>
                       <th className="py-3 fw-semibold">Description</th>
-                      <th className="py-3 fw-semibold">Status</th>
+                      <th className="py-3 fw-semibold">Category</th>
                       <th className="pe-4 py-3 fw-semibold text-end">Date</th>
                     </tr>
                   </thead>
@@ -212,30 +213,23 @@ export function FacultyViolationsPage() {
                     {sortedRows.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
-                          No violations recorded.
+                          No achievements recorded.
                         </td>
                       </tr>
                     ) : (
-                      sortedRows.map((v) => (
-                        <tr key={v.id}>
-                          <td className="ps-4 py-3">{v.violation_type}</td>
-                          <td className="py-3">{v.description}</td>
+                      sortedRows.map((a) => (
+                        <tr key={a.id}>
+                          <td className="ps-4 py-3">{a.title}</td>
+                          <td className="py-3">{a.description}</td>
                           <td className="py-3">
-                            <span
-                              className="badge rounded-pill"
-                              style={{
-                                background:
-                                  v.status.toLowerCase() === 'resolved'
-                                    ? 'rgba(34, 197, 94, .15)'
-                                    : 'rgba(234, 179, 8, .15)',
-                                color: v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
-                              }}
-                            >
-                              {v.status}
-                            </span>
+                            {a.category ? (
+                              <span className="badge rounded-pill bg-primary-subtle text-primary">{a.category}</span>
+                            ) : (
+                              <span className="spms-muted small">—</span>
+                            )}
                           </td>
                           <td className="pe-4 py-3 text-end spms-muted small">
-                            {new Date(v.date).toLocaleDateString()}
+                            {new Date(a.date).toLocaleDateString()}
                           </td>
                         </tr>
                       ))

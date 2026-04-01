@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { RecordTable, type RecordRow } from '../components/RecordTable'
-import { getStudentRecords } from '../db/studentRecords'
+import { getAchievements } from '../db/achievements'
 import { formatStudentRecordDate } from './studentRecordViewUtils'
 
 export function StudentAchievementsPage() {
@@ -11,8 +11,7 @@ export function StudentAchievementsPage() {
 
   const achievementRows = useMemo(() => {
     if (!studentId) return [] as RecordRow[]
-    const rec = getStudentRecords(studentId)
-    return rec.achievements.map((a) => ({
+    return getAchievements(studentId).map((a) => ({
       recordType: a.category ? `${a.title} (${a.category})` : a.title,
       description: a.description,
       date: formatStudentRecordDate(a.date),

@@ -61,6 +61,11 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
               </>
             )}
             {role === 'admin' && (
+              <NavLink className={navClass} to="/registrar/records">
+                <i className="bi bi-clipboard-check" /> Behavior records
+              </NavLink>
+            )}
+            {role === 'admin' && (
               <NavLink className={navClass} to="/users">
                 <i className="bi bi-person-badge" /> Faculty
               </NavLink>

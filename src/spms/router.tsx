@@ -2,9 +2,9 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppShell, type PageMeta } from './components/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
-import { DashboardPage } from './pages/DashboardPage'
 import { RedirectToRoleDashboard } from './pages/RedirectToRoleDashboard'
 import { RegistrarDashboard } from './pages/RegistrarDashboard'
+import { RegistrarRecordsPage } from './pages/RegistrarRecordsPage'
 import { FacultyDashboard } from './pages/FacultyDashboard'
 import { StudentDashboard } from './pages/StudentDashboard'
 import { StudentsPage } from './pages/StudentsPage'
@@ -13,7 +13,8 @@ import { EditStudentPage } from './pages/EditStudentPage'
 import { StudentProfilePage } from './pages/StudentProfilePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SectionsPage } from './pages/SectionsPage'
-import { FacultyAchievementsPage, FacultyViolationsPage } from './pages/FacultyViolationsPage'
+import { FacultyAchievementsPage } from './pages/FacultyAchievementsPage'
+import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
@@ -32,6 +33,12 @@ const dashboardHandle: PageMeta = {
 const registrarHandle: PageMeta = {
   title: 'Registrar Dashboard',
   subtitle: 'Student profile management',
+  showSearch: true,
+}
+
+const registrarRecordsHandle: PageMeta = {
+  title: 'Behavior & achievements',
+  subtitle: 'Verify official violation and non-academic records',
   showSearch: true,
 }
 
@@ -162,6 +169,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: registrarHandle,
+      },
+      {
+        path: '/registrar/records',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin']}>
+            <RegistrarRecordsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: registrarRecordsHandle,
       },
       {
         path: '/faculty',

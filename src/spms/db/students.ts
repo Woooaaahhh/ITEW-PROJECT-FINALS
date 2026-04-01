@@ -30,17 +30,15 @@ type SpmsDb = DBSchema & {
 }
 
 const DB_NAME = 'spms-db'
-const DB_VERSION = 1
+const DB_VERSION = 5
 
 async function getDb() {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('students')) {
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
         const store = db.createObjectStore('students', { keyPath: 'id' })
         store.createIndex('by-updatedAt', 'updatedAt')
         store.createIndex('by-lastName', 'lastName')
-      }
-      if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })
       }
     },

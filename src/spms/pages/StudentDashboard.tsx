@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
 import { getStudentRecords } from '../db/studentRecords'
@@ -6,6 +7,7 @@ import { InsightCard } from '../components/InsightCard'
 import { AcademicTable, type AcademicRow } from '../components/AcademicTable'
 import { SkillCard } from '../components/SkillCard'
 import { ViolationTable, type ViolationRow } from '../components/ViolationTable'
+import { RecordTable } from '../components/RecordTable'
 import { ActivityFeed, type ActivityItem } from '../components/ActivityFeed'
 
 // Mock data until backend is available
@@ -27,6 +29,7 @@ export function StudentDashboard() {
   const { user } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
+  const [recordsTick, setRecordsTick] = useState(0)
 
   const studentId = useMemo(() => {
     if (user?.role === 'student' && user?.studentId) return user.studentId
@@ -55,11 +58,17 @@ export function StudentDashboard() {
     }
   }, [studentId])
 
+  useEffect(() => {
+    const onRecords = () => setRecordsTick((n) => n + 1)
+    window.addEventListener('spms-student-records-changed', onRecords)
+    return () => window.removeEventListener('spms-student-records-changed', onRecords)
+  }, [])
+
   const yearLevel = student?.yearLevel ?? '—'
   const section = student?.section ?? '—'
   const totalSkills = MOCK_SKILLS.length
 
-  const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student])
+  const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student, recordsTick])
   const violationRows: ViolationRow[] = useMemo(
     () =>
       (records?.violations ?? []).map((v) => ({
@@ -74,8 +83,32 @@ export function StudentDashboard() {
   const totalViolations = violationRows.length
   const totalAchievements = records?.achievements.length ?? 0
 
+  const achievementRows = useMemo(
+    () =>
+      (records?.achievements ?? []).map((a) => ({
+        recordType: a.category ? `${a.title} (${a.category})` : a.title,
+        description: a.description,
+        date: new Date(a.date).toLocaleDateString(),
+      })),
+    [records],
+  )
+
   return (
     <div className="d-flex flex-column gap-4">
+      {studentId ? (
+        <div className="d-flex flex-wrap gap-2 spms-no-print">
+          <Link to={`/students/${studentId}`} className="btn btn-outline-primary btn-sm rounded-3">
+            <i className="bi bi-person-badge me-1" /> Full profile &amp; records
+          </Link>
+          <Link to="/student/violations" className="btn btn-outline-secondary btn-sm rounded-3">
+            <i className="bi bi-exclamation-triangle me-1" /> All violations
+          </Link>
+          <Link to="/student/achievements" className="btn btn-outline-secondary btn-sm rounded-3">
+            <i className="bi bi-journal-bookmark me-1" /> All achievements
+          </Link>
+        </div>
+      ) : null}
+
       {/* Overview */}
       <section>
         <h6 className="text-secondary fw-semibold mb-3">Overview</h6>
@@ -145,6 +178,15 @@ export function StudentDashboard() {
           <ViolationTable rows={violationRows} loading={loading} />
         </div>
       </div>
+
+      <section>
+        <h6 className="text-secondary fw-semibold mb-3">Non-academic achievements</h6>
+        <RecordTable
+          title="Achievements (official)"
+          rows={achievementRows}
+          emptyMessage="No non-academic achievements recorded yet."
+        />
+      </section>
 
       {/* 6. Recent Activity */}
       <section>

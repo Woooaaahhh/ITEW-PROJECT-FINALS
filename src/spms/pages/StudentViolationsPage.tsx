@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { RecordTable, type RecordRow } from '../components/RecordTable'
-import { getStudentRecords } from '../db/studentRecords'
+import { getViolations } from '../db/violations'
 import { formatStudentRecordDate } from './studentRecordViewUtils'
 
 export function StudentViolationsPage() {
@@ -11,8 +11,7 @@ export function StudentViolationsPage() {
 
   const violationRows = useMemo(() => {
     if (!studentId) return [] as RecordRow[]
-    const rec = getStudentRecords(studentId)
-    return rec.violations.map((v) => ({
+    return getViolations(studentId).map((v) => ({
       recordType: `${v.violation_type} · ${v.status}`,
       description: v.description,
       date: formatStudentRecordDate(v.date),
