@@ -2,19 +2,19 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { RecordTable, type RecordRow } from '../components/RecordTable'
-import { getViolations } from '../db/violations'
+import { getAchievements } from '../db/achievements'
 import { formatStudentRecordDate } from './studentRecordViewUtils'
 
-export function StudentViolationsPage() {
+export function StudentAchievementsPage() {
   const { user } = useAuth()
   const studentId = user?.role === 'student' ? user.studentId : undefined
 
-  const violationRows = useMemo(() => {
+  const achievementRows = useMemo(() => {
     if (!studentId) return [] as RecordRow[]
-    return getViolations(studentId).map((v) => ({
-      recordType: `${v.violation_type} · ${v.status}`,
-      description: v.description,
-      date: formatStudentRecordDate(v.date),
+    return getAchievements(studentId).map((a) => ({
+      recordType: a.category ? `${a.title} (${a.category})` : a.title,
+      description: a.description,
+      date: formatStudentRecordDate(a.date),
     }))
   }, [studentId])
 
@@ -39,8 +39,8 @@ export function StudentViolationsPage() {
             <i className="bi bi-arrow-left me-1" /> Back to Dashboard
           </Link>
           <div className="d-flex flex-wrap gap-2">
-            <Link to="/student/achievements" className="btn btn-outline-secondary btn-sm rounded-3">
-              <i className="bi bi-journal-bookmark me-1" /> Achievements
+            <Link to="/student/violations" className="btn btn-outline-secondary btn-sm rounded-3">
+              <i className="bi bi-exclamation-triangle me-1" /> Violations
             </Link>
             <Link to={`/students/${studentId}`} className="btn btn-outline-primary btn-sm rounded-3">
               <i className="bi bi-person-badge me-1" /> My profile
@@ -48,9 +48,13 @@ export function StudentViolationsPage() {
           </div>
         </div>
         <p className="spms-muted small mb-4">
-          Official violation records entered by faculty. Also summarized on your student profile.
+          Non-academic achievements recorded by faculty. Also summarized on your student profile.
         </p>
-        <RecordTable title="Violations" rows={violationRows} emptyMessage="No violations recorded." />
+        <RecordTable
+          title="Non-academic achievements"
+          rows={achievementRows}
+          emptyMessage="No non-academic achievements recorded."
+        />
       </div>
     </div>
   )

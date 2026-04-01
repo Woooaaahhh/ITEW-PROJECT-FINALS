@@ -1,4 +1,5 @@
 export type ViolationRow = {
+  id?: string
   violationType: string
   description: string
   dateRecorded: string
@@ -49,7 +50,7 @@ export function ViolationTable({ rows, loading }: ViolationTableProps) {
                 </tr>
               ) : (
                 rows.map((r, i) => (
-                  <tr key={i}>
+                  <tr key={r.id ?? `${r.violationType}-${r.dateRecorded}-${i}`}>
                     <td className="ps-4 py-3">{r.violationType}</td>
                     <td className="py-3">{r.description}</td>
                     <td className="py-3 spms-muted small">{r.dateRecorded}</td>

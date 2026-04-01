@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
+import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
 import { deleteStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
 
 const yearOptions = ['1st', '2nd', '3rd', '4th']
@@ -34,8 +35,10 @@ export function StudentsPage() {
   const [section, setSection] = useState('')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
+  const [recordsRev, setRecordsRev] = useState(0)
   const canEdit = user?.role === 'admin'
   const canDelete = user?.role === 'admin'
+  const showBehaviorCounts = user?.role === 'admin' || user?.role === 'faculty'
 
   const q = useMemo(() => normalize(query), [query])
   const y = useMemo(() => normalize(year), [year])
@@ -55,6 +58,14 @@ export function StudentsPage() {
       alive = false
     }
   }, [])
+
+  useEffect(() => {
+    const onRecords = () => setRecordsRev((n) => n + 1)
+    window.addEventListener('spms-student-records-changed', onRecords)
+    return () => window.removeEventListener('spms-student-records-changed', onRecords)
+  }, [])
+
+  const behaviorCounts = useMemo(() => (showBehaviorCounts ? getBehaviorCountIndex() : {}), [showBehaviorCounts, recordsRev])
 
   const filtered = useMemo(() => students.filter((st) => matches(st, q, y, s)), [students, q, y, s])
 
@@ -112,13 +123,19 @@ export function StudentsPage() {
                 <th>Year Level</th>
                 <th>Section</th>
                 <th>Email</th>
+                {showBehaviorCounts ? (
+                  <>
+                    <th className="text-center">Violations</th>
+                    <th className="text-center">Achievements</th>
+                  </>
+                ) : null}
                 <th className="text-end pe-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="ps-3 py-4" colSpan={5}>
+                  <td className="ps-3 py-4" colSpan={showBehaviorCounts ? 7 : 5}>
                     <div className="spms-muted">Loading students...</div>
                   </td>
                 </tr>
@@ -137,6 +154,20 @@ export function StudentsPage() {
                   <td>{st.yearLevel ?? '—'}</td>
                   <td>{st.section ?? '—'}</td>
                   <td>{st.email ?? '—'}</td>
+                  {showBehaviorCounts ? (
+                    <>
+                      <td className="text-center">
+                        <span className="badge rounded-pill bg-warning-subtle text-warning-emphasis">
+                          {behaviorCounts[st.id]?.violations ?? 0}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <span className="badge rounded-pill bg-primary-subtle text-primary">
+                          {behaviorCounts[st.id]?.achievements ?? 0}
+                        </span>
+                      </td>
+                    </>
+                  ) : null}
                   <td className="text-end pe-3">
                     <div className="btn-group">
                       <Link className="btn btn-sm btn-outline-primary" to={`/students/${st.id}`} aria-label="View Profile">
@@ -169,7 +200,7 @@ export function StudentsPage() {
               ))}
               {!loading && filtered.length === 0 ? (
                 <tr>
-                  <td className="ps-3 py-4" colSpan={5}>
+                  <td className="ps-3 py-4" colSpan={showBehaviorCounts ? 7 : 5}>
                     <div className="spms-muted">No students matched your filters.</div>
                   </td>
                 </tr>
