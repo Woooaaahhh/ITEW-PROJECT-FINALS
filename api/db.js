@@ -62,6 +62,27 @@ export async function getDb() {
   `)
 
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS skills (
+      skill_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL CHECK (category IN ('programming','sports','academic','creative')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS student_skills (
+      student_id INTEGER NOT NULL,
+      skill_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (student_id, skill_id),
+      FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+      FOREIGN KEY (skill_id) REFERENCES skills(skill_id) ON DELETE CASCADE
+    );
+  `)
+
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS sections (
       section_id INTEGER PRIMARY KEY AUTOINCREMENT,
       year_level TEXT NOT NULL,
@@ -117,6 +138,70 @@ export async function getDb() {
     await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'sections_seeded', 'true')
   } else if (sectionsSeeded?.value !== 'true') {
     await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'sections_seeded', 'true')
+  }
+
+  const skillsSeeded = await db.get('SELECT value FROM meta WHERE key = ?', 'skills_seeded')
+  const skillCount = await db.get('SELECT COUNT(1) as count FROM skills')
+  if (skillsSeeded?.value !== 'true' && (skillCount?.count ?? 0) === 0) {
+    const seededSkills = [
+      { name: 'Python Programming', category: 'programming' },
+      { name: 'Web Development', category: 'programming' },
+      { name: 'Basketball', category: 'sports' },
+      { name: 'Volleyball', category: 'sports' },
+      { name: 'Mathematics', category: 'academic' },
+      { name: 'Science Quiz', category: 'academic' },
+      { name: 'Creative Writing', category: 'creative' },
+      { name: 'Digital Arts', category: 'creative' },
+    ]
+    for (const skill of seededSkills) {
+      await db.run(
+        'INSERT INTO skills (name, category, is_active) VALUES (?, ?, 1)',
+        skill.name,
+        skill.category,
+      )
+    }
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'skills_seeded', 'true')
+  } else if (skillsSeeded?.value !== 'true') {
+    await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'skills_seeded', 'true')
+  }
+
+  const studentSkillsSeeded = await db.get('SELECT value FROM meta WHERE key = ?', 'student_skills_seeded')
+  const studentSkillsCount = await db.get('SELECT COUNT(1) as count FROM student_skills')
+  if (studentSkillsSeeded?.value !== 'true' && (studentSkillsCount?.count ?? 0) === 0) {
+    const firstStudent = await db.get('SELECT student_id FROM students ORDER BY student_id ASC LIMIT 1')
+    if (firstStudent?.student_id) {
+      const programming = await db.get(
+        "SELECT skill_id FROM skills WHERE category = 'programming' ORDER BY skill_id ASC LIMIT 1",
+      )
+      const academic = await db.get(
+        "SELECT skill_id FROM skills WHERE category = 'academic' ORDER BY skill_id ASC LIMIT 1",
+      )
+      if (programming?.skill_id) {
+        await db.run(
+          'INSERT OR IGNORE INTO student_skills (student_id, skill_id) VALUES (?, ?)',
+          firstStudent.student_id,
+          programming.skill_id,
+        )
+      }
+      if (academic?.skill_id) {
+        await db.run(
+          'INSERT OR IGNORE INTO student_skills (student_id, skill_id) VALUES (?, ?)',
+          firstStudent.student_id,
+          academic.skill_id,
+        )
+      }
+    }
+    await db.run(
+      'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)',
+      'student_skills_seeded',
+      'true',
+    )
+  } else if (studentSkillsSeeded?.value !== 'true') {
+    await db.run(
+      'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)',
+      'student_skills_seeded',
+      'true',
+    )
   }
 
   return db

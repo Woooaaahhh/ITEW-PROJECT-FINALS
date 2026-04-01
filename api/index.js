@@ -45,6 +45,13 @@ function requireAdmin(req, res, next) {
   return next()
 }
 
+function requireStaff(req, res, next) {
+  if (req.auth?.role !== 'admin' && req.auth?.role !== 'faculty') {
+    return res.status(403).json({ message: 'Forbidden' })
+  }
+  return next()
+}
+
 app.post('/api/login', async (req, res) => {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -299,6 +306,68 @@ app.delete('/api/users/:id', authMiddleware, requireAdmin, async (req, res) => {
 
   await db.run('UPDATE users SET active = 0 WHERE user_id = ?', id)
   return res.json({ ok: true })
+})
+
+const qualificationCategorySchema = z.string().trim().min(1).max(80)
+
+app.get('/api/qualification-reports', authMiddleware, requireStaff, async (req, res) => {
+  const db = await getDb()
+  const categoryRaw = typeof req.query.category === 'string' ? req.query.category.trim().toLowerCase() : ''
+  if (categoryRaw) {
+    const parsed = qualificationCategorySchema.safeParse(categoryRaw)
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Invalid category' })
+    }
+  }
+
+  const params = []
+  let where = "WHERE sk.is_active = 1 AND u.active = 1 AND u.role = 'student'"
+  if (categoryRaw) {
+    where += ' AND sk.category = ?'
+    params.push(categoryRaw)
+  }
+
+  const rows = await db.all(
+    `
+    SELECT
+      s.student_id,
+      u.user_id,
+      st.first_name,
+      st.last_name,
+      sk.category,
+      sk.name AS skill_name
+    FROM student_skills s
+    INNER JOIN students st ON st.student_id = s.student_id
+    INNER JOIN users u ON u.user_id = st.user_id
+    INNER JOIN skills sk ON sk.skill_id = s.skill_id
+    ${where}
+    ORDER BY st.last_name ASC, st.first_name ASC, sk.name ASC
+    `,
+    ...params,
+  )
+
+  const map = new Map()
+  for (const row of rows) {
+    const key = String(row.student_id)
+    if (!map.has(key)) {
+      map.set(key, {
+        student_id: row.student_id,
+        user_id: row.user_id,
+        name: `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim(),
+        skills: [],
+      })
+    }
+    const student = map.get(key)
+    student.skills.push({
+      category: row.category,
+      name: row.skill_name,
+    })
+  }
+
+  return res.json({
+    category: categoryRaw || 'all',
+    students: Array.from(map.values()),
+  })
 })
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))

@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import axios from 'axios'
 import type { Skill, Student } from '../db/spmsDb'
 import { createSkill, deleteSkill, listSkills, seedSkillsIfEmpty, setStudentSkills, updateSkill, listStudentSkills } from '../db/skills'
 import { listStudents, seedIfEmpty } from '../db/students'
 
 export function FacultySkillsPage() {
+  type QualificationCategory = 'programming' | 'sports' | 'academic' | 'creative' | 'other'
+  type QualifiedStudent = {
+    student_id: number
+    user_id: number
+    name: string
+    skills: Array<{ category: string; name: string }>
+  }
+
   const [skills, setSkills] = useState<Skill[]>([])
   const [skillsLoading, setSkillsLoading] = useState(true)
   const [skillsError, setSkillsError] = useState<string | null>(null)
@@ -27,6 +36,11 @@ export function FacultySkillsPage() {
   const [savingAssign, setSavingAssign] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   const [savedModalOpen, setSavedModalOpen] = useState(false)
+  const [qualificationCategory, setQualificationCategory] = useState<QualificationCategory>('programming')
+  const [qualificationCategoryOther, setQualificationCategoryOther] = useState('')
+  const [qualifiedStudents, setQualifiedStudents] = useState<QualifiedStudent[]>([])
+  const [qualificationLoading, setQualificationLoading] = useState(false)
+  const [qualificationError, setQualificationError] = useState<string | null>(null)
 
   const fetchSkills = async () => {
     setSkillsLoading(true)
@@ -81,6 +95,72 @@ export function FacultySkillsPage() {
       alive = false
     }
   }, [selectedStudentId])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const rawCategory =
+        qualificationCategory === 'other'
+          ? qualificationCategoryOther.trim().toLowerCase()
+          : qualificationCategory
+      if (!rawCategory) {
+        setQualifiedStudents([])
+        setQualificationError(null)
+        return
+      }
+      setQualificationLoading(true)
+      setQualificationError(null)
+      try {
+        const res = await axios.get<{ students: QualifiedStudent[] }>('/api/qualification-reports', {
+          params: { category: rawCategory },
+        })
+        if (!alive) return
+        setQualifiedStudents(res.data.students ?? [])
+      } catch (e: unknown) {
+        // Fallback to local IndexedDB data so this section still works
+        // when the API server is unavailable.
+        try {
+          const normalizedCategory = rawCategory.toLowerCase()
+          const activeById = new Map(skills.filter((sk) => sk.isActive).map((sk) => [sk.id, sk]))
+          const rows = await Promise.all(
+            students.map(async (st) => {
+              const assigned = await listStudentSkills(st.id)
+              const matched = assigned
+                .map((row) => activeById.get(row.skillId))
+                .filter((sk): sk is Skill => Boolean(sk))
+                .filter((sk) => {
+                  const categoryLower = (sk.category ?? '').toLowerCase()
+                  const nameLower = (sk.name ?? '').toLowerCase()
+                  return categoryLower.includes(normalizedCategory) || nameLower.includes(normalizedCategory)
+                })
+              if (matched.length === 0) return null
+              const name = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+              return {
+                student_id: Number(st.id.replace(/\D+/g, '')) || 0,
+                user_id: 0,
+                name,
+                skills: matched.map((sk) => ({ category: sk.category, name: sk.name })),
+              } satisfies QualifiedStudent
+            }),
+          )
+          if (!alive) return
+          setQualifiedStudents(rows.filter((row): row is QualifiedStudent => Boolean(row)))
+          setQualificationError(null)
+        } catch {
+          if (!alive) return
+          const msg = axios.isAxiosError(e)
+            ? (e.response?.data as { message?: string } | undefined)?.message
+            : undefined
+          setQualificationError(msg || 'Failed to load qualification results.')
+        }
+      } finally {
+        if (alive) setQualificationLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [qualificationCategory, qualificationCategoryOther, skills, students])
 
   const activeSkills = useMemo(() => skills.filter((s) => s.isActive), [skills])
   const activeSkillsById = useMemo(() => new Map(activeSkills.map((s) => [s.id, s])), [activeSkills])
@@ -471,6 +551,85 @@ export function FacultySkillsPage() {
               >
                 Reset
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="spms-card card border-0 mt-4" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+          <div className="card-body">
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <h6 className="fw-semibold mb-0">Qualification by Category</h6>
+              <span className="spms-chip">
+                <i className="bi bi-people" /> {qualifiedStudents.length} qualified
+              </span>
+            </div>
+
+            <div className="row g-2 mb-3">
+              <div className="col-12 col-lg-5">
+                <label className="form-label small fw-semibold mb-1">Category</label>
+                <select
+                  className="form-select"
+                  value={qualificationCategory}
+                  onChange={(e) => setQualificationCategory(e.target.value as QualificationCategory)}
+                >
+                  <option value="programming">Programming</option>
+                  <option value="sports">Sports</option>
+                  <option value="academic">Academic</option>
+                  <option value="creative">Creative</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="col-12 col-lg-7">
+                <label className="form-label small fw-semibold mb-1">Other Category</label>
+                <input
+                  className="form-control"
+                  placeholder="Type category directly (e.g. robotics)"
+                  value={qualificationCategoryOther}
+                  onChange={(e) => setQualificationCategoryOther(e.target.value)}
+                  disabled={qualificationCategory !== 'other'}
+                />
+              </div>
+            </div>
+
+            {qualificationError ? (
+              <div className="alert alert-danger py-2 mb-3">
+                <i className="bi bi-exclamation-circle me-2" />
+                {qualificationError}
+              </div>
+            ) : null}
+
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0 spms-table">
+                <thead>
+                  <tr className="spms-muted small">
+                    <th className="py-3 fw-semibold">Student Name</th>
+                    <th className="py-3 fw-semibold">Relevant Skills</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {qualificationLoading ? (
+                    <tr>
+                      <td className="py-3" colSpan={2}>
+                        <div className="spms-muted">Loading qualification results...</div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!qualificationLoading && qualifiedStudents.length === 0 ? (
+                    <tr>
+                      <td className="py-3" colSpan={2}>
+                        <div className="spms-muted">No qualified students found for this category.</div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!qualificationLoading &&
+                    qualifiedStudents.map((st) => (
+                      <tr key={st.student_id}>
+                        <td className="fw-semibold">{st.name || `Student #${st.student_id}`}</td>
+                        <td>{st.skills.map((s) => s.name).join(', ') || '—'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
