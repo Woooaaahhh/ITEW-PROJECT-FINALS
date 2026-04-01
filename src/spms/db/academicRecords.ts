@@ -24,7 +24,7 @@ function makeId() {
   return `acr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function readAll(): Record<string, AcademicRecord[]> {
+function readStorageRaw(): Record<string, AcademicRecord[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
@@ -33,6 +33,50 @@ function readAll(): Record<string, AcademicRecord[]> {
   } catch {
     return {}
   }
+}
+
+/** Records from the removed localStorage demo academic seeder. */
+function isLegacyDemoRecord(r: AcademicRecord): boolean {
+  return (
+    r.schoolYear === '2024-2025' &&
+    (r.semester === '1st Semester' || r.semester === '2nd Semester') &&
+    (r.gwa === 1.75 || r.gwa === 1.5) &&
+    r.honors === "Dean's List"
+  )
+}
+
+let legacyDemoMigrated = false
+
+/** One-time: remove auto-seeded demo rows and clear the seed flag. */
+function migrateLegacyDemoAcademicOnce() {
+  if (legacyDemoMigrated) return
+  legacyDemoMigrated = true
+  try {
+    if (localStorage.getItem(SEEDED_KEY) !== 'true') return
+    const all = readStorageRaw()
+    let changed = false
+    for (const sid of Object.keys(all)) {
+      const list = all[sid]
+      if (!Array.isArray(list)) continue
+      const filtered = list.filter((r) => !isLegacyDemoRecord(r))
+      if (filtered.length !== list.length) {
+        changed = true
+        if (filtered.length === 0) delete all[sid]
+        else all[sid] = filtered
+      }
+    }
+    if (changed) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+    }
+    localStorage.removeItem(SEEDED_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+function readAll(): Record<string, AcademicRecord[]> {
+  migrateLegacyDemoAcademicOnce()
+  return readStorageRaw()
 }
 
 function writeAll(all: Record<string, AcademicRecord[]>) {
@@ -97,47 +141,6 @@ export function validateGwa(gwa: number): string | null {
     return 'GWA must be between 1.00 and 5.00'
   }
   return null
-}
-
-export function ensureAcademicSeededForDemo(studentIds: string[]) {
-  try {
-    const seeded = localStorage.getItem(SEEDED_KEY)
-    if (seeded === 'true') return
-    if (studentIds.length === 0) return
-
-    const firstId = studentIds[0]
-    const all = readAll()
-    if (!all[firstId]?.length) {
-      const t = nowIso()
-      all[firstId] = [
-        {
-          id: makeId(),
-          studentId: firstId,
-          schoolYear: '2024-2025',
-          semester: '1st Semester',
-          gwa: 1.75,
-          honors: "Dean's List",
-          createdAt: t,
-          updatedAt: t,
-        },
-        {
-          id: makeId(),
-          studentId: firstId,
-          schoolYear: '2024-2025',
-          semester: '2nd Semester',
-          gwa: 1.5,
-          honors: "Dean's List",
-          createdAt: t,
-          updatedAt: t,
-        },
-      ]
-      writeAll(all)
-    }
-
-    localStorage.setItem(SEEDED_KEY, 'true')
-  } catch {
-    // ignore
-  }
 }
 
 export function addAcademicRecord(

@@ -13,7 +13,7 @@ type RoleProtectedRouteProps = {
 /**
  * Protects routes by role. Redirects to login if not authenticated,
  * or to the user's default dashboard if role is not allowed.
- * For Student role, /students/:id is only allowed when :id === user.studentId.
+ * Student role may open /students/:id for any id (directory view from dashboard).
  */
 export function RoleProtectedRoute({ children, allowedRoles }: RoleProtectedRouteProps) {
   const { user, isAuthenticated } = useAuth()

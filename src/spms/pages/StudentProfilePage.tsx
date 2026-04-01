@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
 import { getStudent, updateStudent, type Student } from '../db/students'
-import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 import { getStudentRecords } from '../db/studentRecords'
 import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
@@ -40,9 +39,6 @@ export function StudentProfilePage() {
       const s = await getStudent(id)
       if (!alive) return
       setStudent(s ?? null)
-      if (s?.id) {
-        ensureAcademicSeededForDemo([s.id])
-      }
       setLoading(false)
     })()
     return () => {

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
-import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 import { addAchievement, addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
 
 type RecordKind = 'violation' | 'achievement'
@@ -76,7 +75,6 @@ export function FacultyViolationsPage() {
       if (!alive) return
       setStudents(all)
       ensureSeededForDemo(all.map((s) => s.id))
-      ensureAcademicSeededForDemo(all.map((s) => s.id))
       setSelectedStudentId(all[0]?.id ?? '')
       setLoadingStudents(false)
     })()

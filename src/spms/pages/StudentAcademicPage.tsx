@@ -1,16 +1,10 @@
-import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
 import { useAuth } from '../auth/AuthContext'
-import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 
 export function StudentAcademicPage() {
   const { user } = useAuth()
   const studentId = user?.studentId
-
-  useEffect(() => {
-    if (studentId) ensureAcademicSeededForDemo([studentId])
-  }, [studentId])
 
   if (!studentId) {
     return (

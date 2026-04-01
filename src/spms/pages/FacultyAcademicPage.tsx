@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
-import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
 
 function fullName(s: Student) {
@@ -22,7 +21,6 @@ export function FacultyAcademicPage() {
       const all = await listStudents()
       if (!alive) return
       setStudents(all)
-      ensureAcademicSeededForDemo(all.map((s) => s.id))
       setSelectedStudentId(all[0]?.id ?? '')
       setLoading(false)
     })()

@@ -91,7 +91,7 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'faculty':
       return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/faculty/sports', '/faculty/academic', '/students', '/reports']
     case 'student':
-      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
+      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations']
     default:
       return ['/']
   }
@@ -146,8 +146,8 @@ export function canAccessPath(
     if (path.startsWith('/students/new')) return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/students/')) {
-      if (!studentIdFromPath || !authStudentId) return false
-      return studentIdFromPath === authStudentId
+      // Student users browse profiles from the dashboard grid; allow any student id (view-only in UI).
+      return Boolean(studentIdFromPath)
     }
     return (
       path === '/' ||
