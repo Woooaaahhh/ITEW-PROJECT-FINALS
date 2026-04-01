@@ -70,7 +70,18 @@ export function RegistrarDashboard() {
     : '—'
 
   const quickActions = [
-    { to: '/students', icon: 'bi-people', label: 'View Student List', desc: 'Browse all students' },
+    {
+      to: '/registrar/records',
+      icon: 'bi-clipboard-check',
+      label: 'Behavior & achievements',
+      desc: 'Review violations and non-academic records for all students',
+    },
+    {
+      to: '/students',
+      icon: 'bi-people',
+      label: 'View Student List',
+      desc: 'Open any profile to verify violations & achievements',
+    },
     { to: '/users', icon: 'bi-person-gear', label: 'Manage Accounts', desc: 'Create faculty & student logins' },
     { to: '/sections', icon: 'bi-diagram-3', label: 'Manage Sections', desc: 'Section setup' },
     { to: '/reports', icon: 'bi-file-earmark-bar-graph', label: 'Generate Reports', desc: 'Export & print' },

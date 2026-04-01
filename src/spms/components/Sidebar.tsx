@@ -58,6 +58,9 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                 <NavLink className={navClass} to="/faculty/violations">
                   <i className="bi bi-exclamation-triangle" /> Violations
                 </NavLink>
+                <NavLink className={navClass} to="/faculty/achievements">
+                  <i className="bi bi-journal-bookmark" /> Achievements
+                </NavLink>
                 <NavLink className={navClass} to="/faculty/skills">
                   <i className="bi bi-award" /> Skills
                 </NavLink>
@@ -68,6 +71,11 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                   <i className="bi bi-mortarboard" /> Academic
                 </NavLink>
               </>
+            )}
+            {role === 'admin' && (
+              <NavLink className={navClass} to="/registrar/records">
+                <i className="bi bi-clipboard-check" /> Behavior records
+              </NavLink>
             )}
             {role === 'admin' && (
               <NavLink className={navClass} to="/users">
@@ -84,6 +92,28 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                 <i className="bi bi-file-earmark-bar-graph" /> Reports
               </NavLink>
             )}
+          </>
+        )}
+
+        {isStudent && (
+          <>
+            {user?.studentId && (
+              <NavLink className={navClass} to={`/students/${user.studentId}`}>
+                <i className="bi bi-person-badge" /> My Profile
+              </NavLink>
+            )}
+            <NavLink className={navClass} to="/student/academic">
+              <i className="bi bi-journal-text" /> Academic History
+            </NavLink>
+            <NavLink className={navClass} to="/student/skills">
+              <i className="bi bi-award" /> Skills
+            </NavLink>
+            <NavLink className={navClass} to="/student/violations">
+              <i className="bi bi-exclamation-triangle" /> Violations
+            </NavLink>
+            <NavLink className={navClass} to="/student/achievements">
+              <i className="bi bi-journal-bookmark" /> Achievements
+            </NavLink>
           </>
         )}
       </nav>

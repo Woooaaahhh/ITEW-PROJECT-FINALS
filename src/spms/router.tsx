@@ -4,6 +4,7 @@ import { RequireAuth } from './components/RequireAuth'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 import { RedirectToRoleDashboard } from './pages/RedirectToRoleDashboard'
 import { RegistrarDashboard } from './pages/RegistrarDashboard'
+import { RegistrarRecordsPage } from './pages/RegistrarRecordsPage'
 import { FacultyDashboard } from './pages/FacultyDashboard'
 import { StudentDashboard } from './pages/StudentDashboard'
 import { StudentsPage } from './pages/StudentsPage'
@@ -12,12 +13,14 @@ import { EditStudentPage } from './pages/EditStudentPage'
 import { StudentProfilePage } from './pages/StudentProfilePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SectionsPage } from './pages/SectionsPage'
+import { FacultyAchievementsPage } from './pages/FacultyAchievementsPage'
 import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
+import { StudentAchievementsPage } from './pages/StudentAchievementsPage'
 import { StudentViolationsPage } from './pages/StudentViolationsPage'
 import { UsersPage } from './pages/UsersPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -35,6 +38,12 @@ const registrarHandle: PageMeta = {
   showSearch: true,
 }
 
+const registrarRecordsHandle: PageMeta = {
+  title: 'Behavior & achievements',
+  subtitle: 'Verify official violation and non-academic records',
+  showSearch: true,
+}
+
 const facultyHandle: PageMeta = {
   title: 'Faculty Dashboard',
   subtitle: 'View students, record violations and skills',
@@ -43,7 +52,12 @@ const facultyHandle: PageMeta = {
 
 const facultyViolationsHandle: PageMeta = {
   title: 'Violations',
-  subtitle: 'Record and manage student violations',
+  subtitle: 'Record and review student violations',
+}
+
+const facultyAchievementsHandle: PageMeta = {
+  title: 'Achievements',
+  subtitle: 'Record and review non-academic achievements',
 }
 
 const facultySkillsHandle: PageMeta = {
@@ -78,7 +92,12 @@ const studentSkillsHandle: PageMeta = {
 
 const studentViolationsHandle: PageMeta = {
   title: 'Violations',
-  subtitle: 'View your violation records',
+  subtitle: 'Your official violation records',
+}
+
+const studentAchievementsHandle: PageMeta = {
+  title: 'Achievements',
+  subtitle: 'Your non-academic achievements',
 }
 
 const studentsHandle: PageMeta = {
@@ -164,6 +183,15 @@ export const spmsRouter = createBrowserRouter([
         handle: registrarHandle,
       },
       {
+        path: '/registrar/records',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin']}>
+            <RegistrarRecordsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: registrarRecordsHandle,
+      },
+      {
         path: '/faculty',
         element: (
           <RoleProtectedRoute allowedRoles={['faculty']}>
@@ -180,6 +208,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: facultyViolationsHandle,
+      },
+      {
+        path: '/faculty/achievements',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyAchievementsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyAchievementsHandle,
       },
       {
         path: '/faculty/skills',
@@ -243,6 +280,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: studentViolationsHandle,
+      },
+      {
+        path: '/student/achievements',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentAchievementsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentAchievementsHandle,
       },
       {
         path: '/students',

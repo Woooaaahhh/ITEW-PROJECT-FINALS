@@ -129,4 +129,3 @@ export async function seedIfEmpty(): Promise<void> {
   await tx.objectStore('meta').put({ key: 'seeded', value: 'true' })
   await tx.done
 }
-

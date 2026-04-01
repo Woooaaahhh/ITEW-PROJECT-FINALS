@@ -33,7 +33,8 @@ export function FacultyDashboard() {
 
   const quickActions = [
     { to: '/students', icon: 'bi-people', label: 'View Student List', desc: 'Browse all students' },
-    { to: '/faculty/violations', icon: 'bi-exclamation-triangle', label: 'Add Violation Record', desc: 'Record student violation' },
+    { to: '/faculty/violations', icon: 'bi-exclamation-triangle', label: 'Violations', desc: 'Record behavior incidents' },
+    { to: '/faculty/achievements', icon: 'bi-journal-bookmark', label: 'Achievements', desc: 'Record non-academic wins' },
     { to: '/faculty/skills', icon: 'bi-award', label: 'Assign Student Skill', desc: 'Add student skill' },
     { to: '/faculty/sports', icon: 'bi-dribbble', label: 'Manage Sports List', desc: 'Sports affiliations & clearance' },
     { to: '/faculty/academic', icon: 'bi-mortarboard', label: 'Academic Records', desc: 'GWA, history & current term' },
@@ -130,7 +131,11 @@ export function FacultyDashboard() {
             <div className="d-grid gap-2">
               <Link to="/faculty/violations" className="btn btn-primary rounded-3 py-2 text-start">
                 <i className="bi bi-exclamation-triangle me-2" />
-                Record Student Violation
+                Record violation
+              </Link>
+              <Link to="/faculty/achievements" className="btn btn-outline-primary rounded-3 py-2 text-start">
+                <i className="bi bi-journal-bookmark me-2" />
+                Record achievement
               </Link>
               <Link to="/faculty/skills" className="btn btn-outline-primary rounded-3 py-2 text-start">
                 <i className="bi bi-award me-2" />

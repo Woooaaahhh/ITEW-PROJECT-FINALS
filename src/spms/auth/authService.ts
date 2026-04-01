@@ -40,11 +40,9 @@ export async function login(identifier: string, password: string): Promise<AuthU
     data = res.data
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
-      // If there's no response, it's usually a network/server issue (API not running).
       if (!err.response) {
         throw new Error('Cannot reach API server. Start it with: npm run dev:all (or npm run dev:api)')
       }
-      // Vite dev proxy returns 5xx when the target (API) is down (ECONNREFUSED).
       if (err.response.status >= 500) {
         throw new Error('API server is not running. Start it with: npm run dev:all (or npm run dev:api)')
       }
@@ -89,9 +87,27 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-      return ['/', '/faculty', '/faculty/violations', '/faculty/skills', '/faculty/sports', '/faculty/academic', '/students', '/reports']
+      return [
+        '/',
+        '/faculty',
+        '/faculty/violations',
+        '/faculty/achievements',
+        '/faculty/skills',
+        '/faculty/sports',
+        '/faculty/academic',
+        '/students',
+        '/reports',
+      ]
     case 'student':
-      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations', '/students']
+      return [
+        '/',
+        '/student',
+        '/student/academic',
+        '/student/skills',
+        '/student/violations',
+        '/student/achievements',
+        '/students',
+      ]
     default:
       return ['/']
   }
@@ -132,6 +148,7 @@ export function canAccessPath(
       path === '/' ||
       path === '/faculty' ||
       path === '/faculty/violations' ||
+      path === '/faculty/achievements' ||
       path === '/faculty/skills' ||
       path === '/faculty/sports' ||
       path === '/faculty/academic' ||
@@ -154,7 +171,8 @@ export function canAccessPath(
       path === '/student' ||
       path === '/student/academic' ||
       path === '/student/skills' ||
-      path === '/student/violations'
+      path === '/student/violations' ||
+      path === '/student/achievements'
     )
   }
 
