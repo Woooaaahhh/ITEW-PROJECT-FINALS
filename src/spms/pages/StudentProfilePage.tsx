@@ -3,7 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
 import { getStudent, updateStudent, type Student } from '../db/students'
+import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 import { getStudentRecords } from '../db/studentRecords'
+import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
 import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
 import type { Sport } from '../db/spmsDb'
@@ -20,7 +22,7 @@ export function StudentProfilePage() {
   const [loading, setLoading] = useState(true)
   const canEditProfile = user?.role === 'admin'
   const canEditEligibility = user?.role === 'faculty'
-  const isOwnProfile = user?.role === 'student' && user?.studentId === id
+  const canEditAcademic = user?.role === 'faculty'
   const [sports, setSports] = useState<Sport[]>([])
   const [savingEligibility, setSavingEligibility] = useState(false)
   const [eligibilityError, setEligibilityError] = useState<string | null>(null)
@@ -38,6 +40,9 @@ export function StudentProfilePage() {
       const s = await getStudent(id)
       if (!alive) return
       setStudent(s ?? null)
+      if (s?.id) {
+        ensureAcademicSeededForDemo([s.id])
+      }
       setLoading(false)
     })()
     return () => {
@@ -217,6 +222,8 @@ export function StudentProfilePage() {
         </div>
       </div>
 
+      <ProfileCurrentAcademicBanner studentId={student.id} />
+
       <div className="row g-3">
         {/* Left column */}
         <div className="col-12 col-xl-5">
@@ -272,36 +279,7 @@ export function StudentProfilePage() {
 
         {/* Right column */}
         <div className="col-12 col-xl-7">
-          <div className="spms-card card">
-            <div className="card-header d-flex align-items-center justify-content-between">
-              <div className="fw-bold">
-                <i className="bi bi-mortarboard me-2" /> Academic History
-              </div>
-              <span className="spms-chip"><i className="bi bi-graph-up" /> Performance</span>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table spms-table table-hover align-middle mb-0">
-                  <thead className="border-bottom">
-                    <tr>
-                      <th className="ps-3">School Year</th>
-                      <th>Semester</th>
-                      <th>GWA</th>
-                      <th>Honors</th>
-                      <th className="pe-3 text-end">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="ps-3" colSpan={5}>
-                        {emptySection('No academic history recorded yet.')}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <ProfileAcademicHistoryCard studentId={student.id} showFacultyForm={canEditAcademic} />
 
           <div className="row g-3 mt-0">
             <div className="col-12 col-lg-6">

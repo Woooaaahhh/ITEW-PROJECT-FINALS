@@ -72,11 +72,12 @@ export type SpmsDb = DBSchema & {
 }
 
 const DB_NAME = 'spms-db'
-const DB_VERSION = 4
+/** Must never be lower than the version already in the user's browser, or openDB throws VersionError. */
+const DB_VERSION = 5
 
 export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains('students')) {
         const store = db.createObjectStore('students', { keyPath: 'id' })
         store.createIndex('by-updatedAt', 'updatedAt')
@@ -95,15 +96,16 @@ export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
         store.createIndex('by-updatedAt', 'updatedAt')
         store.createIndex('by-active', 'isActive')
       }
-      // Ensure studentSkills store uses the correct composite key.
-      // If it was previously created with a different keyPath (e.g. "id"), we must recreate it.
-      if (db.objectStoreNames.contains('studentSkills')) {
+      // Only rebuild studentSkills when migrating from before v4 (wrong keyPath). Do not wipe on v4→v5 bumps.
+      if (oldVersion > 0 && oldVersion < 4 && db.objectStoreNames.contains('studentSkills')) {
         db.deleteObjectStore('studentSkills')
       }
-      const studentSkills = db.createObjectStore('studentSkills', { keyPath: ['studentId', 'skillId'] })
-      studentSkills.createIndex('by-studentId', 'studentId')
-      studentSkills.createIndex('by-skillId', 'skillId')
-      studentSkills.createIndex('by-createdAt', 'createdAt')
+      if (!db.objectStoreNames.contains('studentSkills')) {
+        const studentSkills = db.createObjectStore('studentSkills', { keyPath: ['studentId', 'skillId'] })
+        studentSkills.createIndex('by-studentId', 'studentId')
+        studentSkills.createIndex('by-skillId', 'skillId')
+        studentSkills.createIndex('by-createdAt', 'createdAt')
+      }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })
       }

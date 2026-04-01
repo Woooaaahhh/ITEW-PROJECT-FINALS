@@ -64,6 +64,9 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                 <NavLink className={navClass} to="/faculty/sports">
                   <i className="bi bi-dribbble" /> Sports
                 </NavLink>
+                <NavLink className={navClass} to="/faculty/academic">
+                  <i className="bi bi-mortarboard" /> Academic
+                </NavLink>
               </>
             )}
             {role === 'admin' && (

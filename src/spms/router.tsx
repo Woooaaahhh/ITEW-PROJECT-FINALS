@@ -15,6 +15,7 @@ import { SectionsPage } from './pages/SectionsPage'
 import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
+import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
 import { StudentViolationsPage } from './pages/StudentViolationsPage'
@@ -53,6 +54,11 @@ const facultySkillsHandle: PageMeta = {
 const facultySportsHandle: PageMeta = {
   title: 'Sports',
   subtitle: 'Manage sports list and eligibility fields',
+}
+
+const facultyAcademicHandle: PageMeta = {
+  title: 'Academic',
+  subtitle: 'View current term, history, and update student academic records',
 }
 
 const studentHandle: PageMeta = {
@@ -192,6 +198,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: facultySportsHandle,
+      },
+      {
+        path: '/faculty/academic',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyAcademicPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyAcademicHandle,
       },
       {
         path: '/student',
