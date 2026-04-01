@@ -86,7 +86,9 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   return res.json({ user: row })
 })
 
-app.get('/api/sections', authMiddleware, async (_req, res) => {
+// Public read: Add Student and other forms need sections even when the API was started
+// before login headers are applied; avoids blocking local IndexedDB student creation.
+app.get('/api/sections', async (_req, res) => {
   const db = await getDb()
   const rows = await db.all(
     'SELECT section_id, year_level, section, created_at FROM sections ORDER BY year_level ASC, section ASC',
