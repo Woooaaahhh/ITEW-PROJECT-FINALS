@@ -40,11 +40,9 @@ export async function login(identifier: string, password: string): Promise<AuthU
     data = res.data
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
-      // If there's no response, it's usually a network/server issue (API not running).
       if (!err.response) {
         throw new Error('Cannot reach API server. Start it with: npm run dev:all (or npm run dev:api)')
       }
-      // Vite dev proxy returns 5xx when the target (API) is down (ECONNREFUSED).
       if (err.response.status >= 500) {
         throw new Error('API server is not running. Start it with: npm run dev:all (or npm run dev:api)')
       }
@@ -89,7 +87,17 @@ export function getAllowedPaths(role: UserRole): string[] {
     case 'admin':
       return ['/', '/registrar', '/students', '/reports']
     case 'faculty':
-      return ['/', '/faculty', '/faculty/violations', '/faculty/achievements', '/faculty/skills', '/students']
+      return [
+        '/',
+        '/faculty',
+        '/faculty/violations',
+        '/faculty/achievements',
+        '/faculty/skills',
+        '/faculty/sports',
+        '/faculty/academic',
+        '/students',
+        '/reports',
+      ]
     case 'student':
       return [
         '/',
@@ -143,6 +151,8 @@ export function canAccessPath(
       path === '/faculty/achievements' ||
       path === '/faculty/skills' ||
       path === '/faculty/sports' ||
+      path === '/faculty/academic' ||
+      path === '/reports' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
@@ -153,8 +163,8 @@ export function canAccessPath(
     if (path.startsWith('/students/new')) return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/students/')) {
-      const id = studentIdFromPath ?? path.replace('/students/', '').replace(/\/edit$/, '')
-      return id === authStudentId
+      if (!studentIdFromPath || !authStudentId) return false
+      return studentIdFromPath === authStudentId
     }
     return (
       path === '/' ||

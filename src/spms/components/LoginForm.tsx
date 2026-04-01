@@ -2,9 +2,11 @@ import { useState } from 'react'
 
 type LoginFormProps = {
   onSubmit: (identifier: string, password: string) => Promise<void>
+  onError?: (message: string) => void
+  showInlineError?: boolean
 }
 
-export function LoginForm({ onSubmit }: LoginFormProps) {
+export function LoginForm({ onSubmit, onError, showInlineError = true }: LoginFormProps) {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -15,14 +17,18 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
     e.preventDefault()
     setError(null)
     if (!identifier.trim() || !password) {
-      setError('Please enter email/username and password.')
+      const msg = 'Please enter email/username and password.'
+      setError(msg)
+      onError?.(msg)
       return
     }
     setLoading(true)
     try {
       await onSubmit(identifier.trim(), password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.')
+      const msg = err instanceof Error ? err.message : 'Invalid credentials. Please try again.'
+      setError(msg)
+      onError?.(msg)
     } finally {
       setLoading(false)
     }
@@ -76,7 +82,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
         </div>
       </div>
 
-      {error ? (
+      {showInlineError && error ? (
         <div className="alert alert-danger py-2 mb-0" role="alert">
           <i className="bi bi-exclamation-circle me-2" />
           {error}

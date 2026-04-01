@@ -16,6 +16,8 @@ import { SectionsPage } from './pages/SectionsPage'
 import { FacultyAchievementsPage } from './pages/FacultyAchievementsPage'
 import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
+import { FacultySportsPage } from './pages/FacultySportsPage'
+import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
 import { StudentAcademicPage } from './pages/StudentAcademicPage'
 import { StudentSkillsPage } from './pages/StudentSkillsPage'
 import { StudentAchievementsPage } from './pages/StudentAchievementsPage'
@@ -61,6 +63,16 @@ const facultyAchievementsHandle: PageMeta = {
 const facultySkillsHandle: PageMeta = {
   title: 'Skills',
   subtitle: 'Assign and manage student skills',
+}
+
+const facultySportsHandle: PageMeta = {
+  title: 'Sports',
+  subtitle: 'Manage sports list and eligibility fields',
+}
+
+const facultyAcademicHandle: PageMeta = {
+  title: 'Academic',
+  subtitle: 'View current term, history, and update student academic records',
 }
 
 const studentHandle: PageMeta = {
@@ -216,6 +228,24 @@ export const spmsRouter = createBrowserRouter([
         handle: facultySkillsHandle,
       },
       {
+        path: '/faculty/sports',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultySportsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultySportsHandle,
+      },
+      {
+        path: '/faculty/academic',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyAcademicPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyAcademicHandle,
+      },
+      {
         path: '/student',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
@@ -299,7 +329,7 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/reports',
         element: (
-          <RoleProtectedRoute allowedRoles={['admin']}>
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty']}>
             <ReportsPage />
           </RoleProtectedRoute>
         ),

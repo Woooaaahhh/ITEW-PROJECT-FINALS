@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useMatch, useMatches } from 'react-router-do
 import { useAuth } from '../auth/AuthContext'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { BreadcrumbNav } from './BreadcrumbNav'
 
 export type PageMeta = {
   title: string
@@ -13,6 +14,7 @@ export type PageMeta = {
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
   const matches = useMatches()
@@ -65,8 +67,8 @@ export function AppShell() {
   return (
     <>
       <div className={overlayClass} onClick={() => setMobileOpen(false)} />
-      <div className="spms-app">
-        <Sidebar mobileOpen={mobileOpen} />
+      <div className={`spms-app${desktopSidebarHidden ? ' sidebar-hidden' : ''}`}>
+        <Sidebar mobileOpen={mobileOpen} desktopHidden={desktopSidebarHidden} />
         <main className="spms-main">
           <Topbar
             title={meta.title}
@@ -74,11 +76,19 @@ export function AppShell() {
             showSearch={showSearch}
             searchPlaceholder="Search students..."
             right={headerRight}
-            onToggleSidebar={() => setMobileOpen((v) => !v)}
+            onToggleSidebar={() => {
+              if (window.innerWidth >= 992) {
+                setDesktopSidebarHidden((v) => !v)
+                setMobileOpen(false)
+                return
+              }
+              setMobileOpen((v) => !v)
+            }}
           />
 
           <section className="spms-content">
             <div className="container-fluid">
+              <BreadcrumbNav />
               <Outlet />
             </div>
           </section>

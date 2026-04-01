@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import avatarUrl from '../../assets/react.svg'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
+import { getStudentRecords } from '../db/studentRecords'
+import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
+import { listSports, seedSportsIfEmpty } from '../db/sports'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -11,11 +14,30 @@ function normalize(s: string) {
   return s.toLowerCase().trim()
 }
 
-function exportTableToCsv(rows: Student[], filename: string) {
-  const headers = ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Gender', 'Address']
+type ReportType = 'sports_tryout' | 'programming_contest' | 'no_violations' | 'specific_skill'
+
+type EnrichedStudent = {
+  student: Student
+  skillNames: string[]
+  violationCount: number
+}
+
+function exportTableToCsv(rows: EnrichedStudent[], filename: string) {
+  const headers = ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills']
   const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`
-  const rowToCsv = (s: Student) =>
-    [s.id, fullName(s), s.yearLevel ?? '', s.section ?? '', s.email ?? '', s.contactNumber ?? '', s.gender ?? '', s.address ?? ''].map(escape).join(',')
+  const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) =>
+    [
+      student.id,
+      fullName(student),
+      student.yearLevel ?? '',
+      student.section ?? '',
+      student.email ?? '',
+      student.contactNumber ?? '',
+      String(violationCount),
+      skillNames.join('; '),
+    ]
+      .map(escape)
+      .join(',')
   const csv = [headers.map(escape).join(','), ...rows.map(rowToCsv)].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -30,19 +52,47 @@ function exportTableToCsv(rows: Student[], filename: string) {
 
 export function ReportsPage() {
   const [students, setStudents] = useState<Student[]>([])
+  const [studentSkillsById, setStudentSkillsById] = useState<Record<string, string[]>>({})
+  const [violationsByStudentId, setViolationsByStudentId] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('')
   const [filterSection, setFilterSection] = useState('')
+  const [reportType, setReportType] = useState<ReportType>('sports_tryout')
+  const [sportsOptions, setSportsOptions] = useState<{ id: string; name: string }[]>([])
+  const [selectedSportId, setSelectedSportId] = useState('')
+  const [skillOptions, setSkillOptions] = useState<{ id: string; name: string }[]>([])
+  const [selectedSkillId, setSelectedSkillId] = useState('')
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
-      await seedIfEmpty()
-      const all = await listStudents()
+      await Promise.all([seedIfEmpty(), seedSkillsIfEmpty(), seedSportsIfEmpty()])
+      const [all, allSkills, allSports] = await Promise.all([listStudents(), listSkills({ activeOnly: true }), listSports({ activeOnly: true })])
       if (!alive) return
+      const skillNameById = new Map(allSkills.map((sk) => [sk.id, sk.name]))
+      const skillsMap: Record<string, string[]> = {}
+      const violationsMap: Record<string, number> = {}
+
+      await Promise.all(
+        all.map(async (s) => {
+          const assigned = await listStudentSkills(s.id)
+          skillsMap[s.id] = assigned
+            .map((row) => skillNameById.get(row.skillId))
+            .filter((n): n is string => Boolean(n))
+          const records = getStudentRecords(s.id)
+          violationsMap[s.id] = records.violations.length
+        }),
+      )
+
       setStudents(all)
+      setStudentSkillsById(skillsMap)
+      setViolationsByStudentId(violationsMap)
+      setSkillOptions(allSkills.map((sk) => ({ id: sk.id, name: sk.name })))
+      setSportsOptions(allSports.map((sp) => ({ id: sp.id, name: sp.name })))
+      setSelectedSkillId((prev) => prev || allSkills[0]?.id || '')
+      setSelectedSportId((prev) => prev || allSports[0]?.id || '')
       setLoading(false)
     })()
     return () => {
@@ -50,11 +100,14 @@ export function ReportsPage() {
     }
   }, [])
 
-  const filtered = useMemo(() => {
+  const filtered = useMemo<EnrichedStudent[]>(() => {
     const q = normalize(search)
     const y = normalize(filterYear)
     const sec = normalize(filterSection)
-    return students.filter((s) => {
+    return students
+      .filter((s) => {
+        const skillNames = studentSkillsById[s.id] ?? []
+        const violations = violationsByStudentId[s.id] ?? 0
       const hitSearch =
         !q ||
         fullName(s).toLowerCase().includes(q) ||
@@ -62,9 +115,25 @@ export function ReportsPage() {
         s.id.toLowerCase().includes(q)
       const hitYear = !y || normalize(s.yearLevel ?? '') === y
       const hitSection = !sec || normalize(s.section ?? '') === sec
-      return hitSearch && hitYear && hitSection
-    })
-  }, [students, search, filterYear, filterSection])
+        let hitReport = true
+        if (reportType === 'sports_tryout') {
+          hitReport = !selectedSportId || (s.sportsAffiliations ?? []).includes(selectedSportId)
+        } else if (reportType === 'specific_skill') {
+          const selectedSkillName = normalize(skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? '')
+          hitReport = !selectedSkillName || skillNames.some((name) => normalize(name) === selectedSkillName)
+        } else if (reportType === 'programming_contest') {
+          hitReport = skillNames.some((name) => normalize(name).includes('programming'))
+        } else if (reportType === 'no_violations') {
+          hitReport = violations === 0
+        }
+        return hitSearch && hitYear && hitSection && hitReport
+      })
+      .map((student) => ({
+        student,
+        skillNames: studentSkillsById[student.id] ?? [],
+        violationCount: violationsByStudentId[student.id] ?? 0,
+      }))
+  }, [students, search, filterYear, filterSection, reportType, selectedSportId, selectedSkillId, skillOptions, studentSkillsById, violationsByStudentId])
 
   return (
     <div className="row g-3">
@@ -104,6 +173,62 @@ export function ReportsPage() {
               </select>
             </div>
             <div className="mb-3">
+              <label className="form-label fw-semibold">Report Type</label>
+              <select
+                className="form-select"
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value as ReportType)}
+              >
+                <option value="sports_tryout">Students qualified for basketball try-outs</option>
+                <option value="programming_contest">Students qualified for programming contests</option>
+                <option value="no_violations">Students with no violations</option>
+                <option value="specific_skill">Students with specific skills</option>
+              </select>
+            </div>
+
+            {reportType === 'sports_tryout' ? (
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Sport</label>
+                <select
+                  className="form-select"
+                  value={selectedSportId}
+                  onChange={(e) => setSelectedSportId(e.target.value)}
+                >
+                  {sportsOptions.length === 0 ? (
+                    <option value="">No sports available</option>
+                  ) : (
+                    sportsOptions.map((sp) => (
+                      <option key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            ) : null}
+
+            {reportType === 'specific_skill' ? (
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Skill</label>
+                <select
+                  className="form-select"
+                  value={selectedSkillId}
+                  onChange={(e) => setSelectedSkillId(e.target.value)}
+                >
+                  {skillOptions.length === 0 ? (
+                    <option value="">No skills available</option>
+                  ) : (
+                    skillOptions.map((sk) => (
+                      <option key={sk.id} value={sk.id}>
+                        {sk.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="mb-3">
               <label className="form-label fw-semibold">Section</label>
               <select
                 className="form-select"
@@ -125,6 +250,9 @@ export function ReportsPage() {
                   setSearch('')
                   setFilterYear('')
                   setFilterSection('')
+                  setReportType('sports_tryout')
+                  setSelectedSportId(sportsOptions[0]?.id ?? '')
+                  setSelectedSkillId(skillOptions[0]?.id ?? '')
                 }}
               >
                 Reset
@@ -166,39 +294,47 @@ export function ReportsPage() {
                     <th>Year</th>
                     <th>Section</th>
                     <th>Email</th>
-                    <th className="text-end pe-3">GWA</th>
+                    <th>Violations</th>
+                    <th className="text-end pe-3">Skills</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="ps-3 py-4" colSpan={5}>
+                      <td className="ps-3 py-4" colSpan={6}>
                         <div className="spms-muted">Loading...</div>
                       </td>
                     </tr>
                   ) : null}
                   {!loading && filtered.length === 0 ? (
                     <tr>
-                      <td className="ps-3 py-4" colSpan={5}>
+                      <td className="ps-3 py-4" colSpan={6}>
                         <div className="spms-muted">No students matched your filters.</div>
                       </td>
                     </tr>
                   ) : null}
-                  {filtered.map((s) => (
-                    <tr key={s.id}>
+                  {filtered.map(({ student, skillNames, violationCount }) => (
+                    <tr key={student.id}>
                       <td className="ps-3">
                         <div className="d-flex align-items-center gap-2">
-                          <img className="spms-avatar" src={s.profilePictureDataUrl || avatarUrl} alt="" />
+                          <img className="spms-avatar" src={student.profilePictureDataUrl || avatarUrl} alt="" />
                           <div>
-                            <div className="fw-semibold">{fullName(s)}</div>
-                            <div className="spms-muted small">{s.id}</div>
+                            <div className="fw-semibold">{fullName(student)}</div>
+                            <div className="spms-muted small">{student.id}</div>
                           </div>
                         </div>
                       </td>
-                      <td>{s.yearLevel ?? '—'}</td>
-                      <td>{s.section ?? '—'}</td>
-                      <td>{s.email ?? '—'}</td>
-                      <td className="text-end pe-3">—</td>
+                      <td>{student.yearLevel ?? '—'}</td>
+                      <td>{student.section ?? '—'}</td>
+                      <td>{student.email ?? '—'}</td>
+                      <td>{violationCount}</td>
+                      <td className="text-end pe-3">
+                        {skillNames.length > 0 ? (
+                          <span className="spms-muted small">{skillNames.slice(0, 2).join(', ')}{skillNames.length > 2 ? '…' : ''}</span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

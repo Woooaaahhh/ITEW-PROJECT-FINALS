@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
-import { getStudent, type Student } from '../db/students'
+import { getStudent, updateStudent, type Student } from '../db/students'
+import { ensureAcademicSeededForDemo } from '../db/academicRecords'
 import { ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
+import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
+import { listSports, seedSportsIfEmpty } from '../db/sports'
+import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
+import type { Sport } from '../db/spmsDb'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -16,11 +21,20 @@ export function StudentProfilePage() {
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
   const [recordsTick, setRecordsTick] = useState(0)
-  const canEdit = user?.role === 'admin'
+  
+  // Permissions
+  const canEditProfile = user?.role === 'admin'
   const isOwnProfile = user?.role === 'student' && user?.studentId === id
   const canViewBehaviorRecords =
-    user?.role === 'faculty' || user?.role === 'admin' || (user?.role === 'student' && user?.studentId === id)
+    user?.role === 'faculty' || user?.role === 'admin' || isOwnProfile
 
+  // State for Sports & Skills
+  const [sports, setSports] = useState<Sport[]>([])
+  const [draftSportsIds, setDraftSportsIds] = useState<string[]>([])
+  const [skills, setSkills] = useState<{ id: string; name: string; category: string; isActive: boolean }[]>([])
+  const [studentSkillIds, setStudentSkillIds] = useState<string[]>([])
+
+  // Load Student Data
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -29,32 +43,79 @@ export function StudentProfilePage() {
       const s = await getStudent(id)
       if (!alive) return
       setStudent(s ?? null)
-      if (s) ensureSeededForDemo([s.id])
+      if (s?.id) {
+        ensureSeededForDemo([s.id])
+        ensureAcademicSeededForDemo([s.id])
+      }
       setLoading(false)
     })()
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [id])
 
-  const name = useMemo(() => (student ? fullName(student) : 'Student'), [student])
+  // Load Skills
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!id) return
+      try {
+        await seedSkillsIfEmpty()
+        const [allSkills, rows] = await Promise.all([
+          listSkills({ activeOnly: false }),
+          listStudentSkills(id),
+        ])
+        if (!alive) return
+        setSkills(allSkills)
+        setStudentSkillIds(rows.map((r) => r.skillId))
+      } catch {
+        if (!alive) return
+        setSkills([])
+        setStudentSkillIds([])
+      }
+    })()
+    return () => { alive = false }
+  }, [id])
+
+  // Load Sports
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        await seedSportsIfEmpty()
+        const all = await listSports({ activeOnly: false })
+        if (!alive) return
+        setSports(all)
+      } catch { /* ignore */ }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  useEffect(() => {
+    if (!student) return
+    setDraftSportsIds(Array.isArray(student.sportsAffiliations) ? student.sportsAffiliations : [])
+  }, [student])
+
+  // Records change listener
   useEffect(() => {
     const onRecords = () => setRecordsTick((n) => n + 1)
     window.addEventListener('spms-student-records-changed', onRecords)
     return () => window.removeEventListener('spms-student-records-changed', onRecords)
   }, [])
-  const records = useMemo(
-    () => (student ? getStudentRecords(student.id) : null),
-    [student, recordsTick],
-  )
+
+  const name = useMemo(() => (student ? fullName(student) : 'Student'), [student])
+  const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student, recordsTick])
+
+  const skillsById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills])
+  const skillChips = useMemo(() => {
+    return studentSkillIds
+      .map((sid) => skillsById.get(sid))
+      .filter(Boolean)
+      .map((sk) => sk!)
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+  }, [studentSkillIds, skillsById])
 
   if (loading) {
     return (
-      <div className="spms-card card">
-        <div className="card-body">
-          <div className="spms-muted">Loading student profile...</div>
-        </div>
-      </div>
+      <div className="spms-card card"><div className="card-body"><div className="spms-muted">Loading student profile...</div></div></div>
     )
   }
 
@@ -63,20 +124,13 @@ export function StudentProfilePage() {
       <div className="spms-card card">
         <div className="card-body">
           <div className="fw-bold fs-5">Student not found</div>
-          <div className="spms-muted">The student ID does not exist in the database.</div>
           <div className="mt-3">
-            <Link to="/students" className="btn btn-primary rounded-4 px-4">
-              <i className="bi bi-arrow-left me-1" /> Back to Student List
-            </Link>
+            <Link to="/students" className="btn btn-primary rounded-4 px-4"><i className="bi bi-arrow-left me-1" /> Back</Link>
           </div>
         </div>
       </div>
     )
   }
-
-  const emptySection = (msg: string) => (
-    <div className="spms-muted small py-2">{msg}</div>
-  )
 
   return (
     <div className="d-flex flex-column gap-3">
@@ -87,262 +141,75 @@ export function StudentProfilePage() {
         <div className="flex-grow-1">
           <div className="d-flex flex-wrap align-items-center gap-2">
             <h3 className="mb-0 fw-bold">{name}</h3>
-            <span className="spms-chip">
-              <i className="bi bi-patch-check" /> Active
-            </span>
-            {student.yearLevel ? (
-              <span className="spms-chip">
-                <i className="bi bi-layers" /> {student.yearLevel}
-              </span>
-            ) : null}
-            {student.section ? (
-              <span className="spms-chip">
-                <i className="bi bi-diagram-3" /> {student.section}
-              </span>
-            ) : null}
+            <span className="spms-chip"><i className="bi bi-patch-check" /> Active</span>
+            {student.yearLevel && <span className="spms-chip"><i className="bi bi-layers" /> {student.yearLevel}</span>}
+            {student.section && <span className="spms-chip"><i className="bi bi-diagram-3" /> {student.section}</span>}
           </div>
 
           <div className="d-flex flex-wrap gap-2 mt-2">
-            {student.email ? (
-              <span className="spms-chip">
-                <i className="bi bi-envelope" /> {student.email}
-              </span>
-            ) : null}
-            {student.contactNumber ? (
-              <span className="spms-chip">
-                <i className="bi bi-telephone" /> {student.contactNumber}
-              </span>
-            ) : null}
-            {student.address ? (
-              <span className="spms-chip">
-                <i className="bi bi-geo-alt" /> {student.address}
-              </span>
-            ) : null}
+            {student.email && <span className="spms-chip"><i className="bi bi-envelope" /> {student.email}</span>}
+            {student.contactNumber && <span className="spms-chip"><i className="bi bi-telephone" /> {student.contactNumber}</span>}
           </div>
 
           <div className="d-flex gap-2 mt-3 spms-no-print">
-            {canEdit && (
+            {canEditProfile && (
               <Link to={`/students/${student.id}/edit`} className="btn btn-primary rounded-4 px-4">
-                <i className="bi bi-pencil me-1" /> Edit
+                <i className="bi bi-pencil me-1" /> Edit Profile
               </Link>
             )}
-            {isOwnProfile ? (
+            {isOwnProfile && (
               <>
-                <Link to="/student/violations" className="btn btn-outline-secondary rounded-4 px-4">
-                  <i className="bi bi-exclamation-triangle me-1" /> My violations
-                </Link>
-                <Link to="/student/achievements" className="btn btn-outline-secondary rounded-4 px-4">
-                  <i className="bi bi-journal-bookmark me-1" /> My achievements
-                </Link>
-                <Link to="/student" className="btn btn-outline-primary rounded-4 px-4">
-                  Back to dashboard
-                </Link>
+                <Link to="/student/violations" className="btn btn-outline-secondary rounded-4 px-3">Violations</Link>
+                <Link to="/student/achievements" className="btn btn-outline-secondary rounded-4 px-3">Achievements</Link>
               </>
-            ) : (
-              <Link to="/students" className="btn btn-outline-primary rounded-4 px-4">
-                Back to list
-              </Link>
             )}
           </div>
         </div>
       </div>
 
       <div className="row g-3">
-        {/* Left column */}
-        <div className="col-12 col-xl-5">
-          <div className="spms-card card">
-            <div className="card-header d-flex align-items-center justify-content-between">
-              <div className="fw-bold">
-                <i className="bi bi-person-lines-fill me-2" /> Personal Information
-              </div>
-              <span className="spms-chip"><i className="bi bi-info-circle" /> Details</span>
-            </div>
-            <div className="card-body">
-              <div className="row g-2">
-                <div className="col-6">
-                  <div className="spms-muted small">Student ID</div>
-                  <div className="fw-semibold">{student.id}</div>
-                </div>
-                <div className="col-6">
-                  <div className="spms-muted small">Birthdate</div>
-                  <div className="fw-semibold">{student.birthdate || '—'}</div>
-                </div>
-                <div className="col-6">
-                  <div className="spms-muted small">Gender</div>
-                  <div className="fw-semibold">{student.gender || '—'}</div>
-                </div>
-                <div className="col-6">
-                  <div className="spms-muted small">Year Level</div>
-                  <div className="fw-semibold">{student.yearLevel || '—'}</div>
-                </div>
-                <div className="col-12">
-                  <div className="spms-muted small">Address</div>
-                  <div className="fw-semibold">{student.address || '—'}</div>
-                </div>
-                <div className="col-12">
-                  <hr />
-                  <div className="spms-muted small">Created {new Date(student.createdAt).toLocaleString()} · Updated {new Date(student.updatedAt).toLocaleString()}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="spms-card card mt-3">
-            <div className="card-header d-flex align-items-center justify-content-between">
-              <div className="fw-bold">
-                <i className="bi bi-heart-pulse me-2" /> Medical Records
-              </div>
-              <span className="spms-chip"><i className="bi bi-shield-lock" /> Restricted</span>
-            </div>
-            <div className="card-body">
-              {emptySection('No medical records on file. Add via Edit Profile when supported.')}
-            </div>
-          </div>
+        <div className="col-12 col-lg-8">
+           <ProfileCurrentAcademicBanner studentId={student.id} />
+           <div className="mt-3">
+             <ProfileAcademicHistoryCard studentId={student.id} />
+           </div>
+           
+           {canViewBehaviorRecords && (
+             <div className="spms-card card mt-3">
+               <div className="card-body">
+                 <h6 className="fw-bold mb-3">Behavior & Conduct</h6>
+                 <div className="small">
+                   Violations: <span className="badge bg-danger-subtle text-danger">{records?.violations.length ?? 0}</span>
+                 </div>
+               </div>
+             </div>
+           )}
         </div>
 
-        {/* Right column */}
-        <div className="col-12 col-xl-7">
-          <div className="spms-card card">
-            <div className="card-header d-flex align-items-center justify-content-between">
-              <div className="fw-bold">
-                <i className="bi bi-mortarboard me-2" /> Academic History
-              </div>
-              <span className="spms-chip"><i className="bi bi-graph-up" /> Performance</span>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table spms-table table-hover align-middle mb-0">
-                  <thead className="border-bottom">
-                    <tr>
-                      <th className="ps-3">School Year</th>
-                      <th>Semester</th>
-                      <th>GWA</th>
-                      <th>Honors</th>
-                      <th className="pe-3 text-end">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="ps-3" colSpan={5}>
-                        {emptySection('No academic history recorded yet.')}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div className="row g-3 mt-0">
-            {canViewBehaviorRecords ? (
-              <div className="col-12 col-lg-6">
-                <div className="spms-card card h-100">
-                  <div className="card-header d-flex align-items-center justify-content-between">
-                    <div className="fw-bold">
-                      <i className="bi bi-exclamation-triangle me-2" /> Violations
-                    </div>
-                    <span className="spms-chip">
-                      <i className="bi bi-clipboard-check" /> Official record
-                    </span>
-                  </div>
-                  <div className="card-body">
-                    {!records || records.violations.length === 0 ? (
-                      emptySection('No violations on record.')
-                    ) : (
-                      <div className="d-flex flex-column gap-2">
-                        {records.violations.map((v) => (
-                          <div key={v.id} className="d-flex justify-content-between gap-3">
-                            <div className="flex-grow-1">
-                              <div className="fw-semibold small">{v.violation_type}</div>
-                              <div className="spms-muted small">{v.description}</div>
-                            </div>
-                            <div className="text-end">
-                              <div className="spms-muted small">{new Date(v.date).toLocaleDateString()}</div>
-                              <span
-                                className="badge rounded-pill"
-                                style={{
-                                  background:
-                                    v.status.toLowerCase() === 'resolved' ? 'rgba(34, 197, 94, .15)' : 'rgba(234, 179, 8, .15)',
-                                  color: v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
-                                }}
-                              >
-                                {v.status}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            <div className={canViewBehaviorRecords ? 'col-12 col-lg-6' : 'col-12'}>
-              <div className="spms-card card h-100">
-                <div className="card-header d-flex align-items-center justify-content-between">
-                  <div className="fw-bold">
-                    <i className="bi bi-dribbble me-2" /> Sports Participation
-                  </div>
-                  <span className="spms-chip"><i className="bi bi-check-circle" /> Cleared</span>
-                </div>
-                <div className="card-body">
-                  {emptySection('No sports participation recorded.')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="spms-card card mt-3">
-            <div className="card-header d-flex align-items-center justify-content-between">
-              <div className="fw-bold">
-                <i className="bi bi-stars me-2" /> Skills
-              </div>
-              <span className="spms-chip"><i className="bi bi-lightning-charge" /> Strengths</span>
-            </div>
+        <div className="col-12 col-lg-4">
+          <div className="spms-card card mb-3">
             <div className="card-body">
-              <div className="d-flex flex-wrap gap-2">
-                {emptySection('No skills recorded yet.')}
+              <h6 className="fw-bold mb-3">Skills & Expertise</h6>
+              <div className="d-flex flex-wrap gap-1">
+                {skillChips.length > 0 ? skillChips.map(s => (
+                  <span key={s.id} className="badge bg-primary-subtle text-primary">{s.name}</span>
+                )) : <small className="text-muted">No skills recorded.</small>}
               </div>
             </div>
           </div>
 
-          {canViewBehaviorRecords ? (
-            <div className="spms-card card mt-3">
-              <div className="card-header d-flex align-items-center justify-content-between">
-                <div className="fw-bold">
-                  <i className="bi bi-journal-bookmark me-2" /> Non-Academic Achievements
-                </div>
-                <span className="spms-chip">
-                  <i className="bi bi-award" /> Official record
-                </span>
-              </div>
-              <div className="card-body">
-                {!records || records.achievements.length === 0 ? (
-                  emptySection('No non-academic achievements recorded yet.')
-                ) : (
-                  <div className="d-flex flex-column gap-2">
-                    {records.achievements.map((a) => (
-                      <div key={a.id} className="d-flex justify-content-between gap-3">
-                        <div className="flex-grow-1">
-                          <div className="fw-semibold small">
-                            {a.title}{' '}
-                            {a.category ? (
-                              <span className="badge rounded-pill bg-primary-subtle text-primary ms-1">{a.category}</span>
-                            ) : null}
-                          </div>
-                          <div className="spms-muted small">{a.description}</div>
-                        </div>
-                        <div className="text-end spms-muted small">{new Date(a.date).toLocaleDateString()}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <div className="spms-card card">
+            <div className="card-body">
+              <h6 className="fw-bold mb-3">Sports Affiliations</h6>
+              <div className="d-flex flex-wrap gap-1">
+                {draftSportsIds.length > 0 ? draftSportsIds.map(id => (
+                  <span key={id} className="badge bg-success-subtle text-success">{id}</span>
+                )) : <small className="text-muted">No sports recorded.</small>}
               </div>
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

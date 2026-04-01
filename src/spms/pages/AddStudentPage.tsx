@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import axios from 'axios'
-import { createStudent } from '../db/students'
+import { createStudent, seedIfEmpty } from '../db/students'
 
 type FormState = {
   firstName: string
@@ -13,8 +13,10 @@ type FormState = {
   address: string
   email: string
   contactNumber: string
-  yearLevel: '' | '1st' | '2nd' | '3rd' | '4th'
   section: string
+  /** Used when /api/sections is empty or unreachable */
+  manualYearLevel: '' | '1st' | '2nd' | '3rd' | '4th'
+  manualSection: string
 }
 
 const initial: FormState = {
@@ -26,8 +28,9 @@ const initial: FormState = {
   address: '',
   email: '',
   contactNumber: '',
-  yearLevel: '',
   section: '',
+  manualYearLevel: '',
+  manualSection: '',
 }
 
 export function AddStudentPage() {
@@ -35,9 +38,10 @@ export function AddStudentPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [sections, setSections] = useState<Array<{ section_id: number; year_level: FormState['yearLevel']; section: string }>>([])
+  const [sections, setSections] = useState<Array<{ section_id: number; year_level: '1st' | '2nd' | '3rd' | '4th'; section: string }>>([])
   const [sectionsLoading, setSectionsLoading] = useState(true)
   const [sectionsError, setSectionsError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const preview = fileUrl ?? avatarUrl
@@ -54,19 +58,39 @@ export function AddStudentPage() {
         const mapped = res.data.sections
           .map((s) => ({
             section_id: s.section_id,
-            year_level: (s.year_level as FormState['yearLevel']) ?? '',
+            year_level: s.year_level as '1st' | '2nd' | '3rd' | '4th',
             section: s.section,
           }))
           .filter((s) => !!s.year_level && !!s.section)
         setSections(mapped)
       } catch (e: unknown) {
-        const msg =
-          axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+        let msg = 'Failed to load sections.'
+        if (axios.isAxiosError(e)) {
+          if (!e.response) {
+            msg = 'Cannot reach API (is it running?). Use manual year level & section, or run npm run dev:all.'
+          } else {
+            msg = (e.response?.data as { message?: string } | undefined)?.message || msg
+          }
+        }
         if (!alive) return
-        setSectionsError(msg || 'Failed to load sections.')
+        setSectionsError(msg)
       } finally {
         if (!alive) return
         setSectionsLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        await seedIfEmpty()
+      } catch {
+        if (!alive) return
       }
     })()
     return () => {
@@ -78,6 +102,8 @@ export function AddStudentPage() {
     if (!form.section) return null
     return sections.find((s) => s.section === form.section) ?? null
   }, [sections, form.section])
+
+  const canUseApiSections = sections.length > 0 && !sectionsError
 
   return (
     <div className="row g-3">
@@ -93,27 +119,61 @@ export function AddStudentPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault()
+                setSubmitError(null)
+                const fn = form.firstName.trim()
+                const ln = form.lastName.trim()
+                if (!fn || !ln) {
+                  setSubmitError('First name and last name are required.')
+                  return
+                }
+
+                let yearLevel: string | null = null
+                let sectionVal: string | null = null
+                if (canUseApiSections) {
+                  if (!form.section) {
+                    setSubmitError('Please select a section from the list.')
+                    return
+                  }
+                  yearLevel = selectedSection?.year_level ?? null
+                  sectionVal = form.section || null
+                } else {
+                  if (!form.manualYearLevel || !form.manualSection.trim()) {
+                    setSubmitError(
+                      'Enter year level and section name, or start the API (npm run dev:all) to load sections from the server.',
+                    )
+                    return
+                  }
+                  yearLevel = form.manualYearLevel
+                  sectionVal = form.manualSection.trim()
+                }
+
                 setSaving(true)
-                const student = await createStudent({
-                  profilePictureDataUrl: fileDataUrl,
-                  firstName: form.firstName,
-                  middleName: form.middleName || null,
-                  lastName: form.lastName,
-                  birthdate: form.birthdate || null,
-                  gender: form.gender || null,
-                  address: form.address || null,
-                  email: form.email || null,
-                  contactNumber: form.contactNumber || null,
-                  yearLevel: form.yearLevel || null,
-                  section: form.section || null,
-                })
-                setSaving(false)
-                navigate(`/students/${student.id}`)
+                try {
+                  const student = await createStudent({
+                    profilePictureDataUrl: fileDataUrl,
+                    firstName: fn,
+                    middleName: form.middleName.trim() || null,
+                    lastName: ln,
+                    birthdate: form.birthdate || null,
+                    gender: form.gender || null,
+                    address: form.address.trim() || null,
+                    email: form.email.trim() || null,
+                    contactNumber: form.contactNumber.trim() || null,
+                    yearLevel,
+                    section: sectionVal,
+                  })
+                  navigate(`/students/${student.id}`)
+                } catch (err) {
+                  setSubmitError(err instanceof Error ? err.message : 'Could not save student. Check browser storage permissions.')
+                } finally {
+                  setSaving(false)
+                }
               }}
               onReset={() => {
                 setForm(initial)
                 setFileUrl(null)
                 setFileDataUrl(null)
+                setSubmitError(null)
               }}
             >
               <div className="row g-3">
@@ -162,6 +222,7 @@ export function AddStudentPage() {
                       value={form.firstName}
                       onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
                       placeholder="First name"
+                      required
                     />
                   </div>
                 </div>
@@ -190,6 +251,7 @@ export function AddStudentPage() {
                       value={form.lastName}
                       onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
                       placeholder="Last name"
+                      required
                     />
                   </div>
                 </div>
@@ -272,29 +334,6 @@ export function AddStudentPage() {
                 </div>
 
                 <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold">Year Level</label>
-                  <div className="input-group">
-                    <span className="input-group-text">
-                      <i className="bi bi-layers" />
-                    </span>
-                    <select
-                      className="form-select"
-                      value={selectedSection?.year_level ?? form.yearLevel}
-                      onChange={(e) => setForm((f) => ({ ...f, yearLevel: e.target.value as FormState['yearLevel'] }))}
-                      disabled={!!selectedSection || sectionsLoading || sections.length > 0}
-                    >
-                      <option value="">Select</option>
-                      <option>1st</option>
-                      <option>2nd</option>
-                      <option>3rd</option>
-                      <option>4th</option>
-                    </select>
-                  </div>
-                  {sections.length > 0 ? (
-                    <div className="spms-muted small mt-1">Auto-filled based on selected section.</div>
-                  ) : null}
-                </div>
-                <div className="col-12 col-md-6">
                   <label className="form-label fw-semibold">Section</label>
                   <div className="input-group">
                     <span className="input-group-text">
@@ -305,10 +344,9 @@ export function AddStudentPage() {
                       value={form.section}
                       onChange={(e) => {
                         const v = e.target.value
-                        const s = sections.find((x) => x.section === v)
-                        setForm((f) => ({ ...f, section: v, yearLevel: (s?.year_level ?? f.yearLevel) as FormState['yearLevel'] }))
+                        setForm((f) => ({ ...f, section: v }))
                       }}
-                      disabled={sectionsLoading}
+                      disabled={sectionsLoading || !canUseApiSections}
                     >
                       <option value="">{sectionsLoading ? 'Loading...' : 'Select'}</option>
                       {sections.map((s) => (
@@ -319,13 +357,71 @@ export function AddStudentPage() {
                     </select>
                   </div>
                   {sectionsError ? (
-                    <div className="text-danger small mt-1">{sectionsError}</div>
+                    <div className="text-danger small mt-1">
+                      {sectionsError}{' '}
+                      <span className="text-body">You can use manual year level and section below.</span>
+                    </div>
                   ) : sections.length === 0 && !sectionsLoading ? (
-                    <div className="spms-muted small mt-1">No sections found. Create sections first in the Sections module.</div>
+                    <div className="spms-muted small mt-1">
+                      No sections from server. Use manual fields below, or run <code className="small">npm run dev:all</code> and add
+                      sections under Sections.
+                    </div>
+                  ) : selectedSection ? (
+                    <div className="spms-muted small mt-1">
+                      Year Level auto-set to <span className="fw-semibold">{selectedSection.year_level}</span>.
+                    </div>
                   ) : null}
                 </div>
 
+                {!canUseApiSections ? (
+                  <>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label fw-semibold">Year level (manual)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-layers" />
+                        </span>
+                        <select
+                          className="form-select"
+                          value={form.manualYearLevel}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              manualYearLevel: e.target.value as FormState['manualYearLevel'],
+                            }))
+                          }
+                        >
+                          <option value="">Select</option>
+                          <option value="1st">1st</option>
+                          <option value="2nd">2nd</option>
+                          <option value="3rd">3rd</option>
+                          <option value="4th">4th</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label fw-semibold">Section name (manual)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-pencil" />
+                        </span>
+                        <input
+                          className="form-control"
+                          value={form.manualSection}
+                          onChange={(e) => setForm((f) => ({ ...f, manualSection: e.target.value }))}
+                          placeholder="e.g. BSIT-2A"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
                 <div className="col-12">
+                  {submitError ? (
+                    <div className="alert alert-danger" role="alert">
+                      {submitError}
+                    </div>
+                  ) : null}
                   <div className="d-flex flex-column flex-md-row gap-2 justify-content-end">
                     <button className="btn btn-outline-secondary rounded-4 px-4" type="reset">
                       <i className="bi bi-arrow-counterclockwise me-1" /> Reset
@@ -334,7 +430,10 @@ export function AddStudentPage() {
                       <i className="bi bi-check2-circle me-1" /> {saving ? 'Saving...' : 'Save Student'}
                     </button>
                   </div>
-                  <div className="spms-muted small mt-2">Pure React + IndexedDB (stored locally in browser).</div>
+                  <div className="spms-muted small mt-2">
+                    Students are saved in this browser&apos;s IndexedDB (not in Git). Use the same machine/browser to see them after
+                    switching branches.
+                  </div>
                 </div>
               </div>
             </form>

@@ -6,13 +6,14 @@ import { ROLES } from '../auth/types'
 
 type SidebarProps = {
   mobileOpen: boolean
+  desktopHidden: boolean
 }
 
 function cx(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Sidebar({ mobileOpen }: SidebarProps) {
+export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
   const navClass = ({ isActive }: { isActive: boolean }) => `nav-link${isActive ? ' active' : ''}`
   const { user } = useAuth()
   const role = user?.role ?? 'admin'
@@ -21,7 +22,12 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
   return (
     <aside
       id="spmsSidebar"
-      className={cx('spms-sidebar d-flex flex-column', 'spms-sidebar-mobile d-lg-flex', mobileOpen && 'show')}
+      className={cx(
+        'spms-sidebar d-flex flex-column',
+        'spms-sidebar-mobile d-lg-flex',
+        mobileOpen && 'show',
+        desktopHidden && 'spms-sidebar-desktop-hidden',
+      )}
       aria-label="Sidebar navigation"
     >
       <div className="spms-brand">
@@ -58,6 +64,12 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
                 <NavLink className={navClass} to="/faculty/skills">
                   <i className="bi bi-award" /> Skills
                 </NavLink>
+                <NavLink className={navClass} to="/faculty/sports">
+                  <i className="bi bi-dribbble" /> Sports
+                </NavLink>
+                <NavLink className={navClass} to="/faculty/academic">
+                  <i className="bi bi-mortarboard" /> Academic
+                </NavLink>
               </>
             )}
             {role === 'admin' && (
@@ -75,13 +87,14 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
                 <i className="bi bi-diagram-3" /> Sections
               </NavLink>
             )}
-            {role === 'admin' && (
+            {(role === 'admin' || role === 'faculty') && (
               <NavLink className={navClass} to="/reports">
                 <i className="bi bi-file-earmark-bar-graph" /> Reports
               </NavLink>
             )}
           </>
         )}
+
         {isStudent && (
           <>
             {user?.studentId && (

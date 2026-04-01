@@ -12,18 +12,16 @@ import { ActivityFeed, type ActivityItem } from '../components/ActivityFeed'
 
 // Mock data until backend is available
 const MOCK_ACADEMIC: AcademicRow[] = [
-  { schoolYear: '2024-2025', semester: '1st', gwa: '1.45', honors: 'Dean\'s Lister' },
+  { schoolYear: '2024-2025', semester: '1st', gwa: '1.45', honors: "Dean's Lister" },
   { schoolYear: '2023-2024', semester: '2nd', gwa: '1.52', honors: '—' },
 ]
+
 const MOCK_SKILLS = [
   { name: 'Programming - Python', levelOrDescription: 'Intermediate', dateAdded: 'Feb 1, 2025', icon: 'bi-code-slash' },
   { name: 'Leadership', levelOrDescription: 'Workshop completed', dateAdded: 'Jan 15, 2025', icon: 'bi-people' },
 ]
-const MOCK_ACTIVITY: ActivityItem[] = [
-  { text: 'Skill added: Programming - Python', date: 'Feb 1, 2025', icon: 'bi-award' },
-  { text: 'Academic record updated', date: 'Jan 20, 2025', icon: 'bi-journal-text' },
-  { text: 'Skill added: Leadership Workshop', date: 'Jan 15, 2025', icon: 'bi-award' },
-]
+
+const MOCK_ACTIVITY: ActivityItem[] =
 
 export function StudentDashboard() {
   const { user } = useAuth()
@@ -39,18 +37,15 @@ export function StudentDashboard() {
   useEffect(() => {
     let alive = true
     ;(async () => {
+      if (!studentId) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       await seedIfEmpty()
-      if (studentId) {
-        const s = await getStudent(studentId)
-        if (!alive) return
-        setStudent(s ?? null)
-      } else {
-        const list = await listStudents()
-        const found = list.find((s) => (s.email ?? '').toLowerCase() === 'student@spms.edu') ?? list[0]
-        if (!alive) return
-        setStudent(found ?? null)
-      }
+      const data = await getStudent(studentId)
+      if (!alive) return
+      setStudent(data ?? null)
       setLoading(false)
     })()
     return () => {
@@ -69,6 +64,7 @@ export function StudentDashboard() {
   const totalSkills = MOCK_SKILLS.length
 
   const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student, recordsTick])
+  
   const violationRows: ViolationRow[] = useMemo(
     () =>
       (records?.violations ?? []).map((v) => ({
@@ -80,18 +76,9 @@ export function StudentDashboard() {
       })),
     [records],
   )
+  
   const totalViolations = violationRows.length
   const totalAchievements = records?.achievements.length ?? 0
-
-  const achievementRows = useMemo(
-    () =>
-      (records?.achievements ?? []).map((a) => ({
-        recordType: a.category ? `${a.title} (${a.category})` : a.title,
-        description: a.description,
-        date: new Date(a.date).toLocaleDateString(),
-      })),
-    [records],
-  )
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -109,89 +96,59 @@ export function StudentDashboard() {
         </div>
       ) : null}
 
-      {/* Overview */}
       <section>
         <h6 className="text-secondary fw-semibold mb-3">Overview</h6>
         <div className="row g-3">
           <div className="col-6 col-lg-3">
-            <InsightCard
-              icon="bi-mortarboard"
-              value={loading ? '—' : yearLevel}
-              label="Year Level"
-            />
+            <InsightCard icon="bi-mortarboard" value={loading ? '—' : yearLevel} label="Year Level" />
           </div>
           <div className="col-6 col-lg-3">
-            <InsightCard
-              icon="bi-diagram-3"
-              value={loading ? '—' : section}
-              label="Section"
-            />
+            <InsightCard icon="bi-diagram-3" value={loading ? '—' : section} label="Section" />
           </div>
           <div className="col-6 col-lg-3">
-            <InsightCard
-              icon="bi-award"
-              value={loading ? '—' : totalSkills}
-              label="Total Skills"
-            />
+            <InsightCard icon="bi-award" value={loading ? '—' : totalSkills.toString()} label="Total Skills" />
           </div>
           <div className="col-6 col-lg-3">
-            <InsightCard
-              icon="bi-exclamation-triangle"
-              value={loading ? '—' : totalViolations}
-              label="Total Violations"
-            />
-          </div>
-          <div className="col-6 col-lg-3">
-            <InsightCard
-              icon="bi-journal-bookmark"
-              value={loading ? '—' : totalAchievements}
-              label="Achievements"
-            />
+            <InsightCard icon="bi-journal-bookmark" value={loading ? '—' : totalAchievements.toString()} label="Achievements" />
           </div>
         </div>
       </section>
 
-      {/* Academic Progress */}
-      <section>
-        <AcademicTable rows={MOCK_ACADEMIC} loading={loading} />
-      </section>
-
-      {/* 4. Skills & 5. Violations - two columns */}
       <div className="row g-4">
-        <div className="col-12 col-lg-6">
-          <h6 className="text-secondary fw-semibold mb-3">Skills</h6>
-          <div className="row g-3">
-            {MOCK_SKILLS.map((s, i) => (
-              <div key={i} className="col-12 col-sm-6">
-                <SkillCard
-                  name={s.name}
-                  levelOrDescription={s.levelOrDescription}
-                  dateAdded={s.dateAdded}
-                  icon={s.icon}
-                />
-              </div>
-            ))}
-          </div>
+        <div className="col-12 col-xl-8">
+          <section className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="text-secondary fw-semibold mb-0">Recent Academic Performance</h6>
+              <Link to="/student/academic" className="small text-decoration-none">View History</Link>
+            </div>
+            <AcademicTable rows={MOCK_ACADEMIC} />
+          </section>
+
+          <section>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="text-secondary fw-semibold mb-0">Recent Violations</h6>
+              <span className="badge rounded-pill bg-danger-subtle text-danger">{totalViolations} Active</span>
+            </div>
+            <ViolationTable rows={violationRows.slice(0, 3)} />
+          </section>
         </div>
-        <div className="col-12 col-lg-6">
-          <h6 className="text-secondary fw-semibold mb-3">Violations</h6>
-          <ViolationTable rows={violationRows} loading={loading} />
+
+        <div className="col-12 col-xl-4">
+          <section className="mb-4">
+            <h6 className="text-secondary fw-semibold mb-3">Top Skills</h6>
+            <div className="d-flex flex-column gap-2">
+              {MOCK_SKILLS.map((s, i) => (
+                <SkillCard key={i} {...s} />
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h6 className="text-secondary fw-semibold mb-3">Activity Feed</h6>
+            <ActivityFeed items={MOCK_ACTIVITY} />
+          </section>
         </div>
       </div>
-
-      <section>
-        <h6 className="text-secondary fw-semibold mb-3">Non-academic achievements</h6>
-        <RecordTable
-          title="Achievements (official)"
-          rows={achievementRows}
-          emptyMessage="No non-academic achievements recorded yet."
-        />
-      </section>
-
-      {/* 6. Recent Activity */}
-      <section>
-        <ActivityFeed items={MOCK_ACTIVITY} />
-      </section>
     </div>
   )
 }
