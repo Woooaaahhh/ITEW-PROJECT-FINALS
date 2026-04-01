@@ -1,26 +1,24 @@
-<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { addAchievement, addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
-=======
-import { NavLink } from 'react-router-dom'
-import { AppIcon } from './AppIcon'
-import avatarUrl from '../../assets/react.svg'
-import { useAuth } from '../auth/AuthContext'
-import { ROLES } from '../auth/types'
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
 
-type SidebarProps = {
-  mobileOpen: boolean
-  desktopHidden: boolean
+type RecordKind = 'violation' | 'achievement'
+
+type ViolationPayload = {
+  violation_type: string
+  description: string
+  date: string
+  status: string
 }
 
-function cx(...parts: Array<string | false | undefined>) {
-  return parts.filter(Boolean).join(' ')
+type AchievementPayload = {
+  title: string
+  description: string
+  date: string
+  category: string
 }
 
-<<<<<<< HEAD
 type ApiViolation = {
   id: string
   violation_type: string
@@ -175,122 +173,342 @@ export function FacultyViolationsPage() {
       setSubmitting(false)
     }
   }
-=======
-export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
-  const navClass = ({ isActive }: { isActive: boolean }) => `nav-link${isActive ? ' active' : ''}`
-  const { user } = useAuth()
-  const role = user?.role ?? 'admin'
-  const isStudent = role === 'student'
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
 
   return (
-    <aside
-      id="spmsSidebar"
-      className={cx(
-        'spms-sidebar d-flex flex-column',
-        'spms-sidebar-mobile d-lg-flex',
-        mobileOpen && 'show',
-        desktopHidden && 'spms-sidebar-desktop-hidden',
-      )}
-      aria-label="Sidebar navigation"
-    >
-      <div className="spms-brand">
-        <div className="d-flex align-items-center gap-2">
-          <AppIcon />
-          <div className="min-w-0">
-            <div className="fw-bold text-white lh-tight" style={{ fontSize: '.9rem' }}>
-              Student Profiling
+    <div className="space-y-6">
+      <div
+        className="spms-card card border-0"
+        style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
+      >
+        <div className="card-body">
+          <div className="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h5 className="fw-bold mb-1">Student Conduct &amp; Participation</h5>
+              <p className="spms-muted small mb-0">
+                Record violations and non-academic achievements for a selected student.
+              </p>
             </div>
-            <div className="text-white-50" style={{ fontSize: '.7rem' }}>
-              Management System
+            <div className="d-flex gap-2">
+              <Link to="/students" className="btn btn-outline-secondary btn-sm rounded-3">
+                <i className="bi bi-people me-1" /> View Students
+              </Link>
+              <Link to="/faculty" className="btn btn-outline-secondary btn-sm rounded-3">
+                Back to Dashboard
+              </Link>
             </div>
           </div>
-        </div>
-      </div>
 
-      <nav className="spms-nav nav flex-column">
-        <NavLink className={navClass} to={role === 'admin' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
-          <i className="bi bi-grid-1x2" /> Dashboard
-        </NavLink>
-        {!isStudent && (
-          <>
-            <NavLink className={navClass} to="/students">
-              <i className="bi bi-people" /> Students
-            </NavLink>
-            {role === 'faculty' && (
+          <div className="row g-2 mb-3">
+            <div className="col-12 col-lg-7">
+              <label className="form-label small fw-semibold">Target Student</label>
+              <select
+                className="form-select form-select-sm rounded-3"
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+                disabled={loadingStudents}
+              >
+                {loadingStudents ? (
+                  <option value="">Loading students...</option>
+                ) : students.length === 0 ? (
+                  <option value="">No students available</option>
+                ) : (
+                  students.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {fullName(st)} (ID: {st.id})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="col-12 col-lg-5 d-flex align-items-end">
+              <div className="d-flex flex-wrap gap-2">
+                <Link
+                  to={selectedStudentId ? `/students/${selectedStudentId}` : '/students'}
+                  className="btn btn-outline-primary btn-sm rounded-3"
+                >
+                  <i className="bi bi-eye me-1" /> View Profile
+                </Link>
+                <span className="badge rounded-pill bg-secondary-subtle text-secondary">
+                  Dummy storage: localStorage
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <div className="inline-flex rounded-full bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setActiveKind('violation')}
+                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
+                  activeKind === 'violation'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Violation
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveKind('achievement')}
+                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
+                  activeKind === 'achievement'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Achievement
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger rounded-3 py-2 small mb-3" role="alert">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="alert alert-success rounded-3 py-2 small mb-3" role="alert">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="row g-3">
+            {activeKind === 'violation' ? (
               <>
-                <NavLink className={navClass} to="/faculty/violations">
-                  <i className="bi bi-exclamation-triangle" /> Violations
-                </NavLink>
-                <NavLink className={navClass} to="/faculty/achievements">
-                  <i className="bi bi-journal-bookmark" /> Achievements
-                </NavLink>
-                <NavLink className={navClass} to="/faculty/skills">
-                  <i className="bi bi-award" /> Skills
-                </NavLink>
-                <NavLink className={navClass} to="/faculty/sports">
-                  <i className="bi bi-dribbble" /> Sports
-                </NavLink>
-                <NavLink className={navClass} to="/faculty/academic">
-                  <i className="bi bi-mortarboard" /> Academic
-                </NavLink>
+                <div className="col-md-6">
+                  <label className="form-label small fw-semibold">Violation Type</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm rounded-3"
+                    placeholder="e.g. Uniform, Attendance, Cheating"
+                    value={violationForm.violation_type}
+                    onChange={(e) =>
+                      setViolationForm((prev) => ({ ...prev, violation_type: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small fw-semibold">Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm rounded-3"
+                    value={violationForm.date}
+                    onChange={(e) => setViolationForm((prev) => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small fw-semibold">Status</label>
+                  <select
+                    className="form-select form-select-sm rounded-3"
+                    value={violationForm.status}
+                    onChange={(e) =>
+                      setViolationForm((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </div>
+                <div className="col-12">
+                  <label className="form-label small fw-semibold">Description</label>
+                  <textarea
+                    rows={3}
+                    className="form-control form-control-sm rounded-3"
+                    placeholder="Provide brief details of the violation."
+                    value={violationForm.description}
+                    onChange={(e) =>
+                      setViolationForm((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="col-md-6">
+                  <label className="form-label small fw-semibold">Achievement Title</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm rounded-3"
+                    placeholder="e.g. Programming Contest Winner"
+                    value={achievementForm.title}
+                    onChange={(e) =>
+                      setAchievementForm((prev) => ({ ...prev, title: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small fw-semibold">Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm rounded-3"
+                    value={achievementForm.date}
+                    onChange={(e) =>
+                      setAchievementForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small fw-semibold">Category</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm rounded-3"
+                    placeholder="e.g. Sports, Programming, Leadership"
+                    value={achievementForm.category}
+                    onChange={(e) =>
+                      setAchievementForm((prev) => ({ ...prev, category: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="form-label small fw-semibold">Description</label>
+                  <textarea
+                    rows={3}
+                    className="form-control form-control-sm rounded-3"
+                    placeholder="Provide brief details of the achievement or recognition."
+                    value={achievementForm.description}
+                    onChange={(e) =>
+                      setAchievementForm((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
               </>
             )}
-            {role === 'admin' && (
-              <NavLink className={navClass} to="/registrar/records">
-                <i className="bi bi-clipboard-check" /> Behavior records
-              </NavLink>
-            )}
-            {role === 'admin' && (
-              <NavLink className={navClass} to="/users">
-                <i className="bi bi-person-badge" /> Faculty
-              </NavLink>
-            )}
-            {role === 'admin' && (
-              <NavLink className={navClass} to="/sections">
-                <i className="bi bi-diagram-3" /> Sections
-              </NavLink>
-            )}
-            {(role === 'admin' || role === 'faculty') && (
-              <NavLink className={navClass} to="/reports">
-                <i className="bi bi-file-earmark-bar-graph" /> Reports
-              </NavLink>
-            )}
-          </>
-        )}
 
-        {isStudent && (
-          <>
-            {user?.studentId && (
-              <NavLink className={navClass} to={`/students/${user.studentId}`}>
-                <i className="bi bi-person-badge" /> My Profile
-              </NavLink>
-            )}
-            <NavLink className={navClass} to="/student/academic">
-              <i className="bi bi-journal-text" /> Academic History
-            </NavLink>
-            <NavLink className={navClass} to="/student/skills">
-              <i className="bi bi-award" /> Skills
-            </NavLink>
-            <NavLink className={navClass} to="/student/violations">
-              <i className="bi bi-exclamation-triangle" /> Violations
-            </NavLink>
-            <NavLink className={navClass} to="/student/achievements">
-              <i className="bi bi-journal-bookmark" /> Achievements
-            </NavLink>
-          </>
-        )}
-      </nav>
+            <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm rounded-3 px-4"
+                disabled={submitting}
+              >
+                {submitting ? 'Saving...' : 'Save Record'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
-      <div className="mt-auto spms-sidebar-footer">
-        <div className="d-flex align-items-center gap-2">
-          <img src={avatarUrl} className="rounded-3" width={40} height={40} alt="" />
-          <div className="min-w-0">
-            <div className="fw-semibold text-white text-truncate" style={{ fontSize: '.85rem' }}>{user?.name ?? 'User'}</div>
-            {role === 'student' ? null : <small className="text-white-50">{ROLES[role]}</small>}
+      <div className="row g-3">
+        <div className="col-12 col-xl-6">
+          <div
+            className="spms-card card border-0 overflow-hidden h-100"
+            style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
+          >
+            <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
+              <h6 className="fw-semibold mb-0">Violations</h6>
+              <span className="spms-muted small">{sortedViolations.length} record(s)</span>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0 spms-table">
+                  <thead>
+                    <tr className="spms-muted small">
+                      <th className="ps-4 py-3 fw-semibold">Violation Type</th>
+                      <th className="py-3 fw-semibold">Description</th>
+                      <th className="py-3 fw-semibold">Status</th>
+                      <th className="pe-4 py-3 fw-semibold text-end">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedViolations.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
+                          No violations recorded.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedViolations.map((v) => (
+                        <tr key={v.id}>
+                          <td className="ps-4 py-3">{v.violation_type}</td>
+                          <td className="py-3">{v.description}</td>
+                          <td className="py-3">
+                            <span
+                              className="badge rounded-pill"
+                              style={{
+                                background:
+                                  v.status.toLowerCase() === 'resolved'
+                                    ? 'rgba(34, 197, 94, .15)'
+                                    : 'rgba(234, 179, 8, .15)',
+                                color:
+                                  v.status.toLowerCase() === 'resolved' ? '#15803d' : '#a16207',
+                              }}
+                            >
+                              {v.status}
+                            </span>
+                          </td>
+                          <td className="pe-4 py-3 text-end spms-muted small">
+                            {new Date(v.date).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-12 col-xl-6">
+          <div
+            className="spms-card card border-0 overflow-hidden h-100"
+            style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
+          >
+            <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
+              <h6 className="fw-semibold mb-0">Non-Academic Achievements</h6>
+              <span className="spms-muted small">{sortedAchievements.length} record(s)</span>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0 spms-table">
+                  <thead>
+                    <tr className="spms-muted small">
+                      <th className="ps-4 py-3 fw-semibold">Title</th>
+                      <th className="py-3 fw-semibold">Description</th>
+                      <th className="py-3 fw-semibold">Category</th>
+                      <th className="pe-4 py-3 fw-semibold text-end">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedAchievements.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
+                          No achievements recorded.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedAchievements.map((a) => (
+                        <tr key={a.id}>
+                          <td className="ps-4 py-3">{a.title}</td>
+                          <td className="py-3">{a.description}</td>
+                          <td className="py-3">
+                            {a.category ? (
+                              <span className="badge rounded-pill bg-primary-subtle text-primary">
+                                {a.category}
+                              </span>
+                            ) : (
+                              <span className="spms-muted small">—</span>
+                            )}
+                          </td>
+                          <td className="pe-4 py-3 text-end spms-muted small">
+                            {new Date(a.date).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   )
 }

@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-<<<<<<< HEAD
-import { Link, Outlet, useMatches, useLocation } from 'react-router-dom'
-=======
 import { Link, Outlet, useLocation, useMatch, useMatches } from 'react-router-dom'
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
 import { useAuth } from '../auth/AuthContext'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -37,24 +33,9 @@ export function AppShell() {
       </Link>
     ) : null
 
-  const isStudentBrowsingProfile =
-    user?.role === 'student' && /^\/students\/[^/]+$/.test(location.pathname)
-
   const headerRight =
-<<<<<<< HEAD
-    location.pathname === '/students' && user?.role !== 'admin'
-      ? null
-      : isStudentBrowsingProfile
-        ? (
-            <Link className="btn btn-outline-primary rounded-4 px-3" to="/student">
-              <i className="bi bi-arrow-left me-1" /> Back to directory
-            </Link>
-          )
-        : meta.right
-=======
     profileHeaderRight ??
     (location.pathname === '/students' && user?.role !== 'admin' ? null : meta.right)
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
 
   const overlayClass = useMemo(() => `spms-overlay${mobileOpen ? ' show' : ''}`, [mobileOpen])
   const showSearch = meta.showSearch === true

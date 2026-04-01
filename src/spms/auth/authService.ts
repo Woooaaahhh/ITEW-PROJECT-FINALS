@@ -99,9 +99,6 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/reports',
       ]
     case 'student':
-<<<<<<< HEAD
-      return ['/', '/student', '/student/academic', '/student/skills', '/student/violations']
-=======
       return [
         '/',
         '/student',
@@ -109,9 +106,7 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/student/skills',
         '/student/violations',
         '/student/achievements',
-        '/students',
       ]
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
     default:
       return ['/']
   }
@@ -135,7 +130,7 @@ export function canAccessPath(
   role: UserRole,
   pathname: string,
   studentIdFromPath?: string,
-  authStudentId?: string,
+  _authStudentId?: string,
 ): boolean {
   const path = pathname.replace(/\/$/, '') || '/'
 

@@ -2,13 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import { useAuth } from '../auth/AuthContext'
-import { getStudent, updateStudent, type Student } from '../db/students'
-<<<<<<< HEAD
+import { getStudent, type Student } from '../db/students'
 import { getStudentRecords } from '../db/studentRecords'
-=======
-import { ensureAcademicSeededForDemo } from '../db/academicRecords'
-import { ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
 import { ProfileAcademicHistoryCard, ProfileCurrentAcademicBanner } from '../components/AcademicProfileSections'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
 import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
@@ -28,6 +23,7 @@ export function StudentProfilePage() {
   
   // Permissions
   const canEditProfile = user?.role === 'admin'
+  const canEditAcademic = user?.role === 'faculty'
   const isOwnProfile = user?.role === 'student' && user?.studentId === id
   const canViewBehaviorRecords =
     user?.role === 'faculty' || user?.role === 'admin' || isOwnProfile
@@ -47,13 +43,6 @@ export function StudentProfilePage() {
       const s = await getStudent(id)
       if (!alive) return
       setStudent(s ?? null)
-<<<<<<< HEAD
-=======
-      if (s?.id) {
-        ensureSeededForDemo([s.id])
-        ensureAcademicSeededForDemo([s.id])
-      }
->>>>>>> a18d51df6d79b75d038516660afd205af438449a
       setLoading(false)
     })()
     return () => { alive = false }
@@ -112,6 +101,7 @@ export function StudentProfilePage() {
   const records = useMemo(() => (student ? getStudentRecords(student.id) : null), [student, recordsTick])
 
   const skillsById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills])
+  const sportNameById = useMemo(() => new Map(sports.map((s) => [s.id, s.name])), [sports])
   const skillChips = useMemo(() => {
     return studentSkillIds
       .map((sid) => skillsById.get(sid))
@@ -178,7 +168,7 @@ export function StudentProfilePage() {
         <div className="col-12 col-lg-8">
            <ProfileCurrentAcademicBanner studentId={student.id} />
            <div className="mt-3">
-             <ProfileAcademicHistoryCard studentId={student.id} />
+             <ProfileAcademicHistoryCard studentId={student.id} showFacultyForm={canEditAcademic} />
            </div>
            
            {canViewBehaviorRecords && (
@@ -209,8 +199,10 @@ export function StudentProfilePage() {
             <div className="card-body">
               <h6 className="fw-bold mb-3">Sports Affiliations</h6>
               <div className="d-flex flex-wrap gap-1">
-                {draftSportsIds.length > 0 ? draftSportsIds.map(id => (
-                  <span key={id} className="badge bg-success-subtle text-success">{id}</span>
+                {draftSportsIds.length > 0 ? draftSportsIds.map((sid) => (
+                  <span key={sid} className="badge bg-success-subtle text-success">
+                    {sportNameById.get(sid) ?? sid}
+                  </span>
                 )) : <small className="text-muted">No sports recorded.</small>}
               </div>
             </div>
