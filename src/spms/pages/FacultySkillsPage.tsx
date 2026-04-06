@@ -5,6 +5,26 @@ import type { Skill, Student } from '../db/spmsDb'
 import { createSkill, deleteSkill, listSkills, seedSkillsIfEmpty, setStudentSkills, updateSkill, listStudentSkills } from '../db/skills'
 import { listStudents, seedIfEmpty } from '../db/students'
 
+function normalize(s: string) {
+  return s.toLowerCase().trim()
+}
+
+const yearOptions = ['1st', '2nd', '3rd', '4th'] as const
+const sectionOptions = ['BSIT-2A', 'BSBA-1B', 'BSED-3C', 'BSIT-4A']
+
+function matchesStudentFilter(st: Student, q: string, year: string, section: string) {
+  const parts = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ')
+  const full = parts.replace(/\s+/g, ' ').trim()
+  const hitQ =
+    !q ||
+    normalize(full).includes(q) ||
+    normalize(st.email ?? '').includes(q) ||
+    normalize(st.id).includes(q)
+  const hitYear = !year || normalize(st.yearLevel ?? '') === year
+  const hitSection = !section || normalize(st.section ?? '') === section
+  return hitQ && hitYear && hitSection
+}
+
 export function FacultySkillsPage() {
   type QualificationCategory = 'programming' | 'sports' | 'academic' | 'creative' | 'other'
   type QualifiedStudent = {
@@ -88,6 +108,11 @@ export function FacultySkillsPage() {
     )
     return rows.filter((row): row is QualifiedStudent => Boolean(row))
   }
+
+  const [studentQuery, setStudentQuery] = useState('')
+  const [studentYear, setStudentYear] = useState('')
+  const [studentSection, setStudentSection] = useState('')
+  const [assignSkillSearch, setAssignSkillSearch] = useState('')
 
   const fetchSkills = async () => {
     setSkillsLoading(true)
@@ -207,6 +232,28 @@ export function FacultySkillsPage() {
   const activeSkills = useMemo(() => skills.filter((s) => s.isActive), [skills])
   const activeSkillsById = useMemo(() => new Map(activeSkills.map((s) => [s.id, s])), [activeSkills])
   const assignedActiveCount = useMemo(() => assignedSkillIds.filter((id) => activeSkillsById.has(id)).length, [assignedSkillIds, activeSkillsById])
+
+  const sq = useMemo(() => normalize(studentQuery), [studentQuery])
+  const sy = useMemo(() => normalize(studentYear), [studentYear])
+  const ssec = useMemo(() => normalize(studentSection), [studentSection])
+
+  const filteredStudents = useMemo(
+    () => students.filter((st) => matchesStudentFilter(st, sq, sy, ssec)),
+    [students, sq, sy, ssec],
+  )
+
+  useEffect(() => {
+    if (filteredStudents.some((s) => s.id === selectedStudentId)) return
+    setSelectedStudentId(filteredStudents[0]?.id ?? '')
+  }, [filteredStudents, selectedStudentId])
+
+  const assignSkillQ = useMemo(() => normalize(assignSkillSearch), [assignSkillSearch])
+  const filteredActiveSkills = useMemo(() => {
+    if (!assignSkillQ) return activeSkills
+    return activeSkills.filter(
+      (sk) => normalize(sk.name).includes(assignSkillQ) || normalize(sk.category).includes(assignSkillQ),
+    )
+  }, [activeSkills, assignSkillQ])
 
   const selectedStudent = useMemo(() => students.find((s) => s.id === selectedStudentId) ?? null, [students, selectedStudentId])
   const selectedStudentName = useMemo(() => {
@@ -474,15 +521,73 @@ export function FacultySkillsPage() {
             </div>
 
             <div className="row g-3">
+              <div className="col-12">
+                <div className="spms-muted small fw-semibold mb-2">Filter students</div>
+                <div className="row g-2 align-items-end">
+                  <div className="col-12 col-md-5">
+                    <label className="form-label small fw-semibold mb-1">Search</label>
+                    <div className="input-group input-group-sm">
+                      <span className="input-group-text">
+                        <i className="bi bi-search" />
+                      </span>
+                      <input
+                        className="form-control"
+                        value={studentQuery}
+                        onChange={(e) => setStudentQuery(e.target.value)}
+                        placeholder="Name, email, or ID..."
+                      />
+                    </div>
+                  </div>
+                  <div className="col-6 col-md-3">
+                    <label className="form-label small fw-semibold mb-1">Year level</label>
+                    <select
+                      className="form-select form-select-sm rounded-3"
+                      value={studentYear}
+                      onChange={(e) => setStudentYear(e.target.value)}
+                    >
+                      <option value="">All years</option>
+                      {yearOptions.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-6 col-md-3">
+                    <label className="form-label small fw-semibold mb-1">Section</label>
+                    <select
+                      className="form-select form-select-sm rounded-3"
+                      value={studentSection}
+                      onChange={(e) => setStudentSection(e.target.value)}
+                    >
+                      <option value="">All sections</option>
+                      {sectionOptions.map((sec) => (
+                        <option key={sec} value={sec}>
+                          {sec}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-12 col-md-1 text-md-end">
+                    <span className="spms-chip small">
+                      <i className="bi bi-funnel" /> {filteredStudents.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="col-12 col-lg-6">
                 <label className="form-label small fw-semibold mb-1">Student</label>
                 <select
                   className="form-select"
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  disabled={studentsLoading}
+                  disabled={studentsLoading || filteredStudents.length === 0}
                 >
-                  {students.map((st) => {
+                  {filteredStudents.length === 0 ? (
+                    <option value="">No students match filters</option>
+                  ) : null}
+                  {filteredStudents.map((st) => {
                     const parts = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ')
                     const nm = parts.replace(/\s+/g, ' ').trim()
                     return (
@@ -525,8 +630,31 @@ export function FacultySkillsPage() {
                     No active skills available. Create skills first in the table.
                   </div>
                 ) : (
+                  <>
+                    <div className="mb-2">
+                      <label className="form-label small fw-semibold mb-1">Filter skills to assign</label>
+                      <div className="input-group input-group-sm">
+                        <span className="input-group-text">
+                          <i className="bi bi-search" />
+                        </span>
+                        <input
+                          className="form-control"
+                          value={assignSkillSearch}
+                          onChange={(e) => setAssignSkillSearch(e.target.value)}
+                          placeholder="Search skill name or category..."
+                        />
+                      </div>
+                      <div className="spms-muted small mt-1">
+                        Showing {filteredActiveSkills.length} of {activeSkills.length} active skills
+                      </div>
+                    </div>
+                    {filteredActiveSkills.length === 0 ? (
+                      <div className="alert alert-light border mb-0 small">
+                        No skills match “{assignSkillSearch.trim() || '…'}”. Clear the search to see all.
+                      </div>
+                    ) : (
                   <div className="d-flex flex-wrap gap-2">
-                    {activeSkills.map((sk) => {
+                    {filteredActiveSkills.map((sk) => {
                       const checked = assignedSkillIds.includes(sk.id)
                       return (
                         <label key={sk.id} className={`btn btn-sm rounded-4 ${checked ? 'btn-primary' : 'btn-outline-primary'}`}>
@@ -551,6 +679,8 @@ export function FacultySkillsPage() {
                       )
                     })}
                   </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
