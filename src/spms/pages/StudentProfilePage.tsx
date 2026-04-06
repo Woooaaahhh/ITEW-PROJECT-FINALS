@@ -9,7 +9,13 @@ import { ProfileAcademicHistoryCard } from '../components/AcademicProfileSection
 import { formatStudentRecordDate } from './studentRecordViewUtils'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
 import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
-import type { MedicalClearanceStatus, Sport } from '../db/spmsDb'
+import type { Sport } from '../db/spmsDb'
+import {
+  hasPendingMedicalSubmission,
+  isMedicalApprovedForTryouts,
+  medicalStatusLabel,
+  normalizeMedicalStatus,
+} from '../db/medicalClearance'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -44,11 +50,11 @@ export function StudentProfilePage() {
   const canEditAcademic = user?.role === 'faculty'
   const isFaculty = user?.role === 'faculty'
   const isStudentViewer = user?.role === 'student'
+  const isOwnStudentProfile = Boolean(user?.role === 'student' && user?.studentId && user.studentId === id)
 
   const [sports, setSports] = useState<Sport[]>([])
   const [sportsAffiliationIds, setSportsAffiliationIds] = useState<string[]>([])
-  const [draftMedicalStatus, setDraftMedicalStatus] = useState<MedicalClearanceStatus>('pending')
-  const [draftMedicalNotes, setDraftMedicalNotes] = useState('')
+  const [facultyReviewNotes, setFacultyReviewNotes] = useState('')
   const [savingMedical, setSavingMedical] = useState(false)
   const [medicalError, setMedicalError] = useState<string | null>(null)
   const [skills, setSkills] = useState<{ id: string; name: string; category: string; isActive: boolean }[]>([])
@@ -113,8 +119,7 @@ export function StudentProfilePage() {
   useEffect(() => {
     if (!student) return
     setSportsAffiliationIds(Array.isArray(student.sportsAffiliations) ? student.sportsAffiliations : [])
-    setDraftMedicalStatus((student.medicalClearanceStatus ?? 'pending') as MedicalClearanceStatus)
-    setDraftMedicalNotes(student.medicalClearanceNotes ?? '')
+    setFacultyReviewNotes(student.medicalClearanceNotes ?? '')
     setMedicalError(null)
   }, [student])
 
@@ -130,11 +135,7 @@ export function StudentProfilePage() {
   const skillsById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills])
   const sportNameById = useMemo(() => new Map(sports.map((s) => [s.id, s.name])), [sports])
 
-  const medicalLabel = (status: MedicalClearanceStatus) => {
-    if (status === 'cleared') return 'Cleared'
-    if (status === 'not_cleared') return 'Not cleared'
-    return 'Pending'
-  }
+  const medicalNorm = student ? normalizeMedicalStatus(student.medicalClearanceStatus) : 'pending'
 
   const skillChips = useMemo(() => {
     return studentSkillIds
@@ -296,7 +297,7 @@ export function StudentProfilePage() {
             </div>
           </div>
 
-          <div className="spms-profile-section-card card">
+          <div id="medical-clearance" className="spms-profile-section-card card scroll-mt-3">
             <div className="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
               <span>
                 <i className="bi bi-heart-pulse me-2 text-danger" />
@@ -304,98 +305,186 @@ export function StudentProfilePage() {
               </span>
               <span className="badge rounded-pill bg-light text-secondary border d-inline-flex align-items-center gap-1">
                 <i className="bi bi-lock-fill" style={{ fontSize: '.65rem' }} />
-                {isFaculty ? 'Faculty maintains' : 'View only'}
+                {isFaculty ? 'Faculty reviews' : 'View only'}
               </span>
             </div>
             <div className="card-body">
               <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
                 <span
                   className={`badge rounded-pill ${
-                    (student.medicalClearanceStatus ?? 'pending') === 'cleared'
+                    medicalNorm === 'approved'
                       ? 'bg-success-subtle text-success border border-success-subtle'
-                      : (student.medicalClearanceStatus ?? 'pending') === 'not_cleared'
+                      : medicalNorm === 'rejected'
                         ? 'bg-danger-subtle text-danger border border-danger-subtle'
                         : 'bg-secondary-subtle text-secondary border border-secondary-subtle'
                   }`}
                 >
-                  {medicalLabel((student.medicalClearanceStatus ?? 'pending') as MedicalClearanceStatus)}
+                  {medicalStatusLabel(medicalNorm)}
                 </span>
                 {student.medicalClearanceUpdatedAt ? (
                   <span className="spms-muted small">Updated {formatMetaTs(student.medicalClearanceUpdatedAt)}</span>
                 ) : null}
               </div>
-              <p className="small mb-2">
-                <span className="text-body-secondary">Notes: </span>
-                {dash(student.medicalClearanceNotes)}
-              </p>
-              {isFaculty ? (
+
+              {isOwnStudentProfile ? (
+                <div className="mb-3">
+                  <Link to="/student/medical" className="btn btn-sm btn-primary rounded-3">
+                    <i className="bi bi-upload me-1" /> Submit or update medical information
+                  </Link>
+                  <p className="spms-muted small mt-2 mb-0">
+                    Upload a document and enter details. Faculty will approve or reject for try-out eligibility.
+                  </p>
+                </div>
+              ) : null}
+
+              {(student.medicalPhysicianName ||
+                student.medicalExamDate ||
+                student.medicalFormDetails ||
+                student.medicalDocumentDataUrl ||
+                student.medicalHeight ||
+                student.medicalWeight ||
+                student.medicalBloodPressure ||
+                student.medicalCondition) ? (
                 <>
                   <hr className="my-3" />
-                  <p className="spms-muted small mb-2">Update clearance for try-out eligibility.</p>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold mb-1">Status</label>
-                    <select
-                      className="form-select form-select-sm rounded-3"
-                      value={draftMedicalStatus}
-                      onChange={(e) => setDraftMedicalStatus(e.target.value as MedicalClearanceStatus)}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="cleared">Cleared</option>
-                      <option value="not_cleared">Not cleared</option>
-                    </select>
-                  </div>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold mb-1">Notes</label>
-                    <textarea
-                      className="form-control form-control-sm rounded-3"
-                      rows={3}
-                      placeholder="Optional (e.g. valid until, restrictions)"
-                      value={draftMedicalNotes}
-                      onChange={(e) => setDraftMedicalNotes(e.target.value)}
-                    />
-                  </div>
-                  {medicalError ? (
-                    <div className="alert alert-danger py-2 small mb-2" role="alert">
-                      {medicalError}
+                  <h6 className="small fw-semibold text-uppercase spms-muted mb-2">Submitted medical information</h6>
+                  <dl className="spms-profile-kv mb-3">
+                    <dt>Height</dt>
+                    <dd>{dash(student.medicalHeight)}</dd>
+                    <dt>Weight</dt>
+                    <dd>{dash(student.medicalWeight)}</dd>
+                    <dt>Blood pressure</dt>
+                    <dd>{dash(student.medicalBloodPressure)}</dd>
+                    <dt>Medical condition</dt>
+                    <dd>{dash(student.medicalCondition)}</dd>
+                    <dt>Doctor&apos;s name</dt>
+                    <dd>{dash(student.medicalPhysicianName)}</dd>
+                    <dt>Date of examination</dt>
+                    <dd>{student.medicalExamDate ? formatStudentRecordDate(student.medicalExamDate) : '—'}</dd>
+                    <dt>Additional notes</dt>
+                    <dd className="small" style={{ whiteSpace: 'pre-wrap' }}>
+                      {dash(student.medicalFormDetails)}
+                    </dd>
+                    <dt>Submitted</dt>
+                    <dd>{student.medicalSubmittedAt ? formatMetaTs(student.medicalSubmittedAt) : '—'}</dd>
+                  </dl>
+                  {student.medicalDocumentDataUrl ? (
+                    <div className="mb-2">
+                      <div className="small fw-semibold mb-1">Uploaded document</div>
+                      {student.medicalDocumentDataUrl.startsWith('data:image') ? (
+                        <img
+                          src={student.medicalDocumentDataUrl}
+                          alt="Medical document"
+                          className="img-fluid rounded border"
+                          style={{ maxHeight: 320, objectFit: 'contain' }}
+                        />
+                      ) : null}
+                      {student.medicalDocumentDataUrl.startsWith('data:application/pdf') ? (
+                        <embed
+                          src={student.medicalDocumentDataUrl}
+                          type="application/pdf"
+                          className="w-100 rounded border bg-light"
+                          style={{ minHeight: 360 }}
+                          title="Medical PDF"
+                        />
+                      ) : null}
+                      <a
+                        href={student.medicalDocumentDataUrl}
+                        download="medical-document"
+                        className="btn btn-sm btn-outline-secondary rounded-3 mt-2"
+                      >
+                        <i className="bi bi-download me-1" /> Open / download
+                      </a>
                     </div>
                   ) : null}
-                  <div className="d-flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm rounded-3"
-                      disabled={savingMedical}
-                      onClick={async () => {
-                        setSavingMedical(true)
-                        setMedicalError(null)
-                        try {
-                          const updated = await updateStudent(student.id, {
-                            medicalClearanceStatus: draftMedicalStatus,
-                            medicalClearanceUpdatedAt: new Date().toISOString(),
-                            medicalClearanceNotes: draftMedicalNotes.trim() ? draftMedicalNotes : null,
-                          })
-                          setStudent(updated)
-                        } catch (e) {
-                          setMedicalError(e instanceof Error ? e.message : 'Failed to save')
-                        } finally {
-                          setSavingMedical(false)
-                        }
-                      }}
-                    >
-                      Save clearance
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm rounded-3"
-                      disabled={savingMedical}
-                      onClick={() => {
-                        setDraftMedicalStatus((student.medicalClearanceStatus ?? 'pending') as MedicalClearanceStatus)
-                        setDraftMedicalNotes(student.medicalClearanceNotes ?? '')
-                        setMedicalError(null)
-                      }}
-                    >
-                      Reset
-                    </button>
-                  </div>
+                </>
+              ) : (
+                <p className="small spms-muted mb-0">No medical submission on file yet.</p>
+              )}
+
+              <hr className="my-3" />
+              <p className="small mb-1">
+                <span className="text-body-secondary fw-semibold">Faculty review notes: </span>
+                {dash(student.medicalClearanceNotes)}
+              </p>
+
+              {isFaculty ? (
+                <>
+                  {hasPendingMedicalSubmission(student) ? (
+                    <>
+                      <hr className="my-3" />
+                      <p className="spms-muted small mb-2">This submission is pending your decision.</p>
+                      <div className="mb-2">
+                        <label className="form-label small fw-semibold mb-1">Review notes (optional)</label>
+                        <textarea
+                          className="form-control form-control-sm rounded-3"
+                          rows={3}
+                          placeholder="Visible to the student (e.g. conditions, follow-up)"
+                          value={facultyReviewNotes}
+                          onChange={(e) => setFacultyReviewNotes(e.target.value)}
+                        />
+                      </div>
+                      {medicalError ? (
+                        <div className="alert alert-danger py-2 small mb-2" role="alert">
+                          {medicalError}
+                        </div>
+                      ) : null}
+                      <div className="d-flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-success btn-sm rounded-3"
+                          disabled={savingMedical}
+                          onClick={async () => {
+                            setSavingMedical(true)
+                            setMedicalError(null)
+                            try {
+                              const updated = await updateStudent(student.id, {
+                                medicalClearanceStatus: 'approved',
+                                medicalClearanceUpdatedAt: new Date().toISOString(),
+                                medicalClearanceNotes: facultyReviewNotes.trim() ? facultyReviewNotes.trim() : null,
+                              })
+                              setStudent(updated)
+                            } catch (e) {
+                              setMedicalError(e instanceof Error ? e.message : 'Failed to save')
+                            } finally {
+                              setSavingMedical(false)
+                            }
+                          }}
+                        >
+                          <i className="bi bi-check-lg me-1" /> Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm rounded-3"
+                          disabled={savingMedical}
+                          onClick={async () => {
+                            setSavingMedical(true)
+                            setMedicalError(null)
+                            try {
+                              const updated = await updateStudent(student.id, {
+                                medicalClearanceStatus: 'rejected',
+                                medicalClearanceUpdatedAt: new Date().toISOString(),
+                                medicalClearanceNotes: facultyReviewNotes.trim() ? facultyReviewNotes.trim() : null,
+                              })
+                              setStudent(updated)
+                            } catch (e) {
+                              setMedicalError(e instanceof Error ? e.message : 'Failed to save')
+                            } finally {
+                              setSavingMedical(false)
+                            }
+                          }}
+                        >
+                          <i className="bi bi-x-lg me-1" /> Reject
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="spms-muted small mb-0 mt-2">
+                      {medicalNorm === 'pending' && !student.medicalSubmittedAt
+                        ? 'Awaiting student submission. Direct students to Student → Submit medical information.'
+                        : 'No pending submission. New activity appears when a student submits again for review.'}
+                    </p>
+                  )}
                 </>
               ) : null}
             </div>
@@ -452,7 +541,7 @@ export function StudentProfilePage() {
                     Sports participation
                   </span>
                   <div className="d-flex align-items-center gap-2 flex-wrap">
-                    {(student.medicalClearanceStatus ?? 'pending') === 'cleared' && sportsAffiliationIds.length > 0 ? (
+                    {isMedicalApprovedForTryouts(student) && sportsAffiliationIds.length > 0 ? (
                       <span className="badge rounded-pill bg-success-subtle text-success border border-success-subtle">
                         Try-out eligible
                       </span>
@@ -481,6 +570,14 @@ export function StudentProfilePage() {
                     <p className="spms-muted small mb-3">
                       Sports are view-only here. To add or change assignments, use{' '}
                       <Link to="/faculty/sports">Faculty → Sports</Link>.
+                    </p>
+                  ) : null}
+                  {isOwnStudentProfile ? (
+                    <p className="small spms-muted mb-3">
+                      <strong>Try-out eligibility</strong> requires medical clearance{' '}
+                      <strong>Approved</strong> by faculty and at least one sport assigned to you. Check status under{' '}
+                      <a href="#medical-clearance">Medical clearance</a> and submit updates via{' '}
+                      <Link to="/student/medical">Medical</Link>.
                     </p>
                   ) : null}
                   {sportsAffiliationIds.length === 0 ? (

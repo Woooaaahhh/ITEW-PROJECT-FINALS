@@ -18,6 +18,8 @@ import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
+import { FacultyMedicalReviewPage } from './pages/FacultyMedicalReviewPage'
+import { StudentMedicalSubmitPage } from './pages/StudentMedicalSubmitPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -70,6 +72,16 @@ const facultySportsHandle: PageMeta = {
 const facultyAcademicHandle: PageMeta = {
   title: 'Academic',
   subtitle: 'View current term, history, and update student academic records',
+}
+
+const facultyMedicalHandle: PageMeta = {
+  title: 'Medical review',
+  subtitle: 'Pending student medical submissions for try-out clearance',
+}
+
+const studentMedicalHandle: PageMeta = {
+  title: 'Medical submission',
+  subtitle: 'Submit documents and details for faculty review',
 }
 
 const studentHandle: PageMeta = {
@@ -216,6 +228,15 @@ export const spmsRouter = createBrowserRouter([
         handle: facultyAcademicHandle,
       },
       {
+        path: '/faculty/medical',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultyMedicalReviewPage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyMedicalHandle,
+      },
+      {
         path: '/student',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
@@ -223,6 +244,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: studentHandle,
+      },
+      {
+        path: '/student/medical',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentMedicalSubmitPage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentMedicalHandle,
       },
       {
         path: '/student/academic',

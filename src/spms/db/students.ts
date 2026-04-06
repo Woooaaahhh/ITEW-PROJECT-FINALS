@@ -9,6 +9,15 @@ function withEligibilityDefaults(s: Student): Student {
     medicalClearanceStatus: s.medicalClearanceStatus ?? 'pending',
     medicalClearanceUpdatedAt: s.medicalClearanceUpdatedAt ?? null,
     medicalClearanceNotes: s.medicalClearanceNotes ?? null,
+    medicalHeight: s.medicalHeight ?? null,
+    medicalWeight: s.medicalWeight ?? null,
+    medicalBloodPressure: s.medicalBloodPressure ?? null,
+    medicalCondition: s.medicalCondition ?? null,
+    medicalPhysicianName: s.medicalPhysicianName ?? null,
+    medicalExamDate: s.medicalExamDate ?? null,
+    medicalFormDetails: s.medicalFormDetails ?? null,
+    medicalDocumentDataUrl: s.medicalDocumentDataUrl ?? null,
+    medicalSubmittedAt: s.medicalSubmittedAt ?? null,
   }
 }
 
