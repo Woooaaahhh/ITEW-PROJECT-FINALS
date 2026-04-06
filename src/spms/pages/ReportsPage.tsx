@@ -4,6 +4,7 @@ import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { getStudentRecords } from '../db/studentRecords'
 import { listSkills, listStudentSkills, seedSkillsIfEmpty } from '../db/skills'
 import { listSports, seedSportsIfEmpty } from '../db/sports'
+import { isMedicalApprovedForTryouts, medicalStatusLabel, normalizeMedicalStatus } from '../db/medicalClearance'
 
 function fullName(s: Student) {
   const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
@@ -23,10 +24,7 @@ type EnrichedStudent = {
 }
 
 function medicalClearanceLabel(s: Student) {
-  const st = s.medicalClearanceStatus ?? 'pending'
-  if (st === 'cleared') return 'Cleared'
-  if (st === 'not_cleared') return 'Not cleared'
-  return 'Pending'
+  return medicalStatusLabel(normalizeMedicalStatus(s.medicalClearanceStatus))
 }
 
 function exportTableToCsv(
@@ -42,9 +40,9 @@ function exportTableToCsv(
       : ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills']
   const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) => {
     if (reportType === 'sports_tryout') {
-      const cleared = (student.medicalClearanceStatus ?? 'pending') === 'cleared'
+      const medicallyOk = isMedicalApprovedForTryouts(student)
       const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
-      const eligible = cleared && inSport
+      const eligible = medicallyOk && inSport
       return [
         student.id,
         fullName(student),
@@ -149,9 +147,9 @@ export function ReportsPage() {
       const hitSection = !sec || normalize(s.section ?? '') === sec
         let hitReport = true
         if (reportType === 'sports_tryout') {
-          const cleared = (s.medicalClearanceStatus ?? 'pending') === 'cleared'
+          const medicallyOk = isMedicalApprovedForTryouts(s)
           const inSport = selectedSportId ? (s.sportsAffiliations ?? []).includes(selectedSportId) : false
-          hitReport = Boolean(selectedSportId) && cleared && inSport
+          hitReport = Boolean(selectedSportId) && medicallyOk && inSport
         } else if (reportType === 'specific_skill') {
           const selectedSkillName = normalize(skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? '')
           hitReport = !selectedSkillName || skillNames.some((name) => normalize(name) === selectedSkillName)
@@ -213,7 +211,7 @@ export function ReportsPage() {
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as ReportType)}
               >
-                <option value="sports_tryout">Sports try-out eligibility (assigned sport + medical cleared)</option>
+                <option value="sports_tryout">Sports try-out eligibility (assigned sport + medical approved)</option>
                 <option value="programming_contest">Students qualified for programming contests</option>
                 <option value="no_violations">Students with no violations</option>
                 <option value="specific_skill">Students with specific skills</option>
@@ -239,7 +237,7 @@ export function ReportsPage() {
                   )}
                 </select>
                 <div className="form-text">
-                  Lists students assigned to the selected sport with medical clearance set to Cleared.
+                  Lists students assigned to the selected sport with medical clearance approved by faculty.
                 </div>
               </div>
             ) : null}

@@ -1,12 +1,25 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
-export type MedicalClearanceStatus = 'pending' | 'cleared' | 'not_cleared'
+/** Faculty decision: pending (awaiting review or no submission), approved, rejected. Legacy: cleared→approved, not_cleared→rejected */
+export type MedicalClearanceStatus = 'pending' | 'approved' | 'rejected'
 
 export type StudentEligibility = {
   sportsAffiliations?: string[] | null
-  medicalClearanceStatus?: MedicalClearanceStatus | null
+  medicalClearanceStatus?: MedicalClearanceStatus | string | null
   medicalClearanceUpdatedAt?: string | null
   medicalClearanceNotes?: string | null
+  /** Student-submitted medical form (faculty reviews) */
+  medicalHeight?: string | null
+  medicalWeight?: string | null
+  medicalBloodPressure?: string | null
+  medicalCondition?: string | null
+  medicalPhysicianName?: string | null
+  medicalExamDate?: string | null
+  /** Extra notes / health status narrative (optional) */
+  medicalFormDetails?: string | null
+  /** Data URL: image/* or application/pdf */
+  medicalDocumentDataUrl?: string | null
+  medicalSubmittedAt?: string | null
 }
 
 export type Student = {
@@ -78,7 +91,7 @@ export type SpmsDb = DBSchema & {
 
 const DB_NAME = 'spms-db'
 /** Must never be lower than the version already in the user's browser, or openDB throws VersionError. */
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
