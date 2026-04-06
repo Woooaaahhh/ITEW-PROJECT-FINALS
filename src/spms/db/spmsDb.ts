@@ -1,7 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
+export type MedicalClearanceStatus = 'pending' | 'cleared' | 'not_cleared'
+
 export type StudentEligibility = {
   sportsAffiliations?: string[] | null
+  medicalClearanceStatus?: MedicalClearanceStatus | null
+  medicalClearanceUpdatedAt?: string | null
+  medicalClearanceNotes?: string | null
 }
 
 export type Student = {

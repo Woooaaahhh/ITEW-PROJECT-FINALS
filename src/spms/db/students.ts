@@ -6,12 +6,131 @@ function withEligibilityDefaults(s: Student): Student {
   return {
     ...s,
     sportsAffiliations: Array.isArray(s.sportsAffiliations) ? s.sportsAffiliations : [],
+    medicalClearanceStatus: s.medicalClearanceStatus ?? 'pending',
+    medicalClearanceUpdatedAt: s.medicalClearanceUpdatedAt ?? null,
+    medicalClearanceNotes: s.medicalClearanceNotes ?? null,
   }
 }
 
 function makeId() {
   // not cryptographically secure; good enough for local DB key
   return `S-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** Fixed keys so concurrent seed runs upsert the same rows instead of creating duplicates. */
+const SEED_STUDENT_IDS = {
+  alyssa: 'S-seed-alyssa-santos',
+  jerome: 'S-seed-jerome-reyes',
+  demo: 'S-seed-student-demo',
+} as const
+
+const DEMO_SEED_EMAILS = [
+  'alyssa.santos@school.edu',
+  'jerome.reyes@school.edu',
+  'student@spms.edu',
+] as const
+
+const STABLE_ID_BY_DEMO_EMAIL: Record<(typeof DEMO_SEED_EMAILS)[number], string> = {
+  'alyssa.santos@school.edu': SEED_STUDENT_IDS.alyssa,
+  'jerome.reyes@school.edu': SEED_STUDENT_IDS.jerome,
+  'student@spms.edu': SEED_STUDENT_IDS.demo,
+}
+
+function normEmail(e: string) {
+  return e.toLowerCase().trim()
+}
+
+/** Removes extra rows for built-in demo emails (e.g. after a race double-seeded the DB). */
+async function dedupeDemoStudentsByEmail(db: Awaited<ReturnType<typeof openSpmsDb>>): Promise<void> {
+  const all = await db.getAll('students')
+  for (const email of DEMO_SEED_EMAILS) {
+    const matches = all.filter((s) => normEmail(s.email ?? '') === email)
+    if (matches.length <= 1) continue
+    const preferredId = STABLE_ID_BY_DEMO_EMAIL[email]
+    const keeper =
+      matches.find((m) => m.id === preferredId) ??
+      [...matches].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    for (const m of matches) {
+      if (m.id !== keeper.id) await db.delete('students', m.id)
+    }
+  }
+}
+
+/** Serializes seeding — many pages call seedIfEmpty(); without this, parallel runs each insert 3 students. */
+let seedChain: Promise<void> = Promise.resolve()
+
+async function runSeededWork(): Promise<void> {
+  const db = await openSpmsDb()
+  await dedupeDemoStudentsByEmail(db)
+
+  const seeded = await db.get('meta', 'seeded')
+  if (seeded?.value === 'true') return
+
+  const existing = await db.count('students')
+  if (existing > 0) {
+    await db.put('meta', { key: 'seeded', value: 'true' })
+    return
+  }
+
+  const ts = nowIso()
+  const demo: Student[] = [
+    {
+      id: SEED_STUDENT_IDS.alyssa,
+      firstName: 'Alyssa',
+      middleName: 'M.',
+      lastName: 'Santos',
+      birthdate: '2006-07-15',
+      gender: 'Female',
+      address: 'Brgy. Example, City, Province',
+      email: 'alyssa.santos@school.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '2nd',
+      section: 'BSIT-2A',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [],
+      createdAt: ts,
+      updatedAt: ts,
+    },
+    {
+      id: SEED_STUDENT_IDS.jerome,
+      firstName: 'Jerome',
+      middleName: 'D.',
+      lastName: 'Reyes',
+      birthdate: '2007-02-10',
+      gender: 'Male',
+      address: 'City, Province',
+      email: 'jerome.reyes@school.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '1st',
+      section: 'BSBA-1B',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [],
+      createdAt: ts,
+      updatedAt: ts,
+    },
+    {
+      id: SEED_STUDENT_IDS.demo,
+      firstName: 'Student',
+      middleName: 'Demo',
+      lastName: 'User',
+      birthdate: '2006-01-01',
+      gender: 'Male',
+      address: 'Campus Address',
+      email: 'student@spms.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '2nd',
+      section: 'BSIT-2A',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [],
+      createdAt: ts,
+      updatedAt: ts,
+    },
+  ]
+
+  const tx = db.transaction(['students', 'meta'], 'readwrite')
+  await Promise.all(demo.map((s) => tx.objectStore('students').put(s)))
+  await tx.objectStore('meta').put({ key: 'seeded', value: 'true' })
+  await tx.done
 }
 
 export async function listStudents(): Promise<Student[]> {
@@ -59,73 +178,7 @@ export async function deleteStudent(id: string): Promise<void> {
 }
 
 export async function seedIfEmpty(): Promise<void> {
-  const db = await openSpmsDb()
-  const seeded = await db.get('meta', 'seeded')
-  if (seeded?.value === 'true') return
-
-  const existing = await db.count('students')
-  if (existing > 0) {
-    await db.put('meta', { key: 'seeded', value: 'true' })
-    return
-  }
-
-  const ts = nowIso()
-  const demo: Student[] = [
-    {
-      id: makeId(),
-      firstName: 'Alyssa',
-      middleName: 'M.',
-      lastName: 'Santos',
-      birthdate: '2006-07-15',
-      gender: 'Female',
-      address: 'Brgy. Example, City, Province',
-      email: 'alyssa.santos@school.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '2nd',
-      section: 'BSIT-2A',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-    {
-      id: makeId(),
-      firstName: 'Jerome',
-      middleName: 'D.',
-      lastName: 'Reyes',
-      birthdate: '2007-02-10',
-      gender: 'Male',
-      address: 'City, Province',
-      email: 'jerome.reyes@school.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '1st',
-      section: 'BSBA-1B',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-    {
-      id: makeId(),
-      firstName: 'Student',
-      middleName: 'Demo',
-      lastName: 'User',
-      birthdate: '2006-01-01',
-      gender: 'Male',
-      address: 'Campus Address',
-      email: 'student@spms.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '2nd',
-      section: 'BSIT-2A',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-  ]
-
-  const tx = db.transaction(['students', 'meta'], 'readwrite')
-  await Promise.all(demo.map((s) => tx.objectStore('students').put(s)))
-  await tx.objectStore('meta').put({ key: 'seeded', value: 'true' })
-  await tx.done
+  const task = seedChain.then(() => runSeededWork())
+  seedChain = task.catch(() => {})
+  return task
 }
