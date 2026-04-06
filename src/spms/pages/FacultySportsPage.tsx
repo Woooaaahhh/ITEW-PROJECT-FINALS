@@ -21,6 +21,8 @@ function studentNameOnly(st: Student | null) {
   return parts.replace(/\s+/g, ' ').trim()
 }
 
+const OTHER_SPORT_VALUE = '__other__'
+
 export function FacultySportsPage() {
   const [sports, setSports] = useState<Sport[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +38,10 @@ export function FacultySportsPage() {
   const [savingAssign, setSavingAssign] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   const [savedModalOpen, setSavedModalOpen] = useState(false)
+
+  /** Qualification-by-sport report (same pattern as Skills “Qualification by Category”) */
+  const [qualSportId, setQualSportId] = useState<string>('')
+  const [qualOtherSport, setQualOtherSport] = useState('')
 
   async function refreshSports() {
     setLoading(true)
@@ -105,6 +111,52 @@ export function FacultySportsPage() {
     [assignedSportIds, activeSportsById],
   )
 
+  useEffect(() => {
+    if (qualSportId) return
+    const first = activeSports[0]?.id
+    if (first) setQualSportId(first)
+  }, [qualSportId, activeSports])
+
+  const qualOtherNorm = useMemo(() => normalize(qualOtherSport), [qualOtherSport])
+
+  const qualHasCriterion = useMemo(() => {
+    if (qualSportId === OTHER_SPORT_VALUE) return qualOtherNorm.length > 0
+    return Boolean(qualSportId) || qualOtherNorm.length > 0
+  }, [qualSportId, qualOtherNorm])
+
+  const qualificationRows = useMemo(() => {
+    type Row = { student: Student; relevantSports: string[] }
+    const rows: Row[] = []
+
+    const collectMatches = (st: Student): string[] => {
+      const ids = Array.isArray(st.sportsAffiliations) ? st.sportsAffiliations : []
+      const names: string[] = []
+      for (const sid of ids) {
+        const sp = activeSportsById.get(sid)
+        if (!sp) continue
+        if (qualSportId === OTHER_SPORT_VALUE) {
+          if (qualOtherNorm && normalize(sp.name).includes(qualOtherNorm)) names.push(sp.name)
+        } else if (qualSportId) {
+          if (sp.id === qualSportId) names.push(sp.name)
+          else if (qualOtherNorm && normalize(sp.name).includes(qualOtherNorm)) names.push(sp.name)
+        } else if (qualOtherNorm && normalize(sp.name).includes(qualOtherNorm)) {
+          names.push(sp.name)
+        }
+      }
+      return [...new Set(names)]
+    }
+
+    if (!qualHasCriterion) return rows
+
+    for (const st of students) {
+      const relevantSports = collectMatches(st)
+      if (relevantSports.length > 0) rows.push({ student: st, relevantSports })
+    }
+
+    rows.sort((a, b) => studentNameOnly(a.student).localeCompare(studentNameOnly(b.student)))
+    return rows
+  }, [students, activeSportsById, qualSportId, qualOtherNorm, qualHasCriterion])
+
   const selectedStudent = useMemo(() => students.find((s) => s.id === selectedStudentId) ?? null, [students, selectedStudentId])
 
   return (
@@ -152,6 +204,106 @@ export function FacultySportsPage() {
       )}
 
       <div className="row g-4">
+        <div className="col-12">
+          <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+            <div className="card-header bg-transparent border-bottom py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div>
+                <h6 className="fw-semibold mb-0">Qualification by Sport</h6>
+                <div className="spms-muted small">Students with assigned sports that match your filters.</div>
+              </div>
+              <span className="spms-chip">
+                <i className="bi bi-people me-1" />
+                {qualificationRows.length} qualified
+              </span>
+            </div>
+            <div className="card-body">
+              <div className="row g-3 mb-3">
+                <div className="col-12 col-md-6">
+                  <label className="form-label small fw-semibold mb-1">Sport</label>
+                  <select
+                    className="form-select rounded-3"
+                    value={qualSportId}
+                    onChange={(e) => setQualSportId(e.target.value)}
+                    disabled={loading || activeSports.length === 0}
+                  >
+                    {activeSports.length === 0 ? <option value="">No active sports</option> : null}
+                    {activeSports.map((sp) => (
+                      <option key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </option>
+                    ))}
+                    <option value={OTHER_SPORT_VALUE}>Other (type sport name below)</option>
+                  </select>
+                </div>
+                <div className="col-12 col-md-6">
+                  <label className="form-label small fw-semibold mb-1">Other sport</label>
+                  <input
+                    className="form-control rounded-3"
+                    value={qualOtherSport}
+                    onChange={(e) => setQualOtherSport(e.target.value)}
+                    placeholder="Type sport directly (e.g. badminton)"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="table-responsive border rounded-3" style={{ borderColor: 'rgba(15, 23, 42, .08)' }}>
+                <table className="table spms-table table-hover align-middle mb-0">
+                  <thead className="border-bottom bg-light bg-opacity-50">
+                    <tr>
+                      <th className="ps-3 py-2 small text-uppercase spms-muted">Student name</th>
+                      <th className="py-2 small text-uppercase spms-muted">Relevant sports</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentsLoading ? (
+                      <tr>
+                        <td colSpan={2} className="ps-3 py-4 spms-muted small">
+                          Loading students…
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!studentsLoading && qualSportId === OTHER_SPORT_VALUE && !qualOtherNorm ? (
+                      <tr>
+                        <td colSpan={2} className="ps-3 py-4 spms-muted small">
+                          Type a sport name in <strong>Other sport</strong> to see matches.
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!studentsLoading &&
+                    !qualHasCriterion &&
+                    qualSportId !== OTHER_SPORT_VALUE ? (
+                      <tr>
+                        <td colSpan={2} className="ps-3 py-4 spms-muted small">
+                          Select a sport in the dropdown, or choose <strong>Other</strong> and type a sport name.
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!studentsLoading &&
+                    qualHasCriterion &&
+                    !(qualSportId === OTHER_SPORT_VALUE && !qualOtherNorm) &&
+                    qualificationRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="ps-3 py-4 spms-muted small">
+                          No students match the current sport filters.
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!studentsLoading
+                      ? qualificationRows.map(({ student, relevantSports }) => (
+                          <tr key={student.id}>
+                            <td className="ps-3 py-3 fw-semibold">{studentNameOnly(student)}</td>
+                            <td className="py-3">{relevantSports.join(', ')}</td>
+                          </tr>
+                        ))
+                      : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="col-12 col-xxl-5">
           <div className="spms-card card border-0 h-100" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
             <div className="card-body">
@@ -350,8 +502,9 @@ export function FacultySportsPage() {
                     className="form-select rounded-3"
                     value={selectedStudentId}
                     onChange={(e) => setSelectedStudentId(e.target.value)}
-                    disabled={studentsLoading}
+                    disabled={studentsLoading || students.length === 0}
                   >
+                    {students.length === 0 ? <option value="">No students</option> : null}
                     {students.map((st) => (
                       <option key={st.id} value={st.id}>
                         {studentLabel(st)}
