@@ -22,11 +22,42 @@ type EnrichedStudent = {
   violationCount: number
 }
 
-function exportTableToCsv(rows: EnrichedStudent[], filename: string) {
-  const headers = ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills']
+function medicalClearanceLabel(s: Student) {
+  const st = s.medicalClearanceStatus ?? 'pending'
+  if (st === 'cleared') return 'Cleared'
+  if (st === 'not_cleared') return 'Not cleared'
+  return 'Pending'
+}
+
+function exportTableToCsv(
+  rows: EnrichedStudent[],
+  filename: string,
+  reportType: ReportType,
+  selectedSportId: string,
+) {
   const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`
-  const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) =>
-    [
+  const headers =
+    reportType === 'sports_tryout'
+      ? ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Medical clearance', 'Try-out eligible']
+      : ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills']
+  const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) => {
+    if (reportType === 'sports_tryout') {
+      const cleared = (student.medicalClearanceStatus ?? 'pending') === 'cleared'
+      const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
+      const eligible = cleared && inSport
+      return [
+        student.id,
+        fullName(student),
+        student.yearLevel ?? '',
+        student.section ?? '',
+        student.email ?? '',
+        medicalClearanceLabel(student),
+        eligible ? 'Yes' : 'No',
+      ]
+        .map(escape)
+        .join(',')
+    }
+    return [
       student.id,
       fullName(student),
       student.yearLevel ?? '',
@@ -38,6 +69,7 @@ function exportTableToCsv(rows: EnrichedStudent[], filename: string) {
     ]
       .map(escape)
       .join(',')
+  }
   const csv = [headers.map(escape).join(','), ...rows.map(rowToCsv)].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -117,7 +149,9 @@ export function ReportsPage() {
       const hitSection = !sec || normalize(s.section ?? '') === sec
         let hitReport = true
         if (reportType === 'sports_tryout') {
-          hitReport = !selectedSportId || (s.sportsAffiliations ?? []).includes(selectedSportId)
+          const cleared = (s.medicalClearanceStatus ?? 'pending') === 'cleared'
+          const inSport = selectedSportId ? (s.sportsAffiliations ?? []).includes(selectedSportId) : false
+          hitReport = Boolean(selectedSportId) && cleared && inSport
         } else if (reportType === 'specific_skill') {
           const selectedSkillName = normalize(skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? '')
           hitReport = !selectedSkillName || skillNames.some((name) => normalize(name) === selectedSkillName)
@@ -179,7 +213,7 @@ export function ReportsPage() {
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as ReportType)}
               >
-                <option value="sports_tryout">Students qualified for basketball try-outs</option>
+                <option value="sports_tryout">Sports try-out eligibility (assigned sport + medical cleared)</option>
                 <option value="programming_contest">Students qualified for programming contests</option>
                 <option value="no_violations">Students with no violations</option>
                 <option value="specific_skill">Students with specific skills</option>
@@ -204,6 +238,9 @@ export function ReportsPage() {
                     ))
                   )}
                 </select>
+                <div className="form-text">
+                  Lists students assigned to the selected sport with medical clearance set to Cleared.
+                </div>
               </div>
             ) : null}
 
@@ -263,7 +300,14 @@ export function ReportsPage() {
               <button
                 type="button"
                 className="btn btn-outline-primary rounded-4"
-                onClick={() => exportTableToCsv(filtered, `spms-report-${new Date().toISOString().slice(0, 10)}.csv`)}
+                onClick={() =>
+                  exportTableToCsv(
+                    filtered,
+                    `spms-report-${new Date().toISOString().slice(0, 10)}.csv`,
+                    reportType,
+                    selectedSportId,
+                  )
+                }
               >
                 <i className="bi bi-filetype-csv me-1" /> Export CSV
               </button>
@@ -294,8 +338,17 @@ export function ReportsPage() {
                     <th>Year</th>
                     <th>Section</th>
                     <th>Email</th>
-                    <th>Violations</th>
-                    <th className="text-end pe-3">Skills</th>
+                    {reportType === 'sports_tryout' ? (
+                      <>
+                        <th>Medical clearance</th>
+                        <th className="text-end pe-3">Try-out eligible</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Violations</th>
+                        <th className="text-end pe-3">Skills</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -313,30 +366,54 @@ export function ReportsPage() {
                       </td>
                     </tr>
                   ) : null}
-                  {filtered.map(({ student, skillNames, violationCount }) => (
-                    <tr key={student.id}>
-                      <td className="ps-3">
-                        <div className="d-flex align-items-center gap-2">
-                          <img className="spms-avatar" src={student.profilePictureDataUrl || avatarUrl} alt="" />
-                          <div>
-                            <div className="fw-semibold">{fullName(student)}</div>
-                            <div className="spms-muted small">{student.id}</div>
+                  {filtered.map(({ student, skillNames, violationCount }) =>
+                    reportType === 'sports_tryout' ? (
+                      <tr key={student.id}>
+                        <td className="ps-3">
+                          <div className="d-flex align-items-center gap-2">
+                            <img className="spms-avatar" src={student.profilePictureDataUrl || avatarUrl} alt="" />
+                            <div>
+                              <div className="fw-semibold">{fullName(student)}</div>
+                              <div className="spms-muted small">{student.id}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>{student.yearLevel ?? '—'}</td>
-                      <td>{student.section ?? '—'}</td>
-                      <td>{student.email ?? '—'}</td>
-                      <td>{violationCount}</td>
-                      <td className="text-end pe-3">
-                        {skillNames.length > 0 ? (
-                          <span className="spms-muted small">{skillNames.slice(0, 2).join(', ')}{skillNames.length > 2 ? '…' : ''}</span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>{student.yearLevel ?? '—'}</td>
+                        <td>{student.section ?? '—'}</td>
+                        <td>{student.email ?? '—'}</td>
+                        <td>{medicalClearanceLabel(student)}</td>
+                        <td className="text-end pe-3">
+                          <span className="badge text-bg-success rounded-pill">Yes</span>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={student.id}>
+                        <td className="ps-3">
+                          <div className="d-flex align-items-center gap-2">
+                            <img className="spms-avatar" src={student.profilePictureDataUrl || avatarUrl} alt="" />
+                            <div>
+                              <div className="fw-semibold">{fullName(student)}</div>
+                              <div className="spms-muted small">{student.id}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{student.yearLevel ?? '—'}</td>
+                        <td>{student.section ?? '—'}</td>
+                        <td>{student.email ?? '—'}</td>
+                        <td>{violationCount}</td>
+                        <td className="text-end pe-3">
+                          {skillNames.length > 0 ? (
+                            <span className="spms-muted small">
+                              {skillNames.slice(0, 2).join(', ')}
+                              {skillNames.length > 2 ? '…' : ''}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
