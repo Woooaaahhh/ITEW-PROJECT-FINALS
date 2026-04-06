@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
-import { listStudents, seedIfEmpty, type Student } from '../db/students'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatCard } from '../components/StatCard'
-import { StudentTable } from '../components/StudentTable'
+import { loadRegistrarDashboardData, type RegistrarDashboardData } from '../dashboards/dashboardAnalytics'
+
+const REG = {
+  accent: '#0d9488',
+  accentSoft: 'rgba(13, 148, 136, 0.14)',
+  gradient: 'linear-gradient(125deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)',
+  chart: ['#0d9488', '#0891b2', '#6366f1', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'],
+}
 
 type CreateStudentPayload = {
   username: string
@@ -22,8 +29,32 @@ type CreateFacultyPayload = {
   faculty_type: 'Teacher' | 'Coach' | 'Adviser' | string
 }
 
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="spms-card card border-0 h-100" style={{ borderRadius: 16, boxShadow: '0 4px 24px rgba(15, 23, 42, .07)' }}>
+      <div className="card-body d-flex flex-column">
+        <div className="mb-2">
+          <h6 className="fw-bold mb-0 text-body">{title}</h6>
+          {subtitle ? <p className="spms-muted small mb-0 mt-1">{subtitle}</p> : null}
+        </div>
+        <div className="flex-grow-1" style={{ minHeight: 260 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function RegistrarDashboard() {
-  const [students, setStudents] = useState<Student[]>([])
+  const [data, setData] = useState<RegistrarDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<null | 'student' | 'faculty'>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -51,41 +82,21 @@ export function RegistrarDashboard() {
     let alive = true
     ;(async () => {
       setLoading(true)
-      await seedIfEmpty()
-      const all = await listStudents()
-      if (!alive) return
-      setStudents(all)
-      setLoading(false)
+      try {
+        const d = await loadRegistrarDashboardData()
+        if (alive) setData(d)
+      } catch {
+        if (alive) setData(null)
+      } finally {
+        if (alive) setLoading(false)
+      }
     })()
     return () => {
       alive = false
     }
   }, [])
 
-  const total = students.length
-  const withEmail = useMemo(() => students.filter((s) => !!s.email).length, [students])
-  const withSection = useMemo(() => students.filter((s) => !!s.section).length, [students])
-  const lastUpdated = students[0]?.updatedAt
-    ? new Date(students[0].updatedAt).toLocaleDateString(undefined, { dateStyle: 'short' })
-    : '—'
-
-  const quickActions = [
-    {
-      to: '/registrar/records',
-      icon: 'bi-clipboard-check',
-      label: 'Behavior & achievements',
-      desc: 'Review violations and non-academic records for all students',
-    },
-    {
-      to: '/students',
-      icon: 'bi-people',
-      label: 'View Student List',
-      desc: 'Open any profile to verify violations & achievements',
-    },
-    { to: '/users', icon: 'bi-person-gear', label: 'Manage Accounts', desc: 'Create faculty & student logins' },
-    { to: '/sections', icon: 'bi-diagram-3', label: 'Manage Sections', desc: 'Section setup' },
-    { to: '/reports', icon: 'bi-file-earmark-bar-graph', label: 'Generate Reports', desc: 'Export & print' },
-  ]
+  const d = data
 
   const closeModal = () => {
     setModal(null)
@@ -116,6 +127,7 @@ export function RegistrarDashboard() {
       })
       setStudentForm({ username: '', email: '', password: '', first_name: '', last_name: '', year_level: '', section: '' })
       closeModal()
+      setData(await loadRegistrarDashboardData())
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setFormError(msg || 'Failed to create student account.')
@@ -181,7 +193,6 @@ export function RegistrarDashboard() {
                         <label className="form-label small fw-semibold">Password</label>
                         <input type="password" className="form-control" value={studentForm.password} onChange={(e) => setStudentForm((s) => ({ ...s, password: e.target.value }))} disabled={submitting} />
                       </div>
-
                       <div className="col-6">
                         <label className="form-label small fw-semibold">First Name</label>
                         <input className="form-control" value={studentForm.first_name} onChange={(e) => setStudentForm((s) => ({ ...s, first_name: e.target.value }))} disabled={submitting} />
@@ -213,7 +224,6 @@ export function RegistrarDashboard() {
                         <label className="form-label small fw-semibold">Password</label>
                         <input type="password" className="form-control" value={facultyForm.password} onChange={(e) => setFacultyForm((s) => ({ ...s, password: e.target.value }))} disabled={submitting} />
                       </div>
-
                       <div className="col-12">
                         <label className="form-label small fw-semibold">Faculty Type</label>
                         <select className="form-select" value={facultyPreset} onChange={(e) => setFacultyPreset(e.target.value as typeof facultyPreset)} disabled={submitting}>
@@ -228,7 +238,6 @@ export function RegistrarDashboard() {
                       </div>
                     </div>
                   )}
-
                   {formError && (
                     <div className="alert alert-danger py-2 mt-3 mb-0">
                       <i className="bi bi-exclamation-circle me-2" />
@@ -243,6 +252,7 @@ export function RegistrarDashboard() {
                   <button
                     type="button"
                     className="btn btn-primary rounded-3"
+                    style={{ backgroundColor: REG.accent, borderColor: REG.accent }}
                     onClick={modal === 'student' ? () => void createStudentAccount() : () => void createFacultyAccount()}
                     disabled={submitting}
                   >
@@ -256,181 +266,207 @@ export function RegistrarDashboard() {
         </>
       )}
 
-      <div className="row g-4">
-      <div className="col-12 col-xl-9">
-        <section className="mb-4">
-          <h6 className="text-secondary fw-semibold mb-3">Overview</h6>
-          <div className="row g-3">
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-people-fill"
-                value={loading ? '—' : total}
-                description="Total Students"
-              />
-            </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-envelope"
-                value={loading ? '—' : withEmail}
-                description="Students With Email"
-              />
-            </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-diagram-3"
-                value={loading ? '—' : withSection}
-                description="With Assigned Section"
-              />
-            </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-clock-history"
-                value={lastUpdated}
-                description="Recently Updated Record"
-              />
-            </div>
+      <div className="d-flex flex-column gap-4">
+        <div
+          className="text-white rounded-4 overflow-hidden position-relative"
+          style={{
+            background: REG.gradient,
+            boxShadow: '0 12px 40px rgba(15, 118, 110, .35)',
+          }}
+        >
+          <div className="position-absolute top-0 end-0 opacity-20 d-none d-md-block" aria-hidden style={{ fontSize: 160, lineHeight: 1, transform: 'translate(8%, -25%)' }}>
+            <i className="bi bi-clipboard-data" />
           </div>
-        </section>
-
-        <section className="mb-4">
-          <h6 className="text-secondary fw-semibold mb-3">Quick Actions</h6>
-          <div className="row g-3">
-            <div className="col-6 col-lg-3">
-              <button
-                type="button"
-                className="spms-card card border-0 text-body h-100 d-block w-100"
-                style={{
-                  borderRadius: 16,
-                  boxShadow: '0 4px 20px rgba(15, 23, 42, .06)',
-                  transition: 'box-shadow .2s ease, transform .2s ease',
-                  background: 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 28px rgba(15, 23, 42, .1)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(15, 23, 42, .06)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-                onClick={() => setModal('student')}
-              >
-                <div className="card-body text-center py-4">
-                  <div
-                    className="d-inline-flex align-items-center justify-content-center rounded-3 mb-2"
-                    style={{ width: 44, height: 44, background: 'rgba(37, 99, 235, .1)', color: 'var(--spms-primary)' }}
-                  >
-                    <i className="bi bi-person-plus fs-5" />
-                  </div>
-                  <div className="fw-semibold small">Add Student</div>
-                  <div className="spms-muted" style={{ fontSize: '.75rem' }}>Create student account</div>
-                </div>
-              </button>
-            </div>
-
-            <div className="col-6 col-lg-3">
-              <button
-                type="button"
-                className="spms-card card border-0 text-body h-100 d-block w-100"
-                style={{
-                  borderRadius: 16,
-                  boxShadow: '0 4px 20px rgba(15, 23, 42, .06)',
-                  transition: 'box-shadow .2s ease, transform .2s ease',
-                  background: 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 28px rgba(15, 23, 42, .1)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(15, 23, 42, .06)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-                onClick={() => setModal('faculty')}
-              >
-                <div className="card-body text-center py-4">
-                  <div
-                    className="d-inline-flex align-items-center justify-content-center rounded-3 mb-2"
-                    style={{ width: 44, height: 44, background: 'rgba(37, 99, 235, .1)', color: 'var(--spms-primary)' }}
-                  >
-                    <i className="bi bi-person-badge fs-5" />
-                  </div>
-                  <div className="fw-semibold small">Add Faculty</div>
-                  <div className="spms-muted" style={{ fontSize: '.75rem' }}>Create faculty account</div>
-                </div>
-              </button>
-            </div>
-
-            {quickActions.map((a) => (
-              <div key={a.to} className="col-6 col-lg-3">
-                <Link
-                  to={a.to}
-                  className="spms-card card border-0 text-decoration-none text-body h-100 d-block"
-                  style={{
-                    borderRadius: 16,
-                    boxShadow: '0 4px 20px rgba(15, 23, 42, .06)',
-                    transition: 'box-shadow .2s ease, transform .2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 8px 28px rgba(15, 23, 42, .1)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(15, 23, 42, .06)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}
+          <div className="p-4 p-md-5 position-relative">
+            <div className="d-flex flex-wrap align-items-start justify-content-between gap-3">
+              <div>
+                <p className="small text-white text-opacity-75 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '.12em' }}>
+                  Registrar office
+                </p>
+                <h1 className="h3 fw-bold mb-2">Enrollment &amp; records intelligence</h1>
+                <p className="text-white text-opacity-90 mb-0 small" style={{ maxWidth: 540 }}>
+                  Monitor roster health and clearance mix. SQL-backed accounts stay under{' '}
+                  <Link to="/users" className="text-white fw-semibold">
+                    Manage Accounts
+                  </Link>
+                  ; student profiles sync in-browser from your student list.
+                </p>
+              </div>
+              <div className="d-flex flex-wrap gap-2 align-items-center">
+                <button
+                  type="button"
+                  className="btn btn-light btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+                  style={{ color: REG.accent }}
+                  onClick={() => setModal('student')}
                 >
-                  <div className="card-body text-center py-4">
-                    <div
-                      className="d-inline-flex align-items-center justify-content-center rounded-3 mb-2"
-                      style={{ width: 44, height: 44, background: 'rgba(37, 99, 235, .1)', color: 'var(--spms-primary)' }}
-                    >
-                      <i className={`bi ${a.icon} fs-5`} />
-                    </div>
-                    <div className="fw-semibold small">{a.label}</div>
-                    <div className="spms-muted" style={{ fontSize: '.75rem' }}>{a.desc}</div>
-                  </div>
+                  <i className="bi bi-person-plus me-1" />
+                  New student login
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-light btn-sm rounded-pill px-3 border-white border-opacity-40"
+                  onClick={() => setModal('faculty')}
+                >
+                  New faculty login
+                </button>
+                <Link to="/reports" className="btn btn-outline-light btn-sm rounded-pill px-3 border-white border-opacity-40">
+                  Reports
                 </Link>
               </div>
-            ))}
+            </div>
+          </div>
+        </div>
+
+        <section>
+          <h2 className="h6 text-secondary fw-semibold mb-3">Summary</h2>
+          <div className="row g-3">
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-people-fill"
+                value={loading ? '—' : (d?.totalStudents ?? 0)}
+                description="Total students (profiles)"
+                iconBg={REG.accentSoft}
+                iconColor={REG.accent}
+              />
+            </div>
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-envelope-check"
+                value={loading ? '—' : (d?.withEmail ?? 0)}
+                description="With email on file"
+                iconBg="rgba(59, 130, 246, 0.12)"
+                iconColor="#2563eb"
+              />
+            </div>
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-diagram-3"
+                value={loading ? '—' : (d?.uniqueSections ?? 0)}
+                description="Distinct year · section pairs"
+                iconBg="rgba(99, 102, 241, 0.12)"
+                iconColor="#4f46e5"
+              />
+            </div>
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-calendar-plus"
+                value={loading ? '—' : (d?.addedLast30Days ?? 0)}
+                description="New profiles (30 days)"
+                iconBg="rgba(16, 185, 129, 0.14)"
+                iconColor="#059669"
+              />
+            </div>
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-exclamation-octagon"
+                value={loading ? '—' : (d?.totalViolations ?? 0)}
+                description="Violations (all students)"
+                iconBg="rgba(245, 158, 11, 0.18)"
+                iconColor="#d97706"
+              />
+            </div>
+            <div className="col-6 col-lg-4 col-xl-2">
+              <StatCard
+                icon="bi-stars"
+                value={loading ? '—' : (d?.totalAchievements ?? 0)}
+                description="Non-academic achievements"
+                iconBg="rgba(168, 85, 247, 0.14)"
+                iconColor="#9333ea"
+              />
+            </div>
           </div>
         </section>
 
         <section>
-          <h6 className="text-secondary fw-semibold mb-3">Recently Updated Students</h6>
-          <StudentTable students={students} loading={loading} />
-        </section>
-      </div>
+          <h2 className="h6 text-secondary fw-semibold mb-3">Analytics</h2>
+          <div className="row g-4">
+            <div className="col-12 col-lg-6">
+              <ChartCard title="Students by year level" subtitle="IndexedDB roster distribution.">
+                {loading || !d ? (
+                  <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={d.byYearLevel} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} width={28} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" name="Students" fill={REG.accent} radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+            </div>
 
-      <div className="col-12 col-xl-3">
-        <div
-          className="spms-card card border-0 sticky-top"
-          style={{ top: 80, zIndex: 1010, borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
-        >
-          <div className="card-body">
-            <h6 className="fw-semibold mb-3">Quick Actions</h6>
-            <div className="d-grid gap-2">
-              <button type="button" className="btn btn-primary rounded-3 py-2 text-start" onClick={() => setModal('student')}>
-                <i className="bi bi-person-plus me-2" />
-                Add Student Account
-              </button>
-              <button type="button" className="btn btn-outline-primary rounded-3 py-2 text-start" onClick={() => setModal('faculty')}>
-                <i className="bi bi-person-badge me-2" />
-                Add Faculty Account
-              </button>
-              <Link to="/users" className="btn btn-outline-primary rounded-3 py-2 text-start">
-                <i className="bi bi-person-gear me-2" />
-                Create / Manage Accounts
-              </Link>
-              <Link to="/students" className="btn btn-outline-secondary rounded-3 py-2 text-start">
-                <i className="bi bi-people me-2" />
-                View Student List
-              </Link>
+            <div className="col-12 col-lg-6">
+              <ChartCard title="Medical clearance mix" subtitle="Snapshot from student health fields.">
+                {loading || !d ? (
+                  <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={d.medicalMix}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={78}
+                        paddingAngle={2}
+                      >
+                        {d.medicalMix.map((_, i) => (
+                          <Cell key={i} fill={REG.chart[i % REG.chart.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => [Number(v ?? 0), 'Students']} />
+                      <Legend verticalAlign="bottom" height={32} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section>
+          <h2 className="h6 text-secondary fw-semibold mb-3">Recently added students</h2>
+          <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 24px rgba(15, 23, 42, .07)' }}>
+            <div className="card-body p-0">
+              {loading || !d ? (
+                <div className="p-4 spms-muted small">Loading…</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="ps-4">Student</th>
+                        <th>Section</th>
+                        <th>Created</th>
+                        <th className="text-end pe-4">Profile</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.recentStudents.map((row) => (
+                        <tr key={row.id}>
+                          <td className="ps-4 fw-semibold">{row.name}</td>
+                          <td className="spms-muted small">{row.section}</td>
+                          <td className="spms-muted small">{new Date(row.createdAt).toLocaleString()}</td>
+                          <td className="text-end pe-4">
+                            <Link to={`/students/${row.id}`} className="btn btn-sm btn-outline-secondary rounded-pill">
+                              Open
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
     </>
   )
 }

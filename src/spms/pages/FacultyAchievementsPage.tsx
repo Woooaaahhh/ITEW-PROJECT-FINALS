@@ -118,9 +118,6 @@ export function FacultyAchievementsPage() {
                 >
                   <i className="bi bi-eye me-1" /> View Profile
                 </Link>
-                <span className="badge rounded-pill bg-secondary-subtle text-secondary">
-                  Dummy storage: localStorage
-                </span>
               </div>
             </div>
           </div>

@@ -51,6 +51,10 @@ function buildCrumbs(pathname: string, role: string | undefined): Crumb[] {
   }
 
   const known: Record<string, Crumb[]> = {
+    '/medical': [
+      { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
+      { label: 'Medical', icon: 'bi bi-heart-pulse' },
+    ],
     '/reports': [
       { label: 'Dashboard', to: dashboardPath, icon: 'bi bi-grid-1x2' },
       { label: 'Reports', icon: 'bi bi-file-earmark-bar-graph' },

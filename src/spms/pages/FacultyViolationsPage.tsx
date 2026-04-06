@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { addAchievement, addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
 
-type RecordKind = 'violation' | 'achievement'
-
 type ViolationPayload = {
   violation_type: string
   description: string
@@ -41,14 +39,13 @@ function fullName(s: Student) {
 }
 
 export function FacultyViolationsPage() {
-  const [activeKind, setActiveKind] = useState<RecordKind>('violation')
   const [students, setStudents] = useState<Student[]>([])
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
 
   const [violations, setViolations] = useState<ApiViolation[]>([])
   const [achievements, setAchievements] = useState<ApiAchievement[]>([])
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting, setSubmitting] = useState<null | 'violation' | 'achievement'>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -120,57 +117,69 @@ export function FacultyViolationsPage() {
     [achievements],
   )
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleViolationSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSuccess(null)
-
     if (!selectedStudentId) {
       setError('Please select a student first.')
       return
     }
-
     try {
-      setSubmitting(true)
-      if (activeKind === 'violation') {
-        const created = addViolation(selectedStudentId, { ...violationForm })
-        const newItem: ApiViolation = {
-          id: created.id,
-          violation_type: created.violation_type,
-          description: created.description,
-          date: created.date,
-          status: created.status,
-        }
-        setViolations((prev) => [newItem, ...prev])
-        setViolationForm({
-          violation_type: '',
-          description: '',
-          date: '',
-          status: 'Pending',
-        })
-        setSuccess('Violation saved successfully.')
-      } else {
-        const created = addAchievement(selectedStudentId, { ...achievementForm })
-        const newItem: ApiAchievement = {
-          id: created.id,
-          title: created.title,
-          description: created.description,
-          date: created.date,
-          category: created.category ?? '',
-        }
-        setAchievements((prev) => [newItem, ...prev])
-        setAchievementForm({
-          title: '',
-          description: '',
-          date: '',
-          category: '',
-        })
-        setSuccess('Achievement saved successfully.')
+      setSubmitting('violation')
+      const created = addViolation(selectedStudentId, { ...violationForm })
+      const newItem: ApiViolation = {
+        id: created.id,
+        violation_type: created.violation_type,
+        description: created.description,
+        date: created.date,
+        status: created.status,
       }
+      setViolations((prev) => [newItem, ...prev])
+      setViolationForm({
+        violation_type: '',
+        description: '',
+        date: '',
+        status: 'Pending',
+      })
+      setSuccess('Violation saved successfully.')
     } catch {
-      setError('Unable to save record. Please check the form and try again.')
+      setError('Unable to save violation. Please check the form and try again.')
     } finally {
-      setSubmitting(false)
+      setSubmitting(null)
+    }
+  }
+
+  const handleAchievementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    if (!selectedStudentId) {
+      setError('Please select a student first.')
+      return
+    }
+    try {
+      setSubmitting('achievement')
+      const created = addAchievement(selectedStudentId, { ...achievementForm })
+      const newItem: ApiAchievement = {
+        id: created.id,
+        title: created.title,
+        description: created.description,
+        date: created.date,
+        category: created.category ?? '',
+      }
+      setAchievements((prev) => [newItem, ...prev])
+      setAchievementForm({
+        title: '',
+        description: '',
+        date: '',
+        category: '',
+      })
+      setSuccess('Achievement saved successfully.')
+    } catch {
+      setError('Unable to save achievement. Please check the form and try again.')
+    } finally {
+      setSubmitting(null)
     }
   }
 
@@ -228,37 +237,7 @@ export function FacultyViolationsPage() {
                 >
                   <i className="bi bi-eye me-1" /> View Profile
                 </Link>
-                <span className="badge rounded-pill bg-secondary-subtle text-secondary">
-                  Dummy storage: localStorage
-                </span>
               </div>
-            </div>
-          </div>
-
-          <div className="mb-3">
-            <div className="inline-flex rounded-full bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => setActiveKind('violation')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
-                  activeKind === 'violation'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Violation
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveKind('achievement')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition ${
-                  activeKind === 'achievement'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Achievement
-              </button>
             </div>
           </div>
 
@@ -273,121 +252,119 @@ export function FacultyViolationsPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="row g-3">
-            {activeKind === 'violation' ? (
-              <>
-                <div className="col-md-6">
-                  <label className="form-label small fw-semibold">Violation Type</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="e.g. Uniform, Attendance, Cheating"
-                    value={violationForm.violation_type}
-                    onChange={(e) =>
-                      setViolationForm((prev) => ({ ...prev, violation_type: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold">Date</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm rounded-3"
-                    value={violationForm.date}
-                    onChange={(e) => setViolationForm((prev) => ({ ...prev, date: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold">Status</label>
-                  <select
-                    className="form-select form-select-sm rounded-3"
-                    value={violationForm.status}
-                    onChange={(e) =>
-                      setViolationForm((prev) => ({ ...prev, status: e.target.value }))
-                    }
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Resolved">Resolved</option>
-                  </select>
-                </div>
-                <div className="col-12">
-                  <label className="form-label small fw-semibold">Description</label>
-                  <textarea
-                    rows={3}
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="Provide brief details of the violation."
-                    value={violationForm.description}
-                    onChange={(e) =>
-                      setViolationForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="col-md-6">
-                  <label className="form-label small fw-semibold">Achievement Title</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="e.g. Programming Contest Winner"
-                    value={achievementForm.title}
-                    onChange={(e) =>
-                      setAchievementForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold">Date</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm rounded-3"
-                    value={achievementForm.date}
-                    onChange={(e) =>
-                      setAchievementForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold">Category</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="e.g. Sports, Programming, Leadership"
-                    value={achievementForm.category}
-                    onChange={(e) =>
-                      setAchievementForm((prev) => ({ ...prev, category: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="col-12">
-                  <label className="form-label small fw-semibold">Description</label>
-                  <textarea
-                    rows={3}
-                    className="form-control form-control-sm rounded-3"
-                    placeholder="Provide brief details of the achievement or recognition."
-                    value={achievementForm.description}
-                    onChange={(e) =>
-                      setAchievementForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-              </>
-            )}
-
-            <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+          <h6 className="fw-semibold mb-3">Record violation</h6>
+          <form onSubmit={handleViolationSubmit} className="row g-3 mb-4">
+            <div className="col-md-6">
+              <label className="form-label small fw-semibold">Violation Type</label>
+              <input
+                type="text"
+                className="form-control form-control-sm rounded-3"
+                placeholder="e.g. Uniform, Attendance, Cheating"
+                value={violationForm.violation_type}
+                onChange={(e) => setViolationForm((prev) => ({ ...prev, violation_type: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label small fw-semibold">Date</label>
+              <input
+                type="date"
+                className="form-control form-control-sm rounded-3"
+                value={violationForm.date}
+                onChange={(e) => setViolationForm((prev) => ({ ...prev, date: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label small fw-semibold">Status</label>
+              <select
+                className="form-select form-select-sm rounded-3"
+                value={violationForm.status}
+                onChange={(e) => setViolationForm((prev) => ({ ...prev, status: e.target.value }))}
+                disabled={submitting !== null}
+              >
+                <option value="Pending">Pending</option>
+                <option value="Resolved">Resolved</option>
+              </select>
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-semibold">Description</label>
+              <textarea
+                rows={3}
+                className="form-control form-control-sm rounded-3"
+                placeholder="Provide brief details of the violation."
+                value={violationForm.description}
+                onChange={(e) => setViolationForm((prev) => ({ ...prev, description: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-12 d-flex justify-content-end">
               <button
                 type="submit"
                 className="btn btn-primary btn-sm rounded-3 px-4"
-                disabled={submitting}
+                disabled={submitting !== null}
               >
-                {submitting ? 'Saving...' : 'Save Record'}
+                {submitting === 'violation' ? 'Saving…' : 'Save violation'}
+              </button>
+            </div>
+          </form>
+
+          <hr className="my-4" />
+
+          <h6 className="fw-semibold mb-3">Record achievement</h6>
+          <form onSubmit={handleAchievementSubmit} className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small fw-semibold">Achievement Title</label>
+              <input
+                type="text"
+                className="form-control form-control-sm rounded-3"
+                placeholder="e.g. Programming Contest Winner"
+                value={achievementForm.title}
+                onChange={(e) => setAchievementForm((prev) => ({ ...prev, title: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label small fw-semibold">Date</label>
+              <input
+                type="date"
+                className="form-control form-control-sm rounded-3"
+                value={achievementForm.date}
+                onChange={(e) => setAchievementForm((prev) => ({ ...prev, date: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label small fw-semibold">Category</label>
+              <input
+                type="text"
+                className="form-control form-control-sm rounded-3"
+                placeholder="e.g. Sports, Programming, Leadership"
+                value={achievementForm.category}
+                onChange={(e) => setAchievementForm((prev) => ({ ...prev, category: e.target.value }))}
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-semibold">Description</label>
+              <textarea
+                rows={3}
+                className="form-control form-control-sm rounded-3"
+                placeholder="Provide brief details of the achievement or recognition."
+                value={achievementForm.description}
+                onChange={(e) => setAchievementForm((prev) => ({ ...prev, description: e.target.value }))}
+                required
+                disabled={submitting !== null}
+              />
+            </div>
+            <div className="col-12 d-flex justify-content-end">
+              <button type="submit" className="btn btn-primary btn-sm rounded-3 px-4" disabled={submitting !== null}>
+                {submitting === 'achievement' ? 'Saving…' : 'Save achievement'}
               </button>
             </div>
           </form>

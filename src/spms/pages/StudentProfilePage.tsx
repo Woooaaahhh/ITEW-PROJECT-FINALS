@@ -267,15 +267,10 @@ export function StudentProfilePage() {
                 >
                   <i className="bi bi-layout-text-sidebar-reverse" />
                 </Link>
+              ) : isStudentViewer ? (
+                <span className="small spms-muted">View only</span>
               ) : (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-3 border-0"
-                  disabled
-                  title="Details are maintained by the registrar"
-                >
-                  <i className="bi bi-info-lg" />
-                </button>
+                <span className="small spms-muted">Registrar maintains details</span>
               )}
             </div>
             <div className="card-body">
@@ -326,15 +321,11 @@ export function StudentProfilePage() {
                 ) : null}
               </div>
 
-              {isOwnStudentProfile ? (
-                <div className="mb-3">
-                  <Link to="/student/medical" className="btn btn-sm btn-primary rounded-3">
-                    <i className="bi bi-upload me-1" /> Submit or update medical information
-                  </Link>
-                  <p className="spms-muted small mt-2 mb-0">
-                    Upload a document and enter details. Faculty will approve or reject for try-out eligibility.
-                  </p>
-                </div>
+              {isStudentViewer ? (
+                <p className="spms-muted small mb-3">
+                  To create or update medical clearance, use <Link to="/medical">Medical</Link> in the sidebar and choose the
+                  correct student row.
+                </p>
               ) : null}
 
               {(student.medicalPhysicianName ||
@@ -388,13 +379,15 @@ export function StudentProfilePage() {
                           title="Medical PDF"
                         />
                       ) : null}
-                      <a
-                        href={student.medicalDocumentDataUrl}
-                        download="medical-document"
-                        className="btn btn-sm btn-outline-secondary rounded-3 mt-2"
-                      >
-                        <i className="bi bi-download me-1" /> Open / download
-                      </a>
+                      {!isStudentViewer ? (
+                        <a
+                          href={student.medicalDocumentDataUrl}
+                          download="medical-document"
+                          className="btn btn-sm btn-outline-secondary rounded-3 mt-2"
+                        >
+                          <i className="bi bi-download me-1" /> Open / download
+                        </a>
+                      ) : null}
                     </div>
                   ) : null}
                 </>
@@ -481,7 +474,7 @@ export function StudentProfilePage() {
                   ) : (
                     <p className="spms-muted small mb-0 mt-2">
                       {medicalNorm === 'pending' && !student.medicalSubmittedAt
-                        ? 'Awaiting student submission. Direct students to Student → Submit medical information.'
+                        ? 'No record yet. Enter data from Sidebar → Medical, or ask students to submit from the Medical module.'
                         : 'No pending submission. New activity appears when a student submits again for review.'}
                     </p>
                   )}
@@ -574,10 +567,9 @@ export function StudentProfilePage() {
                   ) : null}
                   {isOwnStudentProfile ? (
                     <p className="small spms-muted mb-3">
-                      <strong>Try-out eligibility</strong> requires medical clearance{' '}
-                      <strong>Approved</strong> by faculty and at least one sport assigned to you. Check status under{' '}
-                      <a href="#medical-clearance">Medical clearance</a> and submit updates via{' '}
-                      <Link to="/student/medical">Medical</Link>.
+                      <strong>Try-out eligibility</strong> requires medical clearance <strong>Approved</strong> by faculty and
+                      at least one sport assigned to you. See <a href="#medical-clearance">Medical clearance</a> below or{' '}
+                      <Link to="/medical">Medical</Link> for submissions.
                     </p>
                   ) : null}
                   {sportsAffiliationIds.length === 0 ? (

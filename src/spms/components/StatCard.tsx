@@ -3,9 +3,20 @@ type StatCardProps = {
   value: string | number
   description: string
   className?: string
+  /** Icon tile background (e.g. rgba) */
+  iconBg?: string
+  /** Icon color */
+  iconColor?: string
 }
 
-export function StatCard({ icon, value, description, className = '' }: StatCardProps) {
+export function StatCard({
+  icon,
+  value,
+  description,
+  className = '',
+  iconBg = 'rgba(37, 99, 235, .1)',
+  iconColor = 'var(--spms-primary)',
+}: StatCardProps) {
   return (
     <div
       className={`spms-card spms-stat-card card h-100 border-0 ${className}`}
@@ -33,8 +44,8 @@ export function StatCard({ icon, value, description, className = '' }: StatCardP
           style={{
             width: 48,
             height: 48,
-            background: 'rgba(37, 99, 235, .1)',
-            color: 'var(--spms-primary)',
+            background: iconBg,
+            color: iconColor,
           }}
         >
           <i className={`bi ${icon} fs-5`} />

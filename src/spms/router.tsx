@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell, type PageMeta } from './components/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
@@ -18,7 +18,7 @@ import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
-import { FacultyMedicalReviewPage } from './pages/FacultyMedicalReviewPage'
+import { MedicalModulePage } from './pages/MedicalModulePage'
 import { StudentMedicalSubmitPage } from './pages/StudentMedicalSubmitPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
@@ -74,9 +74,10 @@ const facultyAcademicHandle: PageMeta = {
   subtitle: 'View current term, history, and update student academic records',
 }
 
-const facultyMedicalHandle: PageMeta = {
-  title: 'Medical review',
-  subtitle: 'Pending student medical submissions for try-out clearance',
+const medicalModuleHandle: PageMeta = {
+  title: 'Medical',
+  subtitle: 'Search students, view clearance status, and manage medical records',
+  showSearch: true,
 }
 
 const studentMedicalHandle: PageMeta = {
@@ -229,12 +230,16 @@ export const spmsRouter = createBrowserRouter([
       },
       {
         path: '/faculty/medical',
+        element: <Navigate to="/medical" replace />,
+      },
+      {
+        path: '/medical',
         element: (
-          <RoleProtectedRoute allowedRoles={['faculty']}>
-            <FacultyMedicalReviewPage />
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty', 'student']}>
+            <MedicalModulePage />
           </RoleProtectedRoute>
         ),
-        handle: facultyMedicalHandle,
+        handle: medicalModuleHandle,
       },
       {
         path: '/student',

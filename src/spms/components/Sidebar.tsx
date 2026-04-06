@@ -48,16 +48,21 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
         <NavLink className={navClass} to={role === 'admin' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
-        {isStudent && (
-          <NavLink className={navClass} to="/student/medical">
+        {isStudent ? (
+          <NavLink className={navClass} to="/medical">
             <i className="bi bi-heart-pulse" /> Medical
           </NavLink>
-        )}
+        ) : null}
         {!isStudent && (
           <>
             <NavLink className={navClass} to="/students">
               <i className="bi bi-people" /> Students
             </NavLink>
+            {(role === 'admin' || role === 'faculty') && (
+              <NavLink className={navClass} to="/medical">
+                <i className="bi bi-heart-pulse" /> Medical
+              </NavLink>
+            )}
             {role === 'faculty' && (
               <>
                 <NavLink className={navClass} to="/faculty/violations">
@@ -74,9 +79,6 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                 </NavLink>
                 <NavLink className={navClass} to="/faculty/academic">
                   <i className="bi bi-mortarboard" /> Academic
-                </NavLink>
-                <NavLink className={navClass} to="/faculty/medical">
-                  <i className="bi bi-heart-pulse" /> Medical review
                 </NavLink>
               </>
             )}

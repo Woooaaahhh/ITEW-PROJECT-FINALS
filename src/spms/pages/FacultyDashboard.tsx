@@ -1,158 +1,304 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { listStudents, seedIfEmpty, type Student } from '../db/students'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatCard } from '../components/StatCard'
-import { StudentTable } from '../components/StudentTable'
+import { loadFacultyDashboardData, type FacultyDashboardData } from '../dashboards/dashboardAnalytics'
+import { formatStudentRecordDate } from './studentRecordViewUtils'
+
+const FACULTY = {
+  accent: '#4f46e5',
+  accentSoft: 'rgba(79, 70, 229, 0.12)',
+  gradient: 'linear-gradient(120deg, #312e81 0%, #4f46e5 45%, #6366f1 100%)',
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+  className = '',
+}: {
+  title: string
+  subtitle?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`spms-card card border-0 h-100 ${className}`}
+      style={{ borderRadius: 16, boxShadow: '0 4px 24px rgba(15, 23, 42, .07)' }}
+    >
+      <div className="card-body d-flex flex-column">
+        <div className="mb-2">
+          <h6 className="fw-bold mb-0 text-body">{title}</h6>
+          {subtitle ? <p className="spms-muted small mb-0 mt-1">{subtitle}</p> : null}
+        </div>
+        <div className="flex-grow-1" style={{ minHeight: 280 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function FacultyDashboard() {
-  const [students, setStudents] = useState<Student[]>([])
+  const [data, setData] = useState<FacultyDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
-      await seedIfEmpty()
-      const all = await listStudents()
-      if (!alive) return
-      setStudents(all)
-      setLoading(false)
+      try {
+        const d = await loadFacultyDashboardData()
+        if (alive) setData(d)
+      } catch {
+        if (alive) setData(null)
+      } finally {
+        if (alive) setLoading(false)
+      }
     })()
     return () => {
       alive = false
     }
   }, [])
 
-  const total = students.length
-  // Placeholder counts until violations/skills data is implemented
-  const withViolations = 0
-  const withSkills = 0
-  const lastUpdated = students[0]?.updatedAt
-    ? new Date(students[0].updatedAt).toLocaleDateString(undefined, { dateStyle: 'short' })
-    : '—'
-
-  const quickActions = [
-    { to: '/students', icon: 'bi-people', label: 'View Student List', desc: 'Browse all students' },
-    { to: '/faculty/violations', icon: 'bi-exclamation-triangle', label: 'Violations', desc: 'Record behavior incidents' },
-    { to: '/faculty/achievements', icon: 'bi-journal-bookmark', label: 'Achievements', desc: 'Record non-academic wins' },
-    { to: '/faculty/skills', icon: 'bi-award', label: 'Assign Student Skill', desc: 'Add student skill' },
-    { to: '/faculty/sports', icon: 'bi-dribbble', label: 'Manage Sports List', desc: 'Sports affiliations & clearance' },
-    { to: '/faculty/academic', icon: 'bi-mortarboard', label: 'Academic Records', desc: 'GWA, history & current term' },
-  ]
+  const d = data
 
   return (
-    <div className="row g-4">
-      <div className="col-12 col-xl-9">
-        <section className="mb-4">
-          <h6 className="text-secondary fw-semibold mb-3">Overview</h6>
-          <div className="row g-3">
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-people-fill"
-                value={loading ? '—' : total}
-                description="Total Students"
-              />
+    <div className="d-flex flex-column gap-4">
+      <div
+        className="text-white rounded-4 overflow-hidden position-relative"
+        style={{
+          background: FACULTY.gradient,
+          boxShadow: '0 12px 40px rgba(49, 46, 129, .35)',
+        }}
+      >
+        <div className="position-absolute top-0 end-0 opacity-25 d-none d-md-block" aria-hidden style={{ fontSize: 180, lineHeight: 1, transform: 'translate(10%, -20%)' }}>
+          <i className="bi bi-easel" />
+        </div>
+        <div className="p-4 p-md-5 position-relative">
+          <div className="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div>
+              <p className="small text-white text-opacity-75 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '.12em' }}>
+                Faculty workspace
+              </p>
+              <h1 className="h3 fw-bold mb-2">Monitoring &amp; decisions</h1>
+              <p className="text-white text-opacity-90 mb-0 small" style={{ maxWidth: 520 }}>
+                Live view of clearance, academics, and skills — prioritize reviews without hunting through menus.
+              </p>
             </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-exclamation-triangle"
-                value={loading ? '—' : withViolations}
-                description="Students With Violations"
-              />
-            </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-award"
-                value={loading ? '—' : withSkills}
-                description="Students With Skills"
-              />
-            </div>
-            <div className="col-6 col-lg-3">
-              <StatCard
-                icon="bi-clock-history"
-                value={lastUpdated}
-                description="Recently Updated Records"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-4">
-          <h6 className="text-secondary fw-semibold mb-3">Quick Actions</h6>
-          <div className="row g-3">
-            {quickActions.map((a) => (
-              <div key={a.to} className="col-6 col-lg-4">
-                <Link
-                  to={a.to}
-                  className="spms-card card border-0 text-decoration-none text-body h-100 d-block"
-                  style={{
-                    borderRadius: 16,
-                    boxShadow: '0 4px 20px rgba(15, 23, 42, .06)',
-                    transition: 'box-shadow .2s ease, transform .2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 8px 28px rgba(15, 23, 42, .1)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(15, 23, 42, .06)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}
-                >
-                  <div className="card-body text-center py-4">
-                    <div
-                      className="d-inline-flex align-items-center justify-content-center rounded-3 mb-2"
-                      style={{ width: 44, height: 44, background: 'rgba(37, 99, 235, .1)', color: 'var(--spms-primary)' }}
-                    >
-                      <i className={`bi ${a.icon} fs-5`} />
-                    </div>
-                    <div className="fw-semibold small">{a.label}</div>
-                    <div className="spms-muted" style={{ fontSize: '.75rem' }}>{a.desc}</div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h6 className="text-secondary fw-semibold mb-3">Student Records</h6>
-          <StudentTable students={students} loading={loading} showStatusColumn />
-        </section>
-      </div>
-
-      <div className="col-12 col-xl-3">
-        <div
-          className="spms-card card border-0 sticky-top"
-          style={{ top: 80, zIndex: 1010, borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
-        >
-          <div className="card-body">
-            <h6 className="fw-semibold mb-3">Quick Actions</h6>
-            <div className="d-grid gap-2">
-              <Link to="/faculty/violations" className="btn btn-primary rounded-3 py-2 text-start">
-                <i className="bi bi-exclamation-triangle me-2" />
-                Record violation
+            <div className="d-flex flex-wrap gap-2 align-items-center">
+              <Link
+                to="/medical"
+                className="btn btn-light btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+                style={{ color: FACULTY.accent }}
+              >
+                <i className="bi bi-heart-pulse me-1" />
+                Medical queue
               </Link>
-              <Link to="/faculty/achievements" className="btn btn-outline-primary rounded-3 py-2 text-start">
-                <i className="bi bi-journal-bookmark me-2" />
-                Record achievement
-              </Link>
-              <Link to="/faculty/skills" className="btn btn-outline-primary rounded-3 py-2 text-start">
-                <i className="bi bi-award me-2" />
-                Add Student Skill
-              </Link>
-              <Link to="/faculty/academic" className="btn btn-outline-primary rounded-3 py-2 text-start">
-                <i className="bi bi-mortarboard me-2" />
-                Academic records
-              </Link>
-              <Link to="/students" className="btn btn-outline-secondary rounded-3 py-2 text-start">
-                <i className="bi bi-person-badge me-2" />
-                View Student Profile
+              <Link to="/faculty/academic" className="btn btn-outline-light btn-sm rounded-pill px-3 border-white border-opacity-40">
+                Academics
               </Link>
             </div>
           </div>
         </div>
       </div>
+
+      <section>
+        <h2 className="h6 text-secondary fw-semibold mb-3">Summary</h2>
+        <div className="row g-3">
+          <div className="col-6 col-xl-3">
+            <StatCard
+              icon="bi-people-fill"
+              value={loading ? '—' : (d?.totalStudents ?? 0)}
+              description="Total students"
+              iconBg={FACULTY.accentSoft}
+              iconColor={FACULTY.accent}
+            />
+          </div>
+          <div className="col-6 col-xl-3">
+            <StatCard
+              icon="bi-heart-pulse-fill"
+              value={loading ? '—' : (d?.approvedMedical ?? 0)}
+              description="Approved medical"
+              iconBg="rgba(16, 185, 129, 0.15)"
+              iconColor="#059669"
+            />
+          </div>
+          <div className="col-6 col-xl-3">
+            <StatCard
+              icon="bi-exclamation-triangle-fill"
+              value={loading ? '—' : (d?.studentsWithViolations ?? 0)}
+              description="Students with violations"
+              iconBg="rgba(245, 158, 11, 0.18)"
+              iconColor="#d97706"
+            />
+          </div>
+          <div className="col-6 col-xl-3">
+            <StatCard
+              icon="bi-hourglass-split"
+              value={loading ? '—' : (d?.pendingMedicalCount ?? 0)}
+              description="Medical pending review"
+              iconBg="rgba(234, 179, 8, 0.2)"
+              iconColor="#ca8a04"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="h6 text-secondary fw-semibold mb-3">Qualification insights</h2>
+        <div className="row g-3">
+          {[
+            {
+              label: 'Programming track',
+              value: d?.qualifiedProgramming ?? 0,
+              hint: 'At least one programming skill assigned',
+              icon: 'bi-code-slash',
+            },
+            {
+              label: 'Sports try-out ready',
+              value: d?.qualifiedSportsTryout ?? 0,
+              hint: 'Cleared medically + sport on file',
+              icon: 'bi-trophy',
+            },
+            {
+              label: 'Academic competitions',
+              value: d?.qualifiedAcademic ?? 0,
+              hint: 'At least one academic-category skill',
+              icon: 'bi-journal-richtext',
+            },
+          ].map((q) => (
+            <div key={q.label} className="col-12 col-md-4">
+              <div
+                className="spms-card card border-0 h-100"
+                style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
+              >
+                <div className="card-body">
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{ width: 48, height: 48, background: FACULTY.accentSoft, color: FACULTY.accent }}
+                    >
+                      <i className={`bi ${q.icon} fs-5`} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="spms-muted small">{q.label}</div>
+                      <div className="fs-3 fw-bold">{loading ? '—' : q.value}</div>
+                      <div className="spms-muted small text-truncate">{q.hint}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="h6 text-secondary fw-semibold mb-3">Analytics</h2>
+        <div className="row g-4">
+          <div className="col-12 col-lg-6">
+            <ChartCard title="Academic performance overview" subtitle="Latest-term GWA distribution (Philippine scale).">
+              {loading || !d ? (
+                <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading chart…</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={d.gwaDistribution} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="band" tick={{ fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={70} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
+                    <Tooltip />
+                    <Bar dataKey="count" name="Students" fill={FACULTY.accent} radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </div>
+
+          <div className="col-12 col-lg-6">
+            <ChartCard title="Top students by latest GWA" subtitle="Lower GWA is stronger. Includes skill assignment count.">
+              {loading || !d ? (
+                <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
+              ) : d.topByGwa.length === 0 ? (
+                <p className="spms-muted small mb-0">No academic records yet — add terms under Faculty → Academic.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-sm align-middle mb-0">
+                    <thead className="spms-muted small">
+                      <tr>
+                        <th>Student</th>
+                        <th className="text-end">GWA</th>
+                        <th className="text-end">Skills</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.topByGwa.map((row) => (
+                        <tr key={row.id}>
+                          <td>
+                            <Link to={`/students/${row.id}`} className="fw-semibold text-decoration-none">
+                              {row.name}
+                            </Link>
+                          </td>
+                          <td className="text-end font-monospace">{row.gwa.toFixed(2)}</td>
+                          <td className="text-end">{row.skillCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </ChartCard>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="h6 text-secondary fw-semibold mb-3">Medical — pending approval</h2>
+        <div
+          className="spms-card card border-0"
+          style={{ borderRadius: 16, boxShadow: '0 4px 24px rgba(15, 23, 42, .07)' }}
+        >
+          <div className="card-body p-0">
+            {loading || !d ? (
+              <div className="p-4 spms-muted small">Loading…</div>
+            ) : d.pendingMedicalRows.length === 0 ? (
+              <div className="p-4 spms-muted small mb-0">No submissions waiting for review. Great job staying on top of the queue.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="ps-4">Student</th>
+                      <th>Submitted</th>
+                      <th className="text-end pe-4">Open</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.pendingMedicalRows.map((row) => (
+                      <tr key={row.id}>
+                        <td className="ps-4">
+                          <Link to={`/students/${row.id}#medical-clearance`} className="fw-semibold text-decoration-none">
+                            {row.name}
+                          </Link>
+                        </td>
+                        <td className="spms-muted small">
+                          {row.submittedAt ? formatStudentRecordDate(row.submittedAt.slice(0, 10)) : '—'}
+                        </td>
+                        <td className="text-end pe-4">
+                          <Link to="/medical" className="btn btn-sm btn-outline-primary rounded-pill">
+                            Review in Medical
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

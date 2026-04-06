@@ -2,6 +2,15 @@ import { nowIso, openSpmsDb, type Student } from './spmsDb'
 
 export type { Student } from './spmsDb'
 
+function notifyStudentsChanged() {
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(new CustomEvent('spms-students-changed'))
+  } catch {
+    /* ignore */
+  }
+}
+
 function withEligibilityDefaults(s: Student): Student {
   return {
     ...s,
@@ -140,6 +149,7 @@ async function runSeededWork(): Promise<void> {
   await Promise.all(demo.map((s) => tx.objectStore('students').put(s)))
   await tx.objectStore('meta').put({ key: 'seeded', value: 'true' })
   await tx.done
+  notifyStudentsChanged()
 }
 
 export async function listStudents(): Promise<Student[]> {
@@ -166,6 +176,7 @@ export async function createStudent(input: Omit<Student, 'id' | 'createdAt' | 'u
     ...input,
   }
   await db.put('students', student)
+  notifyStudentsChanged()
   return withEligibilityDefaults(student)
 }
 
@@ -178,12 +189,14 @@ export async function updateStudent(
   if (!existing) throw new Error('Student not found')
   const updated: Student = { ...existing, ...patch, updatedAt: nowIso() }
   await db.put('students', updated)
+  notifyStudentsChanged()
   return withEligibilityDefaults(updated)
 }
 
 export async function deleteStudent(id: string): Promise<void> {
   const db = await openSpmsDb()
   await db.delete('students', id)
+  notifyStudentsChanged()
 }
 
 export async function seedIfEmpty(): Promise<void> {
