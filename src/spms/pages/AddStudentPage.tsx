@@ -19,6 +19,13 @@ type FormState = {
   manualSection: string
 }
 
+function makeStudentUsername(firstName: string, lastName: string, email: string): string {
+  const fromEmail = email.trim().toLowerCase().split('@')[0]?.replace(/[^a-z0-9._-]/g, '')
+  if (fromEmail) return `${fromEmail}-${Date.now().toString(36)}`
+  const base = `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z0-9._-]/g, '')
+  return `${base || 'student'}-${Date.now().toString(36)}`
+}
+
 const initial: FormState = {
   firstName: '',
   middleName: '',
@@ -126,6 +133,11 @@ export function AddStudentPage() {
                   setSubmitError('First name and last name are required.')
                   return
                 }
+                const emailVal = form.email.trim().toLowerCase()
+                if (!emailVal) {
+                  setSubmitError('Email is required to create a MongoDB student account.')
+                  return
+                }
 
                 let yearLevel: string | null = null
                 let sectionVal: string | null = null
@@ -149,6 +161,21 @@ export function AddStudentPage() {
 
                 setSaving(true)
                 try {
+                  const generatedUsername = makeStudentUsername(fn, ln, emailVal)
+                  // Sync to backend MongoDB first so new students appear in Atlas.
+                  await axios.post('/api/create-user', {
+                    username: generatedUsername,
+                    email: emailVal,
+                    password: 'student123',
+                    role: 'student',
+                    student: {
+                      first_name: fn,
+                      last_name: ln,
+                      year_level: yearLevel,
+                      section: sectionVal,
+                    },
+                  })
+
                   const student = await createStudent({
                     profilePictureDataUrl: fileDataUrl,
                     firstName: fn,
@@ -157,14 +184,26 @@ export function AddStudentPage() {
                     birthdate: form.birthdate || null,
                     gender: form.gender || null,
                     address: form.address.trim() || null,
-                    email: form.email.trim() || null,
+                    email: emailVal || null,
                     contactNumber: form.contactNumber.trim() || null,
                     yearLevel,
                     section: sectionVal,
                   })
                   navigate(`/students/${student.id}`)
                 } catch (err) {
-                  setSubmitError(err instanceof Error ? err.message : 'Could not save student. Check browser storage permissions.')
+                  if (axios.isAxiosError(err)) {
+                    const status = err.response?.status
+                    const msg = (err.response?.data as { message?: string } | undefined)?.message
+                    if (status === 409) {
+                      setSubmitError(msg || 'Student account already exists. Try a different email.')
+                    } else if (!err.response) {
+                      setSubmitError('Cannot reach API. Start backend with npm run dev:all, then try again.')
+                    } else {
+                      setSubmitError(msg || 'Could not save to MongoDB.')
+                    }
+                  } else {
+                    setSubmitError(err instanceof Error ? err.message : 'Could not save student.')
+                  }
                 } finally {
                   setSaving(false)
                 }
@@ -430,10 +469,7 @@ export function AddStudentPage() {
                       <i className="bi bi-check2-circle me-1" /> {saving ? 'Saving...' : 'Save Student'}
                     </button>
                   </div>
-                  <div className="spms-muted small mt-2">
-                    Students are saved in this browser&apos;s IndexedDB (not in Git). Use the same machine/browser to see them after
-                    switching branches.
-                  </div>
+                  <div className="spms-muted small mt-2">Students are saved to MongoDB and mirrored in this browser&apos;s IndexedDB.</div>
                 </div>
               </div>
             </form>

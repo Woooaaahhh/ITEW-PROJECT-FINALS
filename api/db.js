@@ -13,7 +13,11 @@ async function getNextSequence(db, name) {
     { $inc: { value: 1 } },
     { upsert: true, returnDocument: 'after' },
   )
-  return result.value?.value ?? 1
+  // mongodb driver versions may return either the document directly
+  // or a wrapper object with `value`.
+  if (typeof result?.value === 'number') return result.value
+  if (typeof result?.value?.value === 'number') return result.value.value
+  return 1
 }
 
 async function ensureIndexes(db) {

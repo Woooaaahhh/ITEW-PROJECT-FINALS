@@ -15,8 +15,33 @@ function isDuplicateKeyError(error) {
   return error && typeof error === 'object' && error.code === 11000
 }
 
+function duplicateKeyField(error) {
+  if (!isDuplicateKeyError(error)) return null
+  const keys = Object.keys(error?.keyPattern ?? {})
+  return keys[0] ?? null
+}
+
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function nextSequence(db, name) {
+  const result = await db.collection('counters').findOneAndUpdate(
+    { _id: name },
+    { $inc: { value: 1 } },
+    { upsert: true, returnDocument: 'after' },
+  )
+  if (typeof result?.value === 'number') return result.value
+  if (typeof result?.value?.value === 'number') return result.value.value
+  return 1
+}
+
+async function setSequenceAtLeast(db, name, minValue) {
+  await db.collection('counters').updateOne(
+    { _id: name },
+    { $max: { value: minValue } },
+    { upsert: true },
+  )
 }
 
 const loginSchema = z.object({
@@ -141,13 +166,8 @@ app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
   const { year_level, section } = parsed.data
   const db = await getDb()
   try {
-    const sectionId = await db.collection('counters').findOneAndUpdate(
-      { _id: 'sections' },
-      { $inc: { value: 1 } },
-      { upsert: true, returnDocument: 'after' },
-    )
     const created = {
-      section_id: sectionId.value?.value ?? 1,
+      section_id: await nextSequence(db, 'sections'),
       year_level,
       section,
       created_at: new Date(),
@@ -249,14 +269,10 @@ app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
 
   const db = await getDb()
   const hash = await bcrypt.hash(password, 10)
+  let userId = null
 
   try {
-    const userCounter = await db.collection('counters').findOneAndUpdate(
-      { _id: 'users' },
-      { $inc: { value: 1 } },
-      { upsert: true, returnDocument: 'after' },
-    )
-    const userId = userCounter.value?.value ?? 1
+    userId = await nextSequence(db, 'users')
     await db.collection('users').insertOne({
       user_id: userId,
       username,
@@ -269,20 +285,36 @@ app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
     })
 
     if (role === 'student' && student) {
-      const studentCounter = await db.collection('counters').findOneAndUpdate(
-        { _id: 'students' },
-        { $inc: { value: 1 } },
-        { upsert: true, returnDocument: 'after' },
-      )
-      const studentId = studentCounter.value?.value ?? 1
-      await db.collection('students').insertOne({
-        student_id: studentId,
-        user_id: userId,
-        first_name: student.first_name,
-        last_name: student.last_name,
-        year_level: student.year_level,
-        section: student.section,
-      })
+      let createdStudent = false
+      for (let attempts = 0; attempts < 3 && !createdStudent; attempts += 1) {
+        const studentId = await nextSequence(db, 'students')
+        try {
+          await db.collection('students').insertOne({
+            student_id: studentId,
+            user_id: userId,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            year_level: student.year_level,
+            section: student.section,
+          })
+          createdStudent = true
+        } catch (studentError) {
+          const dupField = duplicateKeyField(studentError)
+          if (dupField === 'student_id') {
+            const maxStudent = await db
+              .collection('students')
+              .find({}, { projection: { student_id: 1 } })
+              .sort({ student_id: -1 })
+              .limit(1)
+              .toArray()
+            const maxStudentId = maxStudent[0]?.student_id ?? 0
+            await setSequenceAtLeast(db, 'students', maxStudentId)
+            continue
+          }
+          throw studentError
+        }
+      }
+      if (!createdStudent) throw new Error('Could not allocate student_id')
     }
 
     const created = await db.collection('users').findOne(
@@ -291,14 +323,21 @@ app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
     )
     return res.status(201).json({ user: created })
   } catch (e) {
-    if (!isDuplicateKeyError(e)) {
-      const created = await db.collection('users').findOne({ username, email })
-      if (created?.user_id) {
-        await db.collection('students').deleteOne({ user_id: created.user_id })
-        await db.collection('users').deleteOne({ user_id: created.user_id })
-      }
+    if (userId != null) {
+      await db.collection('students').deleteOne({ user_id: userId })
+      await db.collection('users').deleteOne({ user_id: userId })
     }
-    return res.status(409).json({ message: 'Username or email already exists' })
+    if (isDuplicateKeyError(e)) {
+      const dupField = duplicateKeyField(e)
+      if (dupField === 'username' || dupField === 'email') {
+        return res.status(409).json({ message: 'Username or email already exists' })
+      }
+      if (dupField === 'student_id' || dupField === 'user_id') {
+        return res.status(500).json({ message: 'ID allocator conflict, please try again' })
+      }
+      return res.status(409).json({ message: 'Duplicate key conflict' })
+    }
+    return res.status(500).json({ message: 'Failed to create user' })
   }
 })
 
@@ -366,6 +405,87 @@ app.delete('/api/users/:id', authMiddleware, requireAdmin, async (req, res) => {
 })
 
 const qualificationCategorySchema = z.string().trim().min(1).max(80)
+
+const skillSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  category: z.string().trim().min(1).max(80),
+})
+
+const updateSkillSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  category: z.string().trim().min(1).max(80).optional(),
+  is_active: z.number().int().min(0).max(1).optional(),
+})
+
+app.get('/api/skills', authMiddleware, requireStaff, async (req, res) => {
+  const db = await getDb()
+  const activeOnly = String(req.query.activeOnly || '').toLowerCase() === 'true'
+  const query = activeOnly ? { is_active: 1 } : {}
+  const skills = await db
+    .collection('skills')
+    .find(query, { projection: { _id: 0 } })
+    .sort({ name: 1 })
+    .toArray()
+  return res.json({ skills })
+})
+
+app.post('/api/skills', authMiddleware, requireStaff, async (req, res) => {
+  const parsed = skillSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const db = await getDb()
+  const { name, category } = parsed.data
+  try {
+    const skill = {
+      skill_id: await nextSequence(db, 'skills'),
+      name,
+      category,
+      is_active: 1,
+      created_at: new Date(),
+    }
+    await db.collection('skills').insertOne(skill)
+    return res.status(201).json({ skill })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Skill already exists' })
+    return res.status(500).json({ message: 'Failed to create skill' })
+  }
+})
+
+app.put('/api/skills/:id', authMiddleware, requireStaff, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid skill id' })
+  const parsed = updateSkillSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const fields = {}
+  if (parsed.data.name !== undefined) fields.name = parsed.data.name
+  if (parsed.data.category !== undefined) fields.category = parsed.data.category
+  if (parsed.data.is_active !== undefined) fields.is_active = parsed.data.is_active
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
+
+  const db = await getDb()
+  const existing = await db.collection('skills').findOne({ skill_id: id }, { projection: { _id: 0, skill_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Skill not found' })
+  try {
+    await db.collection('skills').updateOne({ skill_id: id }, { $set: fields })
+    const updated = await db.collection('skills').findOne({ skill_id: id }, { projection: { _id: 0 } })
+    return res.json({ skill: updated })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Skill already exists' })
+    return res.status(500).json({ message: 'Failed to update skill' })
+  }
+})
+
+app.delete('/api/skills/:id', authMiddleware, requireStaff, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid skill id' })
+  const db = await getDb()
+  const existing = await db.collection('skills').findOne({ skill_id: id }, { projection: { _id: 0, skill_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Skill not found' })
+  await db.collection('student_skills').deleteMany({ skill_id: id })
+  await db.collection('skills').deleteOne({ skill_id: id })
+  return res.json({ ok: true })
+})
 
 app.get('/api/qualification-reports', authMiddleware, requireStaff, async (req, res) => {
   const db = await getDb()
