@@ -11,6 +11,14 @@ const app = express()
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json({ limit: '100kb' }))
 
+function isDuplicateKeyError(error) {
+  return error && typeof error === 'object' && error.code === 11000
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const loginSchema = z.object({
   identifier: z.string().trim().min(1),
   password: z.string().min(1),
@@ -62,10 +70,26 @@ app.post('/api/login', async (req, res) => {
   const id = identifier.toLowerCase()
 
   const db = await getDb()
-  const row = await db.get(
-    'SELECT user_id, username, email, password, role, faculty_type, active, created_at FROM users WHERE (lower(username) = ? OR lower(email) = ?) LIMIT 1',
-    id,
-    id,
+  const row = await db.collection('users').findOne(
+    {
+      $or: [
+        { username: { $regex: `^${escapeRegex(id)}$`, $options: 'i' } },
+        { email: { $regex: `^${escapeRegex(id)}$`, $options: 'i' } },
+      ],
+    },
+    {
+      projection: {
+        _id: 0,
+        user_id: 1,
+        username: 1,
+        email: 1,
+        password: 1,
+        role: 1,
+        faculty_type: 1,
+        active: 1,
+        created_at: 1,
+      },
+    },
   )
 
   if (!row) return res.status(401).json({ message: 'Invalid username/email or password' })
@@ -83,9 +107,9 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   const userId = Number(req.auth?.sub)
   if (!userId) return res.status(401).json({ message: 'Invalid token' })
 
-  const row = await db.get(
-    'SELECT user_id, username, email, role, faculty_type, active, created_at FROM users WHERE user_id = ? LIMIT 1',
-    userId,
+  const row = await db.collection('users').findOne(
+    { user_id: userId },
+    { projection: { _id: 0, password: 0 } },
   )
 
   if (!row) return res.status(404).json({ message: 'User not found' })
@@ -97,9 +121,11 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 // before login headers are applied; avoids blocking local IndexedDB student creation.
 app.get('/api/sections', async (_req, res) => {
   const db = await getDb()
-  const rows = await db.all(
-    'SELECT section_id, year_level, section, created_at FROM sections ORDER BY year_level ASC, section ASC',
-  )
+  const rows = await db
+    .collection('sections')
+    .find({}, { projection: { _id: 0 } })
+    .sort({ year_level: 1, section: 1 })
+    .toArray()
   return res.json({ sections: rows })
 })
 
@@ -115,17 +141,23 @@ app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
   const { year_level, section } = parsed.data
   const db = await getDb()
   try {
-    const result = await db.run(
-      'INSERT INTO sections (year_level, section) VALUES (?, ?)',
+    const sectionId = await db.collection('counters').findOneAndUpdate(
+      { _id: 'sections' },
+      { $inc: { value: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    )
+    const created = {
+      section_id: sectionId.value?.value ?? 1,
       year_level,
       section,
-    )
-    const created = await db.get(
-      'SELECT section_id, year_level, section, created_at FROM sections WHERE section_id = ?',
-      result.lastID,
-    )
+      created_at: new Date(),
+    }
+    await db.collection('sections').insertOne(created)
     return res.status(201).json({ section: created })
-  } catch {
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return res.status(409).json({ message: 'Section already exists for this year level' })
+    }
     return res.status(409).json({ message: 'Section already exists for this year level' })
   }
 })
@@ -138,19 +170,21 @@ app.put('/api/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
 
   const db = await getDb()
-  const existing = await db.get('SELECT section_id FROM sections WHERE section_id = ? LIMIT 1', id)
+  const existing = await db.collection('sections').findOne({ section_id: id }, { projection: { _id: 0, section_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Section not found' })
 
   try {
-    await db.run('UPDATE sections SET year_level = ?, section = ? WHERE section_id = ?', parsed.data.year_level, parsed.data.section, id)
-  } catch {
+    await db
+      .collection('sections')
+      .updateOne({ section_id: id }, { $set: { year_level: parsed.data.year_level, section: parsed.data.section } })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return res.status(409).json({ message: 'Section already exists for this year level' })
+    }
     return res.status(409).json({ message: 'Section already exists for this year level' })
   }
 
-  const updated = await db.get(
-    'SELECT section_id, year_level, section, created_at FROM sections WHERE section_id = ?',
-    id,
-  )
+  const updated = await db.collection('sections').findOne({ section_id: id }, { projection: { _id: 0 } })
   return res.json({ section: updated })
 })
 
@@ -159,10 +193,10 @@ app.delete('/api/sections/:id', authMiddleware, requireAdmin, async (req, res) =
   if (!id) return res.status(400).json({ message: 'Invalid section id' })
 
   const db = await getDb()
-  const existing = await db.get('SELECT section_id FROM sections WHERE section_id = ? LIMIT 1', id)
+  const existing = await db.collection('sections').findOne({ section_id: id }, { projection: { _id: 0, section_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Section not found' })
 
-  await db.run('DELETE FROM sections WHERE section_id = ?', id)
+  await db.collection('sections').deleteOne({ section_id: id })
   return res.json({ ok: true })
 })
 
@@ -190,9 +224,11 @@ const createUserSchema = z.object({
 
 app.get('/api/users', authMiddleware, requireAdmin, async (_req, res) => {
   const db = await getDb()
-  const rows = await db.all(
-    'SELECT user_id, username, email, role, faculty_type, active, created_at FROM users ORDER BY user_id DESC',
-  )
+  const rows = await db
+    .collection('users')
+    .find({}, { projection: { _id: 0, password: 0 } })
+    .sort({ user_id: -1 })
+    .toArray()
   return res.json({ users: rows })
 })
 
@@ -215,35 +251,53 @@ app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
   const hash = await bcrypt.hash(password, 10)
 
   try {
-    await db.exec('BEGIN')
-    const result = await db.run(
-      'INSERT INTO users (username, email, password, role, faculty_type, active) VALUES (?, ?, ?, ?, ?, 1)',
+    const userCounter = await db.collection('counters').findOneAndUpdate(
+      { _id: 'users' },
+      { $inc: { value: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    )
+    const userId = userCounter.value?.value ?? 1
+    await db.collection('users').insertOne({
+      user_id: userId,
       username,
       email,
-      hash,
+      password: hash,
       role,
       faculty_type,
-    )
+      active: 1,
+      created_at: new Date(),
+    })
 
     if (role === 'student' && student) {
-      await db.run(
-        'INSERT INTO students (user_id, first_name, last_name, year_level, section) VALUES (?, ?, ?, ?, ?)',
-        result.lastID,
-        student.first_name,
-        student.last_name,
-        student.year_level,
-        student.section,
+      const studentCounter = await db.collection('counters').findOneAndUpdate(
+        { _id: 'students' },
+        { $inc: { value: 1 } },
+        { upsert: true, returnDocument: 'after' },
       )
+      const studentId = studentCounter.value?.value ?? 1
+      await db.collection('students').insertOne({
+        student_id: studentId,
+        user_id: userId,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        year_level: student.year_level,
+        section: student.section,
+      })
     }
 
-    await db.exec('COMMIT')
-    const created = await db.get(
-      'SELECT user_id, username, email, role, faculty_type, active, created_at FROM users WHERE user_id = ?',
-      result.lastID,
+    const created = await db.collection('users').findOne(
+      { user_id: userId },
+      { projection: { _id: 0, password: 0 } },
     )
     return res.status(201).json({ user: created })
   } catch (e) {
-    await db.exec('ROLLBACK')
+    if (!isDuplicateKeyError(e)) {
+      const created = await db.collection('users').findOne({ username, email })
+      if (created?.user_id) {
+        await db.collection('students').deleteOne({ user_id: created.user_id })
+        await db.collection('users').deleteOne({ user_id: created.user_id })
+      }
+    }
     return res.status(409).json({ message: 'Username or email already exists' })
   }
 })
@@ -262,35 +316,36 @@ app.put('/api/users/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
 
   const db = await getDb()
-  const existing = await db.get('SELECT user_id, role FROM users WHERE user_id = ? LIMIT 1', id)
+  const existing = await db
+    .collection('users')
+    .findOne({ user_id: id }, { projection: { _id: 0, user_id: 1, role: 1 } })
   if (!existing) return res.status(404).json({ message: 'User not found' })
   if (existing.role === 'admin') return res.status(403).json({ message: 'Cannot modify admin account' })
 
-  const fields = []
-  const params = []
+  const fields = {}
   if (parsed.data.email !== undefined) {
-    fields.push('email = ?')
-    params.push(parsed.data.email)
+    fields.email = parsed.data.email
   }
   if (parsed.data.active !== undefined) {
-    fields.push('active = ?')
-    params.push(parsed.data.active)
+    fields.active = parsed.data.active
   }
   if (parsed.data.faculty_type !== undefined) {
-    fields.push('faculty_type = ?')
-    params.push(parsed.data.faculty_type)
+    fields.faculty_type = parsed.data.faculty_type
   }
-  if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' })
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
 
   try {
-    await db.run(`UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`, ...params, id)
-  } catch {
+    await db.collection('users').updateOne({ user_id: id }, { $set: fields })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return res.status(409).json({ message: 'Email already exists' })
+    }
     return res.status(409).json({ message: 'Email already exists' })
   }
 
-  const updated = await db.get(
-    'SELECT user_id, username, email, role, faculty_type, active, created_at FROM users WHERE user_id = ? LIMIT 1',
-    id,
+  const updated = await db.collection('users').findOne(
+    { user_id: id },
+    { projection: { _id: 0, password: 0 } },
   )
   return res.json({ user: updated })
 })
@@ -300,11 +355,13 @@ app.delete('/api/users/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!id) return res.status(400).json({ message: 'Invalid user id' })
 
   const db = await getDb()
-  const existing = await db.get('SELECT user_id, role FROM users WHERE user_id = ? LIMIT 1', id)
+  const existing = await db
+    .collection('users')
+    .findOne({ user_id: id }, { projection: { _id: 0, user_id: 1, role: 1 } })
   if (!existing) return res.status(404).json({ message: 'User not found' })
   if (existing.role === 'admin') return res.status(403).json({ message: 'Cannot deactivate admin account' })
 
-  await db.run('UPDATE users SET active = 0 WHERE user_id = ?', id)
+  await db.collection('users').updateOne({ user_id: id }, { $set: { active: 0 } })
   return res.json({ ok: true })
 })
 
@@ -320,31 +377,33 @@ app.get('/api/qualification-reports', authMiddleware, requireStaff, async (req, 
     }
   }
 
-  const params = []
-  let where = "WHERE sk.is_active = 1 AND u.active = 1 AND u.role = 'student'"
-  if (categoryRaw) {
-    where += ' AND sk.category = ?'
-    params.push(categoryRaw)
-  }
+  const matchSkill = { 'skill.is_active': 1 }
+  if (categoryRaw) matchSkill['skill.category'] = categoryRaw
 
-  const rows = await db.all(
-    `
-    SELECT
-      s.student_id,
-      u.user_id,
-      st.first_name,
-      st.last_name,
-      sk.category,
-      sk.name AS skill_name
-    FROM student_skills s
-    INNER JOIN students st ON st.student_id = s.student_id
-    INNER JOIN users u ON u.user_id = st.user_id
-    INNER JOIN skills sk ON sk.skill_id = s.skill_id
-    ${where}
-    ORDER BY st.last_name ASC, st.first_name ASC, sk.name ASC
-    `,
-    ...params,
-  )
+  const rows = await db
+    .collection('student_skills')
+    .aggregate([
+      { $lookup: { from: 'students', localField: 'student_id', foreignField: 'student_id', as: 'student' } },
+      { $unwind: '$student' },
+      { $lookup: { from: 'users', localField: 'student.user_id', foreignField: 'user_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $lookup: { from: 'skills', localField: 'skill_id', foreignField: 'skill_id', as: 'skill' } },
+      { $unwind: '$skill' },
+      { $match: { ...matchSkill, 'user.active': 1, 'user.role': 'student' } },
+      {
+        $project: {
+          _id: 0,
+          student_id: '$student.student_id',
+          user_id: '$user.user_id',
+          first_name: '$student.first_name',
+          last_name: '$student.last_name',
+          category: '$skill.category',
+          skill_name: '$skill.name',
+        },
+      },
+      { $sort: { last_name: 1, first_name: 1, skill_name: 1 } },
+    ])
+    .toArray()
 
   const map = new Map()
   for (const row of rows) {
@@ -372,8 +431,18 @@ app.get('/api/qualification-reports', authMiddleware, requireStaff, async (req, 
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`SPMS API running on http://localhost:${PORT}`)
-})
+async function startServer() {
+  try {
+    await getDb()
+    console.log('MongoDB connection OK')
+    app.listen(PORT, () => {
+      console.log(`SPMS API running on http://localhost:${PORT}`)
+    })
+  } catch (error) {
+    console.error('MongoDB connection failed:', error?.message || error)
+    process.exit(1)
+  }
+}
+
+startServer()
 
