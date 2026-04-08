@@ -18,6 +18,8 @@ export function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Controlled search input for Part 6 (UsersPage filter).
+  const [search, setSearch] = useState('')
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -31,6 +33,21 @@ export function UsersPage() {
   const facultyType = useMemo(() => {
     return facultyTypePreset === 'Other' ? facultyTypeCustom.trim() : facultyTypePreset
   }, [facultyTypePreset, facultyTypeCustom])
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return users
+    return users.filter((u) => {
+      const roleLabel = u.role === 'admin' ? 'registrar' : u.role
+      return (
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        roleLabel.toLowerCase().includes(q) ||
+        (u.faculty_type ?? '').toLowerCase().includes(q) ||
+        (u.active ? 'active' : 'inactive').includes(q)
+      )
+    })
+  }, [users, search])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -172,10 +189,23 @@ export function UsersPage() {
         <div className="spms-card card border-0 overflow-hidden" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
           <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex align-items-center justify-content-between">
             <h6 className="fw-semibold mb-0">User Accounts</h6>
-            <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => void fetchUsers()} disabled={loading}>
-              <i className="bi bi-arrow-clockwise me-1" />
-              Refresh
-            </button>
+            <div className="d-flex align-items-center gap-2">
+              <div className="input-group input-group-sm" style={{ width: 260 }}>
+                <span className="input-group-text">
+                  <i className="bi bi-search" />
+                </span>
+                <input
+                  className="form-control"
+                  placeholder="Search users..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => void fetchUsers()} disabled={loading}>
+                <i className="bi bi-arrow-clockwise me-1" />
+                Refresh
+              </button>
+            </div>
           </div>
           <div className="card-body p-0">
             {loading ? (
@@ -194,14 +224,14 @@ export function UsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.length === 0 ? (
+                    {filteredUsers.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="ps-4 py-4 spms-muted text-center">
-                          No users found.
+                          No users matched your search.
                         </td>
                       </tr>
                     ) : (
-                      users.map((u) => (
+                      filteredUsers.map((u) => (
                         <tr key={u.user_id}>
                           <td className="ps-4 py-3 fw-semibold">{u.username}</td>
                           <td className="py-3">{u.email}</td>

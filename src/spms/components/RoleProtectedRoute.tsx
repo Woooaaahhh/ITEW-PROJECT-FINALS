@@ -44,6 +44,8 @@ export function RoleProtectedRoute({ children, allowedRoles }: RoleProtectedRout
 
   const roleAllowed = allowedRoles.includes(user.role)
   if (!roleAllowed) {
+    // Part 6 (role-based routing): if current role is not in allowedRoles,
+    // redirect to that role's dashboard (prevents direct URL access).
     const to = getDefaultDashboardPath(user.role)
     return <Navigate to={to} replace />
   }

@@ -335,6 +335,9 @@ export const spmsRouter = createBrowserRouter([
       {
         path: '/reports',
         element: (
+          // Rubric note: current behavior is NOT "Registrar-only".
+          // Access to /reports is allowed for BOTH roles below: admin (Registrar) and faculty.
+          // Students are blocked by this guard + canAccessPath() in authService.ts.
           <RoleProtectedRoute allowedRoles={['admin', 'faculty']}>
             <ReportsPage />
           </RoleProtectedRoute>

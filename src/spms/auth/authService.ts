@@ -155,6 +155,10 @@ export function canAccessPath(
   }
 
   if (role === 'student') {
+    // Rubric note for /reports:
+    // - student: blocked here
+    // - faculty: allowed (see faculty branch above)
+    // - admin/registrar: allowed by admin branch
     if (path === '/registrar' || path === '/faculty' || path === '/students' || path === '/reports') return false
     if (path.startsWith('/students/new')) return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false

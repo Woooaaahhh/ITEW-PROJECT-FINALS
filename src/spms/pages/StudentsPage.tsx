@@ -1,74 +1,75 @@
-/** Client-side routing (React Router): student list links via <Link> (no full page reload). */
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import avatarUrl from '../../assets/react.svg'
-import { useAuth } from '../auth/AuthContext'
-import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
-import { deleteStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
+  /** Client-side routing (React Router): student list links via <Link> (no full page reload). */
+  import { useEffect, useMemo, useState } from 'react'
+  import { Link } from 'react-router-dom'
+  import avatarUrl from '../../assets/react.svg'
+  import { useAuth } from '../auth/AuthContext'
+  import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
+  import { deleteStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
 
-const yearOptions = ['1st', '2nd', '3rd', '4th']
-const sectionOptions = ['BSIT-2A', 'BSBA-1B', 'BSED-3C', 'BSIT-4A']
+  const yearOptions = ['1st', '2nd', '3rd', '4th']
+  const sectionOptions = ['BSIT-2A', 'BSBA-1B', 'BSED-3C', 'BSIT-4A']
 
-function normalize(s: string) {
-  return s.toLowerCase().trim()
-}
+  function normalize(s: string) {
+    return s.toLowerCase().trim()
+  }
 
-function fullName(s: Student) {
-  const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
-  return parts.replace(/\s+/g, ' ').trim()
-}
+  function fullName(s: Student) {
+    const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
+    return parts.replace(/\s+/g, ' ').trim()
+  }
 
-function matches(student: Student, q: string, year: string, section: string) {
-  const hitQ =
-    !q ||
-    normalize(fullName(student)).includes(q) ||
-    normalize(student.email ?? '').includes(q) ||
-    normalize(student.id).includes(q)
-  const hitYear = !year || normalize(student.yearLevel ?? '') === year
-  const hitSection = !section || normalize(student.section ?? '') === section
-  return hitQ && hitYear && hitSection
-}
+  function matches(student: Student, q: string, year: string, section: string) {
+    const hitQ =
+      !q ||
+      normalize(fullName(student)).includes(q) ||
+      normalize(student.email ?? '').includes(q) ||
+      normalize(student.id).includes(q)
+    const hitYear = !year || normalize(student.yearLevel ?? '') === year
+    const hitSection = !section || normalize(student.section ?? '') === section
+    return hitQ && hitYear && hitSection
+  }
 
-export function StudentsPage() {
-  const { user } = useAuth()
-  const [query, setQuery] = useState('')
-  const [year, setYear] = useState('')
-  const [section, setSection] = useState('')
-  const [students, setStudents] = useState<Student[]>([])
-  const [loading, setLoading] = useState(true)
-  const [recordsRev, setRecordsRev] = useState(0)
-  const canEdit = user?.role === 'admin'
-  const canDelete = user?.role === 'admin'
-  const showBehaviorCounts = user?.role === 'admin' || user?.role === 'faculty'
+  export function StudentsPage() {
+    const { user } = useAuth()
+  // Controlled input (Part 5): this state is the single source of truth for the search textbox.
+    const [query, setQuery] = useState('')
+    const [year, setYear] = useState('')
+    const [section, setSection] = useState('')
+    const [students, setStudents] = useState<Student[]>([])
+    const [loading, setLoading] = useState(true)
+    const [recordsRev, setRecordsRev] = useState(0)
+    const canEdit = user?.role === 'admin'
+    const canDelete = user?.role === 'admin'
+    const showBehaviorCounts = user?.role === 'admin' || user?.role === 'faculty'
 
-  const q = useMemo(() => normalize(query), [query])
-  const y = useMemo(() => normalize(year), [year])
-  const s = useMemo(() => normalize(section), [section])
+    const q = useMemo(() => normalize(query), [query])
+    const y = useMemo(() => normalize(year), [year])
+    const s = useMemo(() => normalize(section), [section])
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setLoading(true)
-      await seedIfEmpty()
-      const all = await listStudents()
-      if (!alive) return
-      setStudents(all)
-      setLoading(false)
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
+    useEffect(() => {
+      let alive = true
+      ;(async () => {
+        setLoading(true)
+        await seedIfEmpty()
+        const all = await listStudents()
+        if (!alive) return
+        setStudents(all)
+        setLoading(false)
+      })()
+      return () => {
+        alive = false
+      }
+    }, [])
 
-  useEffect(() => {
-    const onRecords = () => setRecordsRev((n) => n + 1)
-    window.addEventListener('spms-student-records-changed', onRecords)
-    return () => window.removeEventListener('spms-student-records-changed', onRecords)
-  }, [])
+    useEffect(() => {
+      const onRecords = () => setRecordsRev((n) => n + 1)
+      window.addEventListener('spms-student-records-changed', onRecords)
+      return () => window.removeEventListener('spms-student-records-changed', onRecords)
+    }, [])
 
-  const behaviorCounts = useMemo(() => (showBehaviorCounts ? getBehaviorCountIndex() : {}), [showBehaviorCounts, recordsRev])
+    const behaviorCounts = useMemo(() => (showBehaviorCounts ? getBehaviorCountIndex() : {}), [showBehaviorCounts, recordsRev])
 
-  const filtered = useMemo(() => students.filter((st) => matches(st, q, y, s)), [students, q, y, s])
+    const filtered = useMemo(() => students.filter((st) => matches(st, q, y, s)), [students, q, y, s])
 
   return (
     <div className="spms-card card">
@@ -81,7 +82,9 @@ export function StudentsPage() {
               </span>
               <input
                 className="form-control"
+                // Controlled input (Part 5): `value` reads from state...
                 value={query}
+                // ...and `onChange` writes back to state.
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by name, email, or ID..."
               />
