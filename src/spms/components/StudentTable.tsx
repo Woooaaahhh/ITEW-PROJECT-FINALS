@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): row actions use <Link> to student routes without reloading. */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Student } from '../db/students'

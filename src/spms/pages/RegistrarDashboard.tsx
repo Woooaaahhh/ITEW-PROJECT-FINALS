@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): dashboard quick links via <Link> (no full page reload). */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'

@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): faculty dashboard links via <Link> (no full page reload). */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'

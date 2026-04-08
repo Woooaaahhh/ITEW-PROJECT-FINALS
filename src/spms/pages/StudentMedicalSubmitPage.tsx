@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): <Link> / <Navigate> for in-app moves (no full page reload). */
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 

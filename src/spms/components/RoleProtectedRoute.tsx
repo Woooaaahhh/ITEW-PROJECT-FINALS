@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+/** Client-side routing (React Router): role-based guard; <Navigate> for disallowed routes (no full reload). */
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { canAccessPath, getDefaultDashboardPath } from '../auth/authService'

@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): student list links via <Link> (no full page reload). */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'

@@ -1,3 +1,4 @@
+/** SPA entry: mounts the React app; client-side routing (no full reload) is wired in App via React Router. */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'bootstrap/dist/css/bootstrap.min.css'

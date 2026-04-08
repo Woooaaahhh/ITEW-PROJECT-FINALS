@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): guards routes; redirects with <Navigate> without a full page reload. */
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 

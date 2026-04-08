@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): layout shell with <Outlet /> for nested routes (no full page reload). */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useMatch, useMatches } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'

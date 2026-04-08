@@ -1,3 +1,4 @@
+/** Client-side routing: this screen is a React Router <Route> target; shown without a full page reload. */
 export function SectionsPage() {
   // replaced with real section management UI
   return (

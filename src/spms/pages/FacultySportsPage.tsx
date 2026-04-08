@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): uses <Link> for in-app navigation (no full page reload). */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createSport, deleteSport, listSports, seedSportsIfEmpty, updateSport } from '../db/sports'

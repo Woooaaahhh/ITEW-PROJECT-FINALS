@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): after save, useNavigate to profile (no full page reload). */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'

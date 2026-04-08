@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): route table (createBrowserRouter); pages swap without a full document reload. */
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell, type PageMeta } from './components/AppShell'
 import { RequireAuth } from './components/RequireAuth'

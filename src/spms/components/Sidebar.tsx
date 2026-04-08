@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): <NavLink> changes route without reloading the document. */
 import { NavLink } from 'react-router-dom'
 import { AppIcon } from './AppIcon'
 import avatarUrl from '../../assets/react.svg'

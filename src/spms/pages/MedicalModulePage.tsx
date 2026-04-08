@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): uses <Link> for in-app navigation (no full page reload). */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'

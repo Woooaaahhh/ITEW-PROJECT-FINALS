@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): breadcrumb links and current path via useLocation (no full reload). */
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 

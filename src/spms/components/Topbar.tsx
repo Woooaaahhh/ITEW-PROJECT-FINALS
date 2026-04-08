@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): programmatic navigation via useNavigate (no full page reload). */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'

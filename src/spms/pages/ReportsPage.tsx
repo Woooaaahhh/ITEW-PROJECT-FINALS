@@ -1,3 +1,4 @@
+/** Client-side routing: this screen is a React Router <Route> target; shown without a full page reload. */
 import { useEffect, useMemo, useState } from 'react'
 import avatarUrl from '../../assets/react.svg'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'

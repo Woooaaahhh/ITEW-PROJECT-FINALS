@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): post-login redirect via useNavigate (no full page reload). */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'

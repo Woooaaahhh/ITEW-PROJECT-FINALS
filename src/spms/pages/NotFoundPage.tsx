@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): <Link> back to app routes without a full document reload. */
 import { Link } from 'react-router-dom'
 
 export function NotFoundPage() {

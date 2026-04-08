@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): <Link>, useNavigate, useSearchParams (no full page reload). */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'

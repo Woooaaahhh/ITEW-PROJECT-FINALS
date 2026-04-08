@@ -1,3 +1,4 @@
+/** Client-side routing (React Router): legacy URLs redirect with <Navigate> (no full page reload). */
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getDefaultDashboardPath } from '../auth/authService'
