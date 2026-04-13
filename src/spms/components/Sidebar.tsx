@@ -50,9 +50,14 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
         {isStudent ? (
-          <NavLink className={navClass} to="/medical">
-            <i className="bi bi-heart-pulse" /> Medical
-          </NavLink>
+          <>
+            <NavLink className={navClass} to="/medical">
+              <i className="bi bi-heart-pulse" /> Medical
+            </NavLink>
+            <NavLink className={navClass} to="/instruction">
+              <i className="bi bi-journal-text" /> Instruction
+            </NavLink>
+          </>
         ) : null}
         {!isStudent && (
           <>
@@ -101,6 +106,11 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             {(role === 'admin' || role === 'faculty') && (
               <NavLink className={navClass} to="/reports">
                 <i className="bi bi-file-earmark-bar-graph" /> Reports
+              </NavLink>
+            )}
+            {(role === 'admin' || role === 'faculty') && (
+              <NavLink className={navClass} to="/instruction">
+                <i className="bi bi-journal-text" /> Instruction
               </NavLink>
             )}
           </>
