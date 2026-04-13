@@ -85,6 +85,13 @@ function requireStaff(req, res, next) {
   return next()
 }
 
+function requireInstructionEditor(req, res, next) {
+  if (req.auth?.role !== 'admin' && req.auth?.role !== 'faculty') {
+    return res.status(403).json({ message: 'Forbidden' })
+  }
+  return next()
+}
+
 app.post('/api/login', async (req, res) => {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -547,6 +554,241 @@ app.get('/api/qualification-reports', authMiddleware, requireStaff, async (req, 
     category: categoryRaw || 'all',
     students: Array.from(map.values()),
   })
+})
+
+const syllabusSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(4000).optional().default(''),
+  course_code: z.string().trim().max(50).optional().default(''),
+})
+
+const syllabusUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(4000).optional(),
+  course_code: z.string().trim().max(50).optional(),
+  is_archived: z.number().int().min(0).max(1).optional(),
+})
+
+const lessonSchema = z.object({
+  syllabus_id: z.number().int().positive(),
+  title: z.string().trim().min(1).max(220),
+  content: z.string().trim().max(12000).optional().default(''),
+  curriculum_unit: z.string().trim().max(120).optional().default(''),
+  week_number: z.number().int().min(1).max(52).optional().nullable(),
+  order_index: z.number().int().min(1).max(1000).optional(),
+})
+
+const lessonUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(220).optional(),
+  content: z.string().trim().max(12000).optional(),
+  curriculum_unit: z.string().trim().max(120).optional(),
+  week_number: z.number().int().min(1).max(52).optional().nullable(),
+  order_index: z.number().int().min(1).max(1000).optional(),
+  is_archived: z.number().int().min(0).max(1).optional(),
+})
+
+const curriculumReorderSchema = z.object({
+  lessons: z.array(
+    z.object({
+      lesson_id: z.number().int().positive(),
+      order_index: z.number().int().min(1).max(1000),
+      curriculum_unit: z.string().trim().max(120).optional(),
+      week_number: z.number().int().min(1).max(52).optional().nullable(),
+    }),
+  ),
+})
+
+app.get('/api/instruction/syllabi', authMiddleware, async (req, res) => {
+  const db = await getDb()
+  const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true'
+  const query = includeArchived ? {} : { is_archived: { $ne: 1 } }
+  const syllabi = await db
+    .collection('syllabi')
+    .find(query, { projection: { _id: 0 } })
+    .sort({ created_at: -1 })
+    .toArray()
+  return res.json({ syllabi })
+})
+
+app.post('/api/instruction/syllabi', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const parsed = syllabusSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const created = {
+    syllabus_id: await nextSequence(db, 'syllabi'),
+    title: parsed.data.title,
+    description: parsed.data.description,
+    course_code: parsed.data.course_code,
+    is_archived: 0,
+    created_by: Number(req.auth?.sub) || null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }
+  await db.collection('syllabi').insertOne(created)
+  return res.status(201).json({ syllabus: created })
+})
+
+app.put('/api/instruction/syllabi/:id', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid syllabus id' })
+  const parsed = syllabusUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const fields = {}
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title
+  if (parsed.data.description !== undefined) fields.description = parsed.data.description
+  if (parsed.data.course_code !== undefined) fields.course_code = parsed.data.course_code
+  if (parsed.data.is_archived !== undefined) fields.is_archived = parsed.data.is_archived
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+
+  const db = await getDb()
+  const existing = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0, syllabus_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Syllabus not found' })
+  await db.collection('syllabi').updateOne({ syllabus_id: id }, { $set: fields })
+  const updated = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0 } })
+  return res.json({ syllabus: updated })
+})
+
+app.delete('/api/instruction/syllabi/:id', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid syllabus id' })
+  const db = await getDb()
+  const existing = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0, syllabus_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Syllabus not found' })
+
+  const hardDelete = req.auth?.role === 'admin' && String(req.query.hard || '').toLowerCase() === 'true'
+  if (hardDelete) {
+    await db.collection('lessons').deleteMany({ syllabus_id: id })
+    await db.collection('syllabi').deleteOne({ syllabus_id: id })
+    return res.json({ ok: true, mode: 'deleted' })
+  }
+
+  await db.collection('syllabi').updateOne({ syllabus_id: id }, { $set: { is_archived: 1, updated_at: new Date() } })
+  await db.collection('lessons').updateMany({ syllabus_id: id }, { $set: { is_archived: 1, updated_at: new Date() } })
+  return res.json({ ok: true, mode: 'archived' })
+})
+
+app.get('/api/instruction/syllabi/:id/lessons', authMiddleware, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid syllabus id' })
+  const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true'
+  const query = includeArchived ? { syllabus_id: id } : { syllabus_id: id, is_archived: { $ne: 1 } }
+  const db = await getDb()
+  const syllabus = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0 } })
+  if (!syllabus) return res.status(404).json({ message: 'Syllabus not found' })
+  const lessons = await db
+    .collection('lessons')
+    .find(query, { projection: { _id: 0 } })
+    .sort({ order_index: 1, lesson_id: 1 })
+    .toArray()
+  return res.json({ syllabus, lessons })
+})
+
+app.post('/api/instruction/lessons', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const parsed = lessonSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const syllabus = await db.collection('syllabi').findOne(
+    { syllabus_id: parsed.data.syllabus_id, is_archived: { $ne: 1 } },
+    { projection: { _id: 0, syllabus_id: 1 } },
+  )
+  if (!syllabus) return res.status(404).json({ message: 'Syllabus not found or archived' })
+
+  let orderIndex = parsed.data.order_index
+  if (!orderIndex) {
+    const last = await db
+      .collection('lessons')
+      .find({ syllabus_id: parsed.data.syllabus_id }, { projection: { _id: 0, order_index: 1 } })
+      .sort({ order_index: -1 })
+      .limit(1)
+      .toArray()
+    orderIndex = (last[0]?.order_index ?? 0) + 1
+  }
+
+  const lesson = {
+    lesson_id: await nextSequence(db, 'lessons'),
+    syllabus_id: parsed.data.syllabus_id,
+    title: parsed.data.title,
+    content: parsed.data.content,
+    curriculum_unit: parsed.data.curriculum_unit,
+    week_number: parsed.data.week_number ?? null,
+    order_index: orderIndex,
+    is_archived: 0,
+    created_by: Number(req.auth?.sub) || null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }
+  await db.collection('lessons').insertOne(lesson)
+  return res.status(201).json({ lesson })
+})
+
+app.put('/api/instruction/lessons/:id', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid lesson id' })
+  const parsed = lessonUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const fields = {}
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title
+  if (parsed.data.content !== undefined) fields.content = parsed.data.content
+  if (parsed.data.curriculum_unit !== undefined) fields.curriculum_unit = parsed.data.curriculum_unit
+  if (parsed.data.week_number !== undefined) fields.week_number = parsed.data.week_number
+  if (parsed.data.order_index !== undefined) fields.order_index = parsed.data.order_index
+  if (parsed.data.is_archived !== undefined) fields.is_archived = parsed.data.is_archived
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+  const db = await getDb()
+  const existing = await db.collection('lessons').findOne({ lesson_id: id }, { projection: { _id: 0, lesson_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Lesson not found' })
+  await db.collection('lessons').updateOne({ lesson_id: id }, { $set: fields })
+  const updated = await db.collection('lessons').findOne({ lesson_id: id }, { projection: { _id: 0 } })
+  return res.json({ lesson: updated })
+})
+
+app.delete('/api/instruction/lessons/:id', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid lesson id' })
+  const db = await getDb()
+  const existing = await db.collection('lessons').findOne({ lesson_id: id }, { projection: { _id: 0, lesson_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Lesson not found' })
+  const hardDelete = req.auth?.role === 'admin' && String(req.query.hard || '').toLowerCase() === 'true'
+  if (hardDelete) {
+    await db.collection('lessons').deleteOne({ lesson_id: id })
+    return res.json({ ok: true, mode: 'deleted' })
+  }
+  await db.collection('lessons').updateOne({ lesson_id: id }, { $set: { is_archived: 1, updated_at: new Date() } })
+  return res.json({ ok: true, mode: 'archived' })
+})
+
+app.put('/api/instruction/syllabi/:id/curriculum', authMiddleware, requireInstructionEditor, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid syllabus id' })
+  const parsed = curriculumReorderSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const syllabus = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0, syllabus_id: 1 } })
+  if (!syllabus) return res.status(404).json({ message: 'Syllabus not found' })
+
+  for (const entry of parsed.data.lessons) {
+    await db.collection('lessons').updateOne(
+      { lesson_id: entry.lesson_id, syllabus_id: id },
+      {
+        $set: {
+          order_index: entry.order_index,
+          curriculum_unit: entry.curriculum_unit ?? '',
+          week_number: entry.week_number ?? null,
+          updated_at: new Date(),
+        },
+      },
+    )
+  }
+
+  const lessons = await db
+    .collection('lessons')
+    .find({ syllabus_id: id, is_archived: { $ne: 1 } }, { projection: { _id: 0 } })
+    .sort({ order_index: 1, lesson_id: 1 })
+    .toArray()
+  return res.json({ lessons })
 })
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
