@@ -226,10 +226,21 @@ const facultyTypeSchema = z
   .min(1)
   .max(80)
 
+// Gmail validation regex
+const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+
+// Password validation: minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 number
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
+
 const createUserSchema = z.object({
   username: z.string().trim().min(3).max(50),
-  email: z.string().trim().email().max(120),
-  password: z.string().min(6).max(100),
+  email: z.string().trim().email().max(120).refine((email) => {
+    // For student role, require Gmail; for faculty, allow any valid email
+    return true // Will be validated in the route handler based on role
+  }, 'Email must be valid'),
+  password: z.string().min(8).max(100).refine((password) => {
+    return passwordRegex.test(password)
+  }, 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number'),
   role: z.enum(['faculty', 'student']),
   faculty_type: facultyTypeSchema.nullable().optional(),
   student: z
@@ -256,9 +267,19 @@ app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
 
-  const { username, email, password, role } = parsed.data
+  const { email, password, role } = parsed.data
   const faculty_type = role === 'faculty' ? (parsed.data.faculty_type ?? null) : null
   const student = role === 'student' ? parsed.data.student : undefined
+
+  // Additional validation based on role
+  let username = parsed.data.username
+  if (role === 'student') {
+    if (!gmailRegex.test(email)) {
+      return res.status(400).json({ message: 'Students must use a Gmail address (@gmail.com)' })
+    }
+    // For students, use Gmail as username instead of provided username
+    username = email.trim().toLowerCase()
+  }
 
   if (role === 'faculty' && !faculty_type) {
     return res.status(400).json({ message: 'Faculty type is required' })

@@ -18,14 +18,12 @@ type FormState = {
   /** Used when /api/sections is empty or unreachable */
   manualYearLevel: '' | '1st' | '2nd' | '3rd' | '4th'
   manualSection: string
+  // Account creation fields
+  gmail: string
+  password: string
+  confirmPassword: string
 }
 
-function makeStudentUsername(firstName: string, lastName: string, email: string): string {
-  const fromEmail = email.trim().toLowerCase().split('@')[0]?.replace(/[^a-z0-9._-]/g, '')
-  if (fromEmail) return `${fromEmail}-${Date.now().toString(36)}`
-  const base = `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z0-9._-]/g, '')
-  return `${base || 'student'}-${Date.now().toString(36)}`
-}
 
 const initial: FormState = {
   firstName: '',
@@ -39,6 +37,9 @@ const initial: FormState = {
   section: '',
   manualYearLevel: '',
   manualSection: '',
+  gmail: '',
+  password: '',
+  confirmPassword: '',
 }
 
 export function AddStudentPage() {
@@ -136,7 +137,35 @@ export function AddStudentPage() {
                 }
                 const emailVal = form.email.trim().toLowerCase()
                 if (!emailVal) {
-                  setSubmitError('Email is required to create a MongoDB student account.')
+                  setSubmitError('School email is required to create a MongoDB student account.')
+                  return
+                }
+                // Validate Gmail for account creation
+                const gmailVal = form.gmail.trim().toLowerCase()
+                if (!gmailVal) {
+                  setSubmitError('Gmail address is required for student account creation.')
+                  return
+                }
+                if (!gmailVal.endsWith('@gmail.com')) {
+                  setSubmitError('Student account must use a Gmail address (@gmail.com).')
+                  return
+                }
+                // Validate password
+                const passwordVal = form.password
+                if (!passwordVal) {
+                  setSubmitError('Password is required for student account creation.')
+                  return
+                }
+                if (passwordVal.length < 8) {
+                  setSubmitError('Password must be at least 8 characters long.')
+                  return
+                }
+                if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(passwordVal)) {
+                  setSubmitError('Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.')
+                  return
+                }
+                if (passwordVal !== form.confirmPassword) {
+                  setSubmitError('Password and confirm password do not match.')
                   return
                 }
 
@@ -162,12 +191,11 @@ export function AddStudentPage() {
 
                 setSaving(true)
                 try {
-                  const generatedUsername = makeStudentUsername(fn, ln, emailVal)
-                  // Sync to backend MongoDB first so new students appear in Atlas.
+                  // Create student account with Gmail as username
                   await axios.post('/api/create-user', {
-                    username: generatedUsername,
-                    email: emailVal,
-                    password: 'student123',
+                    username: gmailVal, // Gmail will be used as username
+                    email: gmailVal, // Use Gmail for account
+                    password: passwordVal,
                     role: 'student',
                     student: {
                       first_name: fn,
@@ -344,7 +372,7 @@ export function AddStudentPage() {
                 </div>
 
                 <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold">Email</label>
+                  <label className="form-label fw-semibold">School Email</label>
                   <div className="input-group">
                     <span className="input-group-text">
                       <i className="bi bi-envelope" />
@@ -369,6 +397,68 @@ export function AddStudentPage() {
                       value={form.address}
                       onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                       placeholder="Complete address"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-12">
+                  <h6 className="fw-semibold text-primary mt-3">
+                    <i className="bi bi-person-plus me-2" />Student Account Creation
+                  </h6>
+                  <div className="alert alert-info" role="alert">
+                    <i className="bi bi-info-circle me-2" />
+                    Student accounts are created automatically. The Gmail address will be used as the login username.
+                  </div>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label fw-semibold">Gmail Address (Username)</label>
+                  <div className="input-group">
+                    <span className="input-group-text">
+                      <i className="bi bi-google" />
+                    </span>
+                    <input
+                      className="form-control"
+                      type="email"
+                      value={form.gmail}
+                      onChange={(e) => setForm((f) => ({ ...f, gmail: e.target.value }))}
+                      placeholder="student@gmail.com"
+                      required
+                    />
+                  </div>
+                  <div className="spms-muted small mt-1">Must be a valid Gmail address (@gmail.com). This will be the student's login username.</div>
+                </div>
+                <div className="col-12 col-md-6">
+                  <label className="form-label fw-semibold">Password</label>
+                  <div className="input-group">
+                    <span className="input-group-text">
+                      <i className="bi bi-lock" />
+                    </span>
+                    <input
+                      className="form-control"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="Enter password"
+                      required
+                    />
+                  </div>
+                  <div className="spms-muted small mt-1">Minimum 8 characters with 1 uppercase, 1 lowercase, and 1 number.</div>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label fw-semibold">Confirm Password</label>
+                  <div className="input-group">
+                    <span className="input-group-text">
+                      <i className="bi bi-lock-fill" />
+                    </span>
+                    <input
+                      className="form-control"
+                      type="password"
+                      value={form.confirmPassword}
+                      onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="Confirm password"
+                      required
                     />
                   </div>
                 </div>

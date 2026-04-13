@@ -113,6 +113,55 @@ body {
   color: #fff;
 }
 
+/* Remove active styling for placeholder links with # */
+.spms-nav .nav-link[href="#"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: rgba(226, 232, 240, .86) !important;
+}
+
+.spms-nav .nav-link[href="#"]:hover {
+  background: rgba(148, 163, 184, .10) !important;
+  border-color: rgba(148, 163, 184, .14) !important;
+  transform: translateY(-1px);
+}
+
+/* Dropdown menu styling */
+.spms-nav .dropdown-menu {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.spms-nav .dropdown-item {
+  color: rgba(226, 232, 240, .76);
+  padding: 8px 12px 8px 32px;
+  margin: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  font-size: .9rem;
+}
+
+.spms-nav .dropdown-item:hover {
+  background: rgba(148, 163, 184, .08);
+  border-color: rgba(148, 163, 184, .12);
+  transform: translateY(-1px);
+}
+
+.spms-nav .dropdown-item[href="#"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: rgba(226, 232, 240, .76) !important;
+}
+
+.spms-nav .dropdown-item[href="#"]:hover {
+  background: rgba(148, 163, 184, .08) !important;
+  border-color: rgba(148, 163, 184, .12) !important;
+  transform: translateY(-1px);
+}
+
 .spms-nav .nav-link .bi {
   font-size: 1.05rem;
 }

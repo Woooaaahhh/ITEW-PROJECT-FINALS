@@ -21,6 +21,7 @@ import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
 import { MedicalModulePage } from './pages/MedicalModulePage'
 import { StudentMedicalSubmitPage } from './pages/StudentMedicalSubmitPage'
+import { StudentMyRecordsPage } from './pages/StudentMyRecordsPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -84,6 +85,11 @@ const medicalModuleHandle: PageMeta = {
 const studentMedicalHandle: PageMeta = {
   title: 'Medical submission',
   subtitle: 'Submit documents and details for faculty review',
+}
+
+const studentRecordsHandle: PageMeta = {
+  title: 'My Records',
+  subtitle: 'View your violations and skills records',
 }
 
 const studentHandle: PageMeta = {
@@ -243,13 +249,13 @@ export const spmsRouter = createBrowserRouter([
         handle: medicalModuleHandle,
       },
       {
-        path: '/student',
+        path: '/student/records',
         element: (
           <RoleProtectedRoute allowedRoles={['student']}>
-            <StudentDashboard />
+            <StudentMyRecordsPage />
           </RoleProtectedRoute>
         ),
-        handle: studentHandle,
+        handle: studentRecordsHandle,
       },
       {
         path: '/student/medical',
@@ -259,6 +265,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: studentMedicalHandle,
+      },
+      {
+        path: '/student',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentDashboard />
+          </RoleProtectedRoute>
+        ),
+        handle: studentHandle,
       },
       {
         path: '/student/academic',
