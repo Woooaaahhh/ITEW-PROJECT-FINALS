@@ -1,5 +1,4 @@
 /** Client-side routing (React Router): <NavLink> changes route without reloading the document. */
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { AppIcon } from './AppIcon'
 import avatarUrl from '../../assets/react.svg'
@@ -20,7 +19,6 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
   const { user } = useAuth()
   const role = user?.role ?? 'admin'
   const isStudent = role === 'student'
-  const [academicDropdownOpen, setAcademicDropdownOpen] = useState(false)
 
   return (
     <aside
@@ -56,23 +54,9 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             <NavLink className={navClass} to={`/students/${user?.studentId ?? ''}`}>
               <i className="bi bi-person" /> My Profile
             </NavLink>
-            <div className="nav-item dropdown">
-              <button
-                className={`nav-link dropdown-toggle ${navClass({ isActive: false })}`}
-                onClick={() => setAcademicDropdownOpen(!academicDropdownOpen)}
-                style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
-              >
-                <i className="bi bi-mortarboard" /> Academic
-              </button>
-              <div className={`dropdown-menu ${academicDropdownOpen ? 'show' : ''}`} style={{ position: 'relative', border: 'none', background: 'transparent' }}>
-                <NavLink className="dropdown-item" to="#" style={{ color: 'inherit', padding: '0.5rem 1rem 0.5rem 2rem' }}>
-                  <i className="bi bi-book me-2" /> Syllabus
-                </NavLink>
-                <NavLink className="dropdown-item" to="#" style={{ color: 'inherit', padding: '0.5rem 1rem 0.5rem 2rem' }}>
-                  <i className="bi bi-journal-text me-2" /> Lessons
-                </NavLink>
-              </div>
-            </div>
+            <NavLink className={navClass} to="#">
+              <i className="bi bi-mortarboard" /> Academic
+            </NavLink>
             <NavLink className={navClass} to="#">
               <i className="bi bi-calendar3" /> My Schedule
             </NavLink>
