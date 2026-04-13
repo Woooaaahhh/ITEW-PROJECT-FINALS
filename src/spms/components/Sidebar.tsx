@@ -51,7 +51,6 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
         <NavLink className={navClass} to={role === 'admin' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
-<<<<<<< HEAD
         {isStudent && (
           <>
             <NavLink className={navClass} to={`/students/${user?.studentId ?? ''}`}>
@@ -77,26 +76,26 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             <NavLink className={navClass} to="#">
               <i className="bi bi-calendar3" /> My Schedule
             </NavLink>
+            <NavLink className={navClass} to="/student/records">
+              <i className="bi bi-exclamation-triangle" /> My Records
+            </NavLink>
+            <NavLink className={navClass} to="#">
+              <i className="bi bi-award" /> Skills
+            </NavLink>
+            <NavLink className={navClass} to="#">
+              <i className="bi bi-exclamation-triangle" /> Violations
+            </NavLink>
             <NavLink className={navClass} to="#">
               <i className="bi bi-calendar-event" /> Events
+            </NavLink>
+            <NavLink className={navClass} to="#">
+              <i className="bi bi-eye" /> View Events
             </NavLink>
             <NavLink className={navClass} to="/medical">
               <i className="bi bi-heart-pulse" /> My Medical
             </NavLink>
           </>
         )}
-=======
-        {isStudent ? (
-          <>
-            <NavLink className={navClass} to="/medical">
-              <i className="bi bi-heart-pulse" /> Medical
-            </NavLink>
-            <NavLink className={navClass} to="/instruction">
-              <i className="bi bi-journal-text" /> Instruction
-            </NavLink>
-          </>
-        ) : null}
->>>>>>> b4e0b265e83a1e1cfcb40860e4910df19e609ddf
         {!isStudent && (
           <>
             <NavLink className={navClass} to="/students">
