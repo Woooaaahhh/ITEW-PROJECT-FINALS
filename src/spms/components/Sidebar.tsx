@@ -76,21 +76,7 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             <NavLink className={navClass} to="#">
               <i className="bi bi-calendar3" /> My Schedule
             </NavLink>
-            <NavLink className={navClass} to="/student/records">
-              <i className="bi bi-exclamation-triangle" /> My Records
-            </NavLink>
-            <NavLink className={navClass} to="#">
-              <i className="bi bi-award" /> Skills
-            </NavLink>
-            <NavLink className={navClass} to="#">
-              <i className="bi bi-exclamation-triangle" /> Violations
-            </NavLink>
-            <NavLink className={navClass} to="#">
-              <i className="bi bi-calendar-event" /> Events
-            </NavLink>
-            <NavLink className={navClass} to="#">
-              <i className="bi bi-eye" /> View Events
-            </NavLink>
+
             <NavLink className={navClass} to="/medical">
               <i className="bi bi-heart-pulse" /> My Medical
             </NavLink>
