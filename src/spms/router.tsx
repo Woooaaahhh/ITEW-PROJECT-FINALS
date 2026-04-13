@@ -24,6 +24,7 @@ import { StudentMedicalSubmitPage } from './pages/StudentMedicalSubmitPage'
 import { StudentMyRecordsPage } from './pages/StudentMyRecordsPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
+import { InstructionModulePage } from './pages/InstructionModulePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
 import { Link } from 'react-router-dom'
@@ -145,6 +146,11 @@ const sectionsHandle: PageMeta = {
 const usersHandle: PageMeta = {
   title: 'Account Management',
   subtitle: 'Create and manage user accounts',
+}
+
+const instructionHandle: PageMeta = {
+  title: 'Instruction Module',
+  subtitle: 'Manage syllabus, lessons, and curriculum',
 }
 
 const notFoundHandle: PageMeta = {
@@ -376,6 +382,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: usersHandle,
+      },
+      {
+        path: '/instruction',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty', 'student']}>
+            <InstructionModulePage />
+          </RoleProtectedRoute>
+        ),
+        handle: instructionHandle,
       },
       { path: '*', element: <NotFoundPage />, handle: notFoundHandle },
     ],

@@ -85,7 +85,7 @@ export function logout(): void {
 export function getAllowedPaths(role: UserRole): string[] {
   switch (role) {
     case 'admin':
-      return ['/', '/registrar', '/students', '/reports', '/medical']
+      return ['/', '/registrar', '/students', '/reports', '/medical', '/instruction']
     case 'faculty':
       return [
         '/',
@@ -99,9 +99,10 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/medical',
         '/students',
         '/reports',
+        '/instruction',
       ]
     case 'student':
-      return ['/', '/student', '/student/medical', '/medical']
+      return ['/', '/student', '/student/medical', '/medical', '/instruction']
     default:
       return ['/']
   }
@@ -149,6 +150,7 @@ export function canAccessPath(
       path === '/faculty/medical' ||
       path === '/medical' ||
       path === '/reports' ||
+      path === '/instruction' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
@@ -175,7 +177,13 @@ export function canAccessPath(
     ) {
       return true
     }
-    return path === '/' || path === '/student' || path === '/student/medical' || path === '/medical'
+    return (
+      path === '/' ||
+      path === '/student' ||
+      path === '/student/medical' ||
+      path === '/medical' ||
+      path === '/instruction'
+    )
   }
 
   return false
