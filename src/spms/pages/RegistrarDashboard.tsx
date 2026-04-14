@@ -112,6 +112,10 @@ export function RegistrarDashboard() {
       setFormError('Please fill out all fields.')
       return
     }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/.test(f.password)) {
+      setFormError('Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number. Allowed symbols: @$!%*?&')
+      return
+    }
     setSubmitting(true)
     try {
       await axios.post('/api/create-user', {
@@ -143,6 +147,10 @@ export function RegistrarDashboard() {
     const faculty_type = facultyPreset === 'Other' ? facultyOther.trim() : facultyPreset
     if (!f.username.trim() || !f.email.trim() || !f.password || !faculty_type) {
       setFormError('Please fill out all fields.')
+      return
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/.test(f.password)) {
+      setFormError('Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number. Allowed symbols: @$!%*?&')
       return
     }
     setSubmitting(true)

@@ -5,6 +5,8 @@ import avatarUrl from '../../assets/react.svg'
 import axios from 'axios'
 import { createStudent, seedIfEmpty } from '../db/students'
 
+const apiPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
+
 type FormState = {
   firstName: string
   middleName: string
@@ -160,8 +162,10 @@ export function AddStudentPage() {
                   setSubmitError('Password must be at least 8 characters long.')
                   return
                 }
-                if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(passwordVal)) {
-                  setSubmitError('Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.')
+                if (!apiPasswordRegex.test(passwordVal)) {
+                  setSubmitError(
+                    'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number. Allowed symbols: @$!%*?&',
+                  )
                   return
                 }
                 if (passwordVal !== form.confirmPassword) {
