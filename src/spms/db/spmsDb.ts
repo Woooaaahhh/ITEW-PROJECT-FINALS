@@ -62,6 +62,51 @@ export type StudentSkill = {
   createdAt: string
 }
 
+export type Syllabus = {
+  id: string
+  title: string
+  description?: string | null
+  courseCode?: string | null
+  isArchived: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type CurriculumUnit = {
+  id: string
+  syllabusId: string
+  title: string
+  description?: string | null
+  orderIndex: number
+  isArchived: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type Lesson = {
+  id: string
+  syllabusId: string
+  curriculumUnitId?: string | null
+  title: string
+  content?: string | null
+  weekNumber?: number | null
+  orderIndex: number
+  isArchived: boolean
+  attachments?: LessonAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type LessonAttachment = {
+  id: string
+  lessonId: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  fileUrl: string
+  uploadedAt: string
+}
+
 export type SpmsDb = DBSchema & {
   students: {
     key: string
@@ -83,6 +128,26 @@ export type SpmsDb = DBSchema & {
     value: StudentSkill
     indexes: { 'by-studentId': string; 'by-skillId': string; 'by-createdAt': string }
   }
+  syllabi: {
+    key: string
+    value: Syllabus
+    indexes: { 'by-updatedAt': string; 'by-title': string; 'by-courseCode': string }
+  }
+  curriculumUnits: {
+    key: string
+    value: CurriculumUnit
+    indexes: { 'by-syllabusId': string; 'by-orderIndex': number }
+  }
+  lessons: {
+    key: string
+    value: Lesson
+    indexes: { 'by-syllabusId': string; 'by-curriculumUnitId': string; 'by-updatedAt': string; 'by-orderIndex': number }
+  }
+  lessonAttachments: {
+    key: string
+    value: LessonAttachment
+    indexes: { 'by-lessonId': string }
+  }
   meta: {
     key: string
     value: { key: string; value: string }
@@ -91,7 +156,7 @@ export type SpmsDb = DBSchema & {
 
 const DB_NAME = 'spms-db'
 /** Must never be lower than the version already in the user's browser, or openDB throws VersionError. */
-const DB_VERSION = 6
+const DB_VERSION = 9
 
 export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
   return openDB<SpmsDb>(DB_NAME, DB_VERSION, {
@@ -123,6 +188,28 @@ export async function openSpmsDb(): Promise<IDBPDatabase<SpmsDb>> {
         studentSkills.createIndex('by-studentId', 'studentId')
         studentSkills.createIndex('by-skillId', 'skillId')
         studentSkills.createIndex('by-createdAt', 'createdAt')
+      }
+      if (!db.objectStoreNames.contains('syllabi')) {
+        const store = db.createObjectStore('syllabi', { keyPath: 'id' })
+        store.createIndex('by-updatedAt', 'updatedAt')
+        store.createIndex('by-title', 'title')
+        store.createIndex('by-courseCode', 'courseCode')
+      }
+      if (!db.objectStoreNames.contains('curriculumUnits')) {
+        const store = db.createObjectStore('curriculumUnits', { keyPath: 'id' })
+        store.createIndex('by-syllabusId', 'syllabusId')
+        store.createIndex('by-orderIndex', 'orderIndex')
+      }
+      if (!db.objectStoreNames.contains('lessons')) {
+        const store = db.createObjectStore('lessons', { keyPath: 'id' })
+        store.createIndex('by-syllabusId', 'syllabusId')
+        store.createIndex('by-curriculumUnitId', 'curriculumUnitId')
+        store.createIndex('by-updatedAt', 'updatedAt')
+        store.createIndex('by-orderIndex', 'orderIndex')
+      }
+      if (!db.objectStoreNames.contains('lessonAttachments')) {
+        const store = db.createObjectStore('lessonAttachments', { keyPath: 'id' })
+        store.createIndex('by-lessonId', 'lessonId')
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })

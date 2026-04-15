@@ -25,6 +25,7 @@ import { StudentMyRecordsPage } from './pages/StudentMyRecordsPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { InstructionModulePage } from './pages/InstructionModulePage'
+import { DashboardDebug } from './pages/DashboardDebug'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
 import { Link } from 'react-router-dom'
@@ -382,6 +383,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: usersHandle,
+      },
+      {
+        path: '/debug',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin']}>
+            <DashboardDebug />
+          </RoleProtectedRoute>
+        ),
+        handle: { title: 'Dashboard Debug', subtitle: 'Diagnostic tool for dashboard loading issues' },
       },
       {
         path: '/instruction',

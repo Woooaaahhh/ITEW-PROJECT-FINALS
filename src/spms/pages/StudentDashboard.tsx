@@ -228,7 +228,7 @@ export function StudentDashboard() {
                     dataKey="value"
                   >
                     {skillsDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell key={`skill-${entry.name}-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
                   <Tooltip />

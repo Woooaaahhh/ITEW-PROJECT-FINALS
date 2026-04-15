@@ -57,6 +57,7 @@ function ChartCard({
 export function RegistrarDashboard() {
   const [data, setData] = useState<RegistrarDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [modal, setModal] = useState<null | 'student' | 'faculty'>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -79,15 +80,34 @@ export function RegistrarDashboard() {
     password: '',
   })
 
-  useEffect(() => {
+  const loadDashboardData = () => {
     let alive = true
     ;(async () => {
       setLoading(true)
+      setError(null)
       try {
-        const d = await loadRegistrarDashboardData()
+        console.log('Starting dashboard data load...')
+        const startTime = performance.now()
+        
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Dashboard data loading timeout')), 10000)
+        )
+        
+        const d = await Promise.race([
+          loadRegistrarDashboardData(),
+          timeoutPromise
+        ]) as RegistrarDashboardData
+        
+        const endTime = performance.now()
+        console.log(`Dashboard data loaded in ${(endTime - startTime).toFixed(2)}ms`, d)
         if (alive) setData(d)
-      } catch {
-        if (alive) setData(null)
+      } catch (error) {
+        console.error('Dashboard data loading failed:', error)
+        if (alive) {
+          setError(error instanceof Error ? error.message : 'Failed to load dashboard data')
+          setData(null)
+        }
       } finally {
         if (alive) setLoading(false)
       }
@@ -95,6 +115,10 @@ export function RegistrarDashboard() {
     return () => {
       alive = false
     }
+  }
+
+  useEffect(() => {
+    return loadDashboardData()
   }, [])
 
   const d = data
@@ -103,6 +127,10 @@ export function RegistrarDashboard() {
     setModal(null)
     setFormError(null)
     setSubmitting(false)
+  }
+
+  const refreshData = () => {
+    loadDashboardData()
   }
 
   const createStudentAccount = async () => {
@@ -300,6 +328,19 @@ export function RegistrarDashboard() {
                   </Link>
                   ; student profiles sync in-browser from your student list.
                 </p>
+                {error && (
+                  <div className="alert alert-warning alert-sm mt-2 mb-0">
+                    <i className="bi bi-exclamation-triangle me-2" />
+                    {error}
+                    <button 
+                      className="btn btn-sm btn-outline-light ms-2" 
+                      onClick={refreshData}
+                    >
+                      <i className="bi bi-arrow-clockwise me-1" />
+                      Retry
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="d-flex flex-wrap gap-2 align-items-center">
                 <button
@@ -424,8 +465,8 @@ export function RegistrarDashboard() {
                         outerRadius={78}
                         paddingAngle={2}
                       >
-                        {d.medicalMix.map((_, i) => (
-                          <Cell key={i} fill={REG.chart[i % REG.chart.length]} />
+                        {d.medicalMix.map((item, i) => (
+                          <Cell key={`medical-${item.name}-${i}`} fill={REG.chart[i % REG.chart.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(v) => [Number(v ?? 0), 'Students']} />
