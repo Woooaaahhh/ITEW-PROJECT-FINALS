@@ -33,6 +33,11 @@ async function ensureIndexes(db) {
   await db.collection('syllabi').createIndex({ title: 1 })
   await db.collection('lessons').createIndex({ lesson_id: 1 }, { unique: true })
   await db.collection('lessons').createIndex({ syllabus_id: 1, order_index: 1 })
+  await db.collection('rooms').createIndex({ room_id: 1 }, { unique: true })
+  await db.collection('rooms').createIndex({ name: 1 }, { unique: true })
+  await db.collection('labs').createIndex({ lab_id: 1 }, { unique: true })
+  await db.collection('labs').createIndex({ room_id: 1, name: 1 }, { unique: true })
+  await db.collection('labs').createIndex({ faculty_user_id: 1 })
 }
 
 export async function getDb() {

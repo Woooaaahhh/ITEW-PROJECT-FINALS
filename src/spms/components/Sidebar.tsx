@@ -109,6 +109,11 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
                 <i className="bi bi-diagram-3" /> Sections
               </NavLink>
             )}
+            {role === 'admin' && (
+              <NavLink className={navClass} to="/scheduling">
+                <i className="bi bi-calendar-week" /> Scheduling
+              </NavLink>
+            )}
             {(role === 'admin' || role === 'faculty') && (
               <NavLink className={navClass} to="/reports">
                 <i className="bi bi-file-earmark-bar-graph" /> Reports

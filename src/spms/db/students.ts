@@ -79,6 +79,56 @@ function withEligibilityDefaults(s: Student): Student {
   }
 }
 
+type EligibilityPatch = Pick<
+  Student,
+  | 'sportsAffiliations'
+  | 'medicalClearanceStatus'
+  | 'medicalClearanceUpdatedAt'
+  | 'medicalClearanceNotes'
+  | 'medicalHeight'
+  | 'medicalWeight'
+  | 'medicalBloodPressure'
+  | 'medicalCondition'
+  | 'medicalPhysicianName'
+  | 'medicalExamDate'
+  | 'medicalFormDetails'
+  | 'medicalDocumentDataUrl'
+  | 'medicalSubmittedAt'
+>
+
+function pickEligibility(s: Student | undefined | null): Partial<EligibilityPatch> {
+  if (!s) return {}
+  return {
+    sportsAffiliations: s.sportsAffiliations ?? [],
+    medicalClearanceStatus: s.medicalClearanceStatus ?? 'pending',
+    medicalClearanceUpdatedAt: s.medicalClearanceUpdatedAt ?? null,
+    medicalClearanceNotes: s.medicalClearanceNotes ?? null,
+    medicalHeight: s.medicalHeight ?? null,
+    medicalWeight: s.medicalWeight ?? null,
+    medicalBloodPressure: s.medicalBloodPressure ?? null,
+    medicalCondition: s.medicalCondition ?? null,
+    medicalPhysicianName: s.medicalPhysicianName ?? null,
+    medicalExamDate: s.medicalExamDate ?? null,
+    medicalFormDetails: s.medicalFormDetails ?? null,
+    medicalDocumentDataUrl: s.medicalDocumentDataUrl ?? null,
+    medicalSubmittedAt: s.medicalSubmittedAt ?? null,
+  }
+}
+
+async function upsertLocalEligibility(base: Student, eligibility: Partial<EligibilityPatch>): Promise<Student> {
+  const db = await openSpmsDb()
+  const existing = await db.get('students', base.id)
+  const updated: Student = withEligibilityDefaults({
+    ...(existing ?? base),
+    ...base,
+    ...pickEligibility(existing ? withEligibilityDefaults(existing) : undefined),
+    ...eligibility,
+    updatedAt: nowIso(),
+  })
+  await db.put('students', updated)
+  return updated
+}
+
 function makeId() {
   // not cryptographically secure; good enough for local DB key
   return `S-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -206,8 +256,12 @@ export async function listStudents(): Promise<Student[]> {
   // Fallback to local IndexedDB for offline mode or student-role routes.
   try {
     const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
-    const all = (res.data.students ?? []).map(fromApiRow)
-    return all.map(withEligibilityDefaults).sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
+    const apiStudents = (res.data.students ?? []).map(fromApiRow).map(withEligibilityDefaults)
+    const db = await openSpmsDb()
+    const local = await db.getAll('students')
+    const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
+    const merged = apiStudents.map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
+    return merged.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
   } catch {
     const db = await openSpmsDb()
     const all = await db.getAll('students')
@@ -220,7 +274,10 @@ export async function listStudents(): Promise<Student[]> {
 export async function getStudent(id: string): Promise<Student | undefined> {
   try {
     const res = await axios.get<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`)
-    return withEligibilityDefaults(fromApiRow(res.data.student))
+    const base = withEligibilityDefaults(fromApiRow(res.data.student))
+    const db = await openSpmsDb()
+    const local = await db.get('students', id)
+    return { ...base, ...pickEligibility(local ? withEligibilityDefaults(local) : undefined) }
   } catch {
     const db = await openSpmsDb()
     const s = await db.get('students', id)
@@ -246,25 +303,53 @@ export async function updateStudent(
   id: string,
   patch: Partial<Omit<Student, 'id' | 'createdAt' | 'updatedAt'>>,
 ): Promise<Student> {
-  // Prefer backend API for shared dataset; fallback to IndexedDB for legacy/demo ids.
-  try {
-    const payload: Record<string, unknown> = {}
-    if (patch.firstName !== undefined) payload.first_name = patch.firstName
-    if (patch.middleName !== undefined) payload.middle_name = patch.middleName
-    if (patch.lastName !== undefined) payload.last_name = patch.lastName
-    if (patch.birthdate !== undefined) payload.birthdate = patch.birthdate
-    if (patch.gender !== undefined) payload.gender = patch.gender
-    if (patch.address !== undefined) payload.address = patch.address
-    if (patch.email !== undefined) payload.school_email = patch.email
-    if (patch.contactNumber !== undefined) payload.contact_number = patch.contactNumber
-    if (patch.yearLevel !== undefined) payload.year_level = patch.yearLevel
-    if (patch.section !== undefined) payload.section = patch.section
-    if (patch.profilePictureDataUrl !== undefined) payload.profile_picture_data_url = patch.profilePictureDataUrl
+  const payload: Record<string, unknown> = {}
+  if (patch.firstName !== undefined) payload.first_name = patch.firstName
+  if (patch.middleName !== undefined) payload.middle_name = patch.middleName
+  if (patch.lastName !== undefined) payload.last_name = patch.lastName
+  if (patch.birthdate !== undefined) payload.birthdate = patch.birthdate
+  if (patch.gender !== undefined) payload.gender = patch.gender
+  if (patch.address !== undefined) payload.address = patch.address
+  if (patch.email !== undefined) payload.school_email = patch.email
+  if (patch.contactNumber !== undefined) payload.contact_number = patch.contactNumber
+  if (patch.yearLevel !== undefined) payload.year_level = patch.yearLevel
+  if (patch.section !== undefined) payload.section = patch.section
+  if (patch.profilePictureDataUrl !== undefined) payload.profile_picture_data_url = patch.profilePictureDataUrl
 
-    const res = await axios.put<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`, payload)
+  const eligibilityPatch: Partial<EligibilityPatch> = {}
+  if (patch.sportsAffiliations !== undefined) eligibilityPatch.sportsAffiliations = patch.sportsAffiliations
+  if (patch.medicalClearanceStatus !== undefined) eligibilityPatch.medicalClearanceStatus = patch.medicalClearanceStatus
+  if (patch.medicalClearanceUpdatedAt !== undefined) eligibilityPatch.medicalClearanceUpdatedAt = patch.medicalClearanceUpdatedAt
+  if (patch.medicalClearanceNotes !== undefined) eligibilityPatch.medicalClearanceNotes = patch.medicalClearanceNotes
+  if (patch.medicalHeight !== undefined) eligibilityPatch.medicalHeight = patch.medicalHeight
+  if (patch.medicalWeight !== undefined) eligibilityPatch.medicalWeight = patch.medicalWeight
+  if (patch.medicalBloodPressure !== undefined) eligibilityPatch.medicalBloodPressure = patch.medicalBloodPressure
+  if (patch.medicalCondition !== undefined) eligibilityPatch.medicalCondition = patch.medicalCondition
+  if (patch.medicalPhysicianName !== undefined) eligibilityPatch.medicalPhysicianName = patch.medicalPhysicianName
+  if (patch.medicalExamDate !== undefined) eligibilityPatch.medicalExamDate = patch.medicalExamDate
+  if (patch.medicalFormDetails !== undefined) eligibilityPatch.medicalFormDetails = patch.medicalFormDetails
+  if (patch.medicalDocumentDataUrl !== undefined) eligibilityPatch.medicalDocumentDataUrl = patch.medicalDocumentDataUrl
+  if (patch.medicalSubmittedAt !== undefined) eligibilityPatch.medicalSubmittedAt = patch.medicalSubmittedAt
+
+  const hasApiFields = Object.keys(payload).length > 0
+  const hasEligibilityFields = Object.keys(eligibilityPatch).length > 0
+
+  if (!hasApiFields && hasEligibilityFields) {
+    const base = await getStudent(id)
+    if (!base) throw new Error('Student not found')
+    const updated = await upsertLocalEligibility(base, eligibilityPatch)
     notifyStudentsChanged()
-    return withEligibilityDefaults(fromApiRow(res.data.student))
-  } catch (e) {
+    return updated
+  }
+
+  // Prefer backend API for shared dataset; if it fails, fallback to IndexedDB (legacy/demo).
+  try {
+    const res = await axios.put<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`, payload)
+    const base = withEligibilityDefaults(fromApiRow(res.data.student))
+    const merged = hasEligibilityFields ? await upsertLocalEligibility(base, eligibilityPatch) : base
+    notifyStudentsChanged()
+    return merged
+  } catch {
     const db = await openSpmsDb()
     const existing = await db.get('students', id)
     if (!existing) throw new Error('Student not found')

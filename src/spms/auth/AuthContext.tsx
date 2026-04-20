@@ -22,6 +22,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return u
   })
 
+  // If the backend rejects the stored JWT (common in dev after restarts),
+  // automatically clear auth and send the user back to login.
+  useEffect(() => {
+    const interceptorId = axios.interceptors.response.use(
+      (res) => res,
+      (err: unknown) => {
+        if (axios.isAxiosError(err)) {
+          const status = err.response?.status
+          const message = (err.response?.data as { message?: string } | undefined)?.message
+          const url = String(err.config?.url || '')
+          const isAuthCall = url.includes('/api/login') || url.includes('/api/user')
+          if (!isAuthCall && status === 401 && (message === 'Invalid token' || message === 'Missing token')) {
+            doLogout()
+            setUserState(null)
+            delete axios.defaults.headers.common.Authorization
+            // Avoid React Router hook usage here; this runs outside route components.
+            window.location.assign('/login')
+          }
+        }
+        return Promise.reject(err)
+      },
+    )
+    return () => axios.interceptors.response.eject(interceptorId)
+  }, [])
+
   // Ensure axios has auth header on initial load/refresh.
   useEffect(() => {
     if (user?.token) axios.defaults.headers.common.Authorization = `Bearer ${user.token}`

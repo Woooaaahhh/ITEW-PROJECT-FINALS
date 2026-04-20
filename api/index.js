@@ -737,6 +737,28 @@ const curriculumReorderSchema = z.object({
   ),
 })
 
+// Scheduling: Rooms -> Lab -> Faculty
+const roomSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  building: z.string().trim().max(80).optional().nullable(),
+  capacity: z.number().int().min(0).max(1000).optional().nullable(),
+})
+
+const roomUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  building: z.string().trim().max(80).optional().nullable(),
+  capacity: z.number().int().min(0).max(1000).optional().nullable(),
+})
+
+const labSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+})
+
+const labUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  faculty_user_id: z.number().int().positive().nullable().optional(),
+})
+
 app.get('/api/instruction/syllabi', authMiddleware, async (req, res) => {
   const db = await getDb()
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true'
@@ -928,6 +950,166 @@ app.put('/api/instruction/syllabi/:id/curriculum', authMiddleware, requireInstru
     .sort({ order_index: 1, lesson_id: 1 })
     .toArray()
   return res.json({ lessons })
+})
+
+app.get('/api/scheduling/rooms', authMiddleware, requireAdmin, async (_req, res) => {
+  const db = await getDb()
+  const rooms = await db
+    .collection('rooms')
+    .find({}, { projection: { _id: 0 } })
+    .sort({ name: 1, room_id: 1 })
+    .toArray()
+  return res.json({ rooms })
+})
+
+app.post('/api/scheduling/rooms', authMiddleware, requireAdmin, async (req, res) => {
+  const parsed = roomSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  try {
+    const created = {
+      room_id: await nextSequence(db, 'rooms'),
+      name: parsed.data.name,
+      building: parsed.data.building ?? null,
+      capacity: parsed.data.capacity ?? null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await db.collection('rooms').insertOne(created)
+    return res.status(201).json({ room: created })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists' })
+    return res.status(500).json({ message: 'Failed to create room' })
+  }
+})
+
+app.put('/api/scheduling/rooms/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid room id' })
+  const parsed = roomUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const fields = {}
+  if (parsed.data.name !== undefined) fields.name = parsed.data.name
+  if (parsed.data.building !== undefined) fields.building = parsed.data.building
+  if (parsed.data.capacity !== undefined) fields.capacity = parsed.data.capacity
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+
+  const db = await getDb()
+  const existing = await db.collection('rooms').findOne({ room_id: id }, { projection: { _id: 0, room_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Room not found' })
+  try {
+    await db.collection('rooms').updateOne({ room_id: id }, { $set: fields })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists' })
+    return res.status(500).json({ message: 'Failed to update room' })
+  }
+  const updated = await db.collection('rooms').findOne({ room_id: id }, { projection: { _id: 0 } })
+  return res.json({ room: updated })
+})
+
+app.delete('/api/scheduling/rooms/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid room id' })
+  const db = await getDb()
+  const existing = await db.collection('rooms').findOne({ room_id: id }, { projection: { _id: 0, room_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Room not found' })
+  await db.collection('labs').deleteMany({ room_id: id })
+  await db.collection('rooms').deleteOne({ room_id: id })
+  return res.json({ ok: true })
+})
+
+app.get('/api/scheduling/rooms/:id/labs', authMiddleware, requireAdmin, async (req, res) => {
+  const roomId = Number(req.params.id)
+  if (!roomId) return res.status(400).json({ message: 'Invalid room id' })
+  const db = await getDb()
+  const room = await db.collection('rooms').findOne({ room_id: roomId }, { projection: { _id: 0, room_id: 1 } })
+  if (!room) return res.status(404).json({ message: 'Room not found' })
+  const labs = await db
+    .collection('labs')
+    .find({ room_id: roomId }, { projection: { _id: 0 } })
+    .sort({ name: 1, lab_id: 1 })
+    .toArray()
+  return res.json({ labs })
+})
+
+app.post('/api/scheduling/rooms/:id/labs', authMiddleware, requireAdmin, async (req, res) => {
+  const roomId = Number(req.params.id)
+  if (!roomId) return res.status(400).json({ message: 'Invalid room id' })
+  const parsed = labSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const room = await db.collection('rooms').findOne({ room_id: roomId }, { projection: { _id: 0, room_id: 1 } })
+  if (!room) return res.status(404).json({ message: 'Room not found' })
+  try {
+    const created = {
+      lab_id: await nextSequence(db, 'labs'),
+      room_id: roomId,
+      name: parsed.data.name,
+      faculty_user_id: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await db.collection('labs').insertOne(created)
+    return res.status(201).json({ lab: created })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Lab already exists in this room' })
+    return res.status(500).json({ message: 'Failed to create lab' })
+  }
+})
+
+app.put('/api/scheduling/labs/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid lab id' })
+  const parsed = labUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const fields = {}
+  if (parsed.data.name !== undefined) fields.name = parsed.data.name
+  if (parsed.data.faculty_user_id !== undefined) fields.faculty_user_id = parsed.data.faculty_user_id
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+
+  const db = await getDb()
+  const existing = await db.collection('labs').findOne({ lab_id: id }, { projection: { _id: 0, lab_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Lab not found' })
+
+  if (parsed.data.faculty_user_id !== undefined && parsed.data.faculty_user_id != null) {
+    const faculty = await db.collection('users').findOne(
+      { user_id: parsed.data.faculty_user_id, role: 'faculty', active: 1 },
+      { projection: { _id: 0, user_id: 1 } },
+    )
+    if (!faculty) return res.status(400).json({ message: 'Invalid faculty user' })
+  }
+
+  try {
+    await db.collection('labs').updateOne({ lab_id: id }, { $set: fields })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Lab already exists in this room' })
+    return res.status(500).json({ message: 'Failed to update lab' })
+  }
+  const updated = await db.collection('labs').findOne({ lab_id: id }, { projection: { _id: 0 } })
+  return res.json({ lab: updated })
+})
+
+app.delete('/api/scheduling/labs/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid lab id' })
+  const db = await getDb()
+  const existing = await db.collection('labs').findOne({ lab_id: id }, { projection: { _id: 0, lab_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Lab not found' })
+  await db.collection('labs').deleteOne({ lab_id: id })
+  return res.json({ ok: true })
+})
+
+app.get('/api/scheduling/faculty', authMiddleware, requireAdmin, async (_req, res) => {
+  const db = await getDb()
+  const faculty = await db
+    .collection('users')
+    .find({ role: 'faculty', active: 1 }, { projection: { _id: 0, user_id: 1, username: 1, email: 1, faculty_type: 1 } })
+    .sort({ username: 1, user_id: 1 })
+    .toArray()
+  return res.json({ faculty })
 })
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))

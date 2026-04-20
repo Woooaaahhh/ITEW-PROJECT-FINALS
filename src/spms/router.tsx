@@ -25,6 +25,7 @@ import { StudentMyRecordsPage } from './pages/StudentMyRecordsPage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { InstructionModulePage } from './pages/InstructionModulePage'
+import { SchedulingPage } from './pages/SchedulingPage'
 import { DashboardDebug } from './pages/DashboardDebug'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
@@ -152,6 +153,11 @@ const usersHandle: PageMeta = {
 const instructionHandle: PageMeta = {
   title: 'Instruction Module',
   subtitle: 'Manage syllabus, lessons, and curriculum',
+}
+
+const schedulingHandle: PageMeta = {
+  title: 'Scheduling',
+  subtitle: 'Manage rooms, labs, and faculty assignments',
 }
 
 const notFoundHandle: PageMeta = {
@@ -385,6 +391,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: usersHandle,
+      },
+      {
+        path: '/scheduling',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin']}>
+            <SchedulingPage />
+          </RoleProtectedRoute>
+        ),
+        handle: schedulingHandle,
       },
       {
         path: '/debug',

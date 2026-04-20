@@ -585,7 +585,8 @@ export function FacultySportsPage() {
                     setSavingAssign(true)
                     setAssignError(null)
                     try {
-                      await updateStudent(selectedStudentId, { sportsAffiliations: assignedSportIds })
+                      const updated = await updateStudent(selectedStudentId, { sportsAffiliations: assignedSportIds })
+                      setStudents((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)))
                       setSavedModalOpen(true)
                     } catch (e) {
                       setAssignError(e instanceof Error ? e.message : 'Failed to save sports assignments.')
