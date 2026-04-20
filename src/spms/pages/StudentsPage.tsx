@@ -3,6 +3,8 @@
   import axios from 'axios'
   import avatarUrl from '../../assets/react.svg'
   import { useAuth } from '../auth/AuthContext'
+  import { Link } from 'react-router-dom'
+  import { deleteStudent } from '../db/students'
   import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
   import type { Student } from '../db/students'
 
@@ -270,11 +272,31 @@
                   ) : null}
                   <td className="text-end pe-3">
                     <div className="btn-group">
-                      <span className="btn btn-sm btn-outline-primary disabled" aria-label="View Profile">
+                      <Link className="btn btn-sm btn-outline-primary" to={`/students/${st.id}`} aria-label="View Profile">
                         <i className="bi bi-eye" />
-                      </span>
-                      {canEdit && <span className="btn btn-sm btn-outline-secondary disabled"><i className="bi bi-pencil" /></span>}
-                      {canDelete && <span className="btn btn-sm btn-outline-danger disabled"><i className="bi bi-trash" /></span>}
+                      </Link>
+                      {canEdit && (
+                        <Link className="btn btn-sm btn-outline-secondary" to={`/students/${st.id}/edit`} aria-label="Edit">
+                          <i className="bi bi-pencil" />
+                        </Link>
+                      )}
+                      {canDelete && (
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          type="button"
+                          aria-label="Delete"
+                          onClick={() => {
+                            void (async () => {
+                              const ok = confirm(`Delete ${fullName(st)}?`)
+                              if (!ok) return
+                              await deleteStudent(st.id)
+                              await loadStudents()
+                            })()
+                          }}
+                        >
+                          <i className="bi bi-trash" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

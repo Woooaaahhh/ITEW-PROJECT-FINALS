@@ -312,6 +312,79 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
   return res.json({ students })
 })
 
+const updateStudentSchema = z.object({
+  first_name: z.string().trim().min(1).max(80).optional(),
+  middle_name: z.string().trim().max(80).nullable().optional(),
+  last_name: z.string().trim().min(1).max(80).optional(),
+  birthdate: z.string().trim().max(40).nullable().optional(),
+  gender: z.string().trim().max(40).nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  school_email: z.string().trim().email().max(120).nullable().optional(),
+  contact_number: z.string().trim().max(40).nullable().optional(),
+  year_level: z.string().trim().max(20).nullable().optional(),
+  section: z.string().trim().max(40).nullable().optional(),
+  profile_picture_data_url: z.string().trim().max(200000).nullable().optional(),
+})
+
+app.get('/api/students/:id', authMiddleware, requireStaff, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid student id' })
+  const db = await getDb()
+
+  const row = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0 } })
+  if (!row) return res.status(404).json({ message: 'Student not found' })
+
+  const user = await db.collection('users').findOne({ user_id: row.user_id }, { projection: { _id: 0, email: 1, active: 1 } })
+  return res.json({
+    student: {
+      ...row,
+      email: user?.email ?? null,
+      active: user?.active ?? 1,
+    },
+  })
+})
+
+app.put('/api/students/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid student id' })
+  const parsed = updateStudentSchema.safeParse(req.body)
+  if (!parsed.success) {
+    const first = parsed.error.issues?.[0]
+    return res.status(400).json({ message: first?.message || 'Invalid input' })
+  }
+
+  const fields = { ...parsed.data }
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
+
+  const db = await getDb()
+  const existing = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0, student_id: 1, user_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Student not found' })
+
+  await db.collection('students').updateOne({ student_id: id }, { $set: fields })
+  const updated = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0 } })
+  const user = await db.collection('users').findOne({ user_id: existing.user_id }, { projection: { _id: 0, email: 1, active: 1 } })
+  return res.json({
+    student: {
+      ...updated,
+      email: user?.email ?? null,
+      active: user?.active ?? 1,
+    },
+  })
+})
+
+app.delete('/api/students/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid student id' })
+  const db = await getDb()
+  const existing = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0, student_id: 1, user_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Student not found' })
+
+  await db.collection('student_skills').deleteMany({ student_id: id })
+  await db.collection('students').deleteOne({ student_id: id })
+  await db.collection('users').deleteOne({ user_id: existing.user_id })
+  return res.json({ ok: true })
+})
+
 app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body)
   if (!parsed.success) {

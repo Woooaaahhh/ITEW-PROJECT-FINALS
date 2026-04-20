@@ -6,10 +6,16 @@ export type { Student } from './spmsDb'
 type ApiStudentRow = {
   student_id: number
   first_name: string
+  middle_name?: string | null
   last_name: string
+  birthdate?: string | null
+  gender?: string | null
+  address?: string | null
   year_level?: string | null
   section?: string | null
   email?: string | null
+  contact_number?: string | null
+  profile_picture_data_url?: string | null
 }
 
 function fromApiRow(row: ApiStudentRow): Student {
@@ -17,16 +23,16 @@ function fromApiRow(row: ApiStudentRow): Student {
   return {
     id: String(row.student_id),
     firstName: row.first_name ?? '',
-    middleName: '',
+    middleName: row.middle_name ?? '',
     lastName: row.last_name ?? '',
-    birthdate: '',
-    gender: 'Male',
-    address: '',
+    birthdate: row.birthdate ?? '',
+    gender: row.gender ?? '',
+    address: row.address ?? '',
     email: row.email ?? '',
-    contactNumber: '',
+    contactNumber: row.contact_number ?? '',
     yearLevel: row.year_level ?? '',
     section: row.section ?? '',
-    profilePictureDataUrl: null,
+    profilePictureDataUrl: row.profile_picture_data_url ?? null,
     sportsAffiliations: [],
     createdAt: ts,
     updatedAt: ts,
@@ -212,9 +218,14 @@ export async function listStudents(): Promise<Student[]> {
 }
 
 export async function getStudent(id: string): Promise<Student | undefined> {
-  const db = await openSpmsDb()
-  const s = await db.get('students', id)
-  return s ? withEligibilityDefaults(s) : undefined
+  try {
+    const res = await axios.get<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`)
+    return withEligibilityDefaults(fromApiRow(res.data.student))
+  } catch {
+    const db = await openSpmsDb()
+    const s = await db.get('students', id)
+    return s ? withEligibilityDefaults(s) : undefined
+  }
 }
 
 export async function createStudent(input: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> {
@@ -235,19 +246,45 @@ export async function updateStudent(
   id: string,
   patch: Partial<Omit<Student, 'id' | 'createdAt' | 'updatedAt'>>,
 ): Promise<Student> {
-  const db = await openSpmsDb()
-  const existing = await db.get('students', id)
-  if (!existing) throw new Error('Student not found')
-  const updated: Student = { ...existing, ...patch, updatedAt: nowIso() }
-  await db.put('students', updated)
-  notifyStudentsChanged()
-  return withEligibilityDefaults(updated)
+  // Prefer backend API for shared dataset; fallback to IndexedDB for legacy/demo ids.
+  try {
+    const payload: Record<string, unknown> = {}
+    if (patch.firstName !== undefined) payload.first_name = patch.firstName
+    if (patch.middleName !== undefined) payload.middle_name = patch.middleName
+    if (patch.lastName !== undefined) payload.last_name = patch.lastName
+    if (patch.birthdate !== undefined) payload.birthdate = patch.birthdate
+    if (patch.gender !== undefined) payload.gender = patch.gender
+    if (patch.address !== undefined) payload.address = patch.address
+    if (patch.email !== undefined) payload.school_email = patch.email
+    if (patch.contactNumber !== undefined) payload.contact_number = patch.contactNumber
+    if (patch.yearLevel !== undefined) payload.year_level = patch.yearLevel
+    if (patch.section !== undefined) payload.section = patch.section
+    if (patch.profilePictureDataUrl !== undefined) payload.profile_picture_data_url = patch.profilePictureDataUrl
+
+    const res = await axios.put<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`, payload)
+    notifyStudentsChanged()
+    return withEligibilityDefaults(fromApiRow(res.data.student))
+  } catch (e) {
+    const db = await openSpmsDb()
+    const existing = await db.get('students', id)
+    if (!existing) throw new Error('Student not found')
+    const updated: Student = { ...existing, ...patch, updatedAt: nowIso() }
+    await db.put('students', updated)
+    notifyStudentsChanged()
+    return withEligibilityDefaults(updated)
+  }
 }
 
 export async function deleteStudent(id: string): Promise<void> {
-  const db = await openSpmsDb()
-  await db.delete('students', id)
-  notifyStudentsChanged()
+  try {
+    await axios.delete(`/api/students/${encodeURIComponent(id)}`)
+    notifyStudentsChanged()
+    return
+  } catch {
+    const db = await openSpmsDb()
+    await db.delete('students', id)
+    notifyStudentsChanged()
+  }
 }
 
 export async function seedIfEmpty(): Promise<void> {
