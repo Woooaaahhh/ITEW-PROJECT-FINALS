@@ -1,6 +1,49 @@
 import { nowIso, openSpmsDb, type Student } from './spmsDb'
+import axios from 'axios'
 
 export type { Student } from './spmsDb'
+
+type ApiStudentRow = {
+  student_id: number
+  first_name: string
+  last_name: string
+  year_level?: string | null
+  section?: string | null
+  email?: string | null
+}
+
+function fromApiRow(row: ApiStudentRow): Student {
+  const ts = nowIso()
+  return {
+    id: String(row.student_id),
+    firstName: row.first_name ?? '',
+    middleName: '',
+    lastName: row.last_name ?? '',
+    birthdate: '',
+    gender: 'Male',
+    address: '',
+    email: row.email ?? '',
+    contactNumber: '',
+    yearLevel: row.year_level ?? '',
+    section: row.section ?? '',
+    profilePictureDataUrl: null,
+    sportsAffiliations: [],
+    createdAt: ts,
+    updatedAt: ts,
+    medicalClearanceStatus: 'pending',
+    medicalClearanceUpdatedAt: null,
+    medicalClearanceNotes: null,
+    medicalHeight: null,
+    medicalWeight: null,
+    medicalBloodPressure: null,
+    medicalCondition: null,
+    medicalPhysicianName: null,
+    medicalExamDate: null,
+    medicalFormDetails: null,
+    medicalDocumentDataUrl: null,
+    medicalSubmittedAt: null,
+  }
+}
 
 function notifyStudentsChanged() {
   if (typeof window === 'undefined') return
@@ -153,11 +196,19 @@ async function runSeededWork(): Promise<void> {
 }
 
 export async function listStudents(): Promise<Student[]> {
-  const db = await openSpmsDb()
-  const all = await db.getAll('students')
-  return all
-    .map(withEligibilityDefaults)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  // Prefer backend API (MongoDB) so admin/faculty views show the true shared dataset.
+  // Fallback to local IndexedDB for offline mode or student-role routes.
+  try {
+    const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
+    const all = (res.data.students ?? []).map(fromApiRow)
+    return all.map(withEligibilityDefaults).sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
+  } catch {
+    const db = await openSpmsDb()
+    const all = await db.getAll('students')
+    return all
+      .map(withEligibilityDefaults)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }
 }
 
 export async function getStudent(id: string): Promise<Student | undefined> {

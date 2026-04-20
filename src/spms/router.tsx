@@ -36,7 +36,7 @@ const dashboardHandle: PageMeta = {
 }
 
 const registrarHandle: PageMeta = {
-  title: 'Registrar Dashboard',
+  title: 'Admin Dashboard',
   subtitle: 'Student profile management',
   showSearch: true,
 }
@@ -171,7 +171,7 @@ export const spmsRouter = createBrowserRouter([
     children: [
       { path: '/', element: <RedirectToRoleDashboard />, handle: dashboardHandle },
       {
-        path: '/registrar',
+        path: '/admin',
         element: (
           <RoleProtectedRoute allowedRoles={['admin']}>
             <RegistrarDashboard />
@@ -180,7 +180,7 @@ export const spmsRouter = createBrowserRouter([
         handle: registrarHandle,
       },
       {
-        path: '/registrar/records',
+        path: '/admin/records',
         element: (
           <RoleProtectedRoute allowedRoles={['admin']}>
             <RegistrarRecordsPage />
@@ -188,6 +188,8 @@ export const spmsRouter = createBrowserRouter([
         ),
         handle: registrarRecordsHandle,
       },
+      { path: '/registrar', element: <Navigate to="/admin" replace /> },
+      { path: '/registrar/records', element: <Navigate to="/admin/records" replace /> },
       {
         path: '/faculty',
         element: (

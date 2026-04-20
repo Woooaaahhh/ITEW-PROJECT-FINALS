@@ -270,9 +270,54 @@ app.get('/api/users', authMiddleware, requireAdmin, async (_req, res) => {
   return res.json({ users: rows })
 })
 
+app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
+  const db = await getDb()
+  const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true'
+
+  const pipeline = [
+    { $lookup: { from: 'users', localField: 'user_id', foreignField: 'user_id', as: 'user' } },
+    { $unwind: '$user' },
+    { $match: { 'user.role': 'student', ...(includeInactive ? {} : { 'user.active': 1 }) } },
+    { $sort: { 'user.created_at': -1 } },
+    {
+      $group: {
+        _id: '$student_id',
+        student_id: { $first: '$student_id' },
+        user_id: { $first: '$user_id' },
+        first_name: { $first: '$first_name' },
+        last_name: { $first: '$last_name' },
+        year_level: { $first: '$year_level' },
+        section: { $first: '$section' },
+        email: { $first: '$user.email' },
+        active: { $first: '$user.active' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        student_id: 1,
+        user_id: 1,
+        first_name: 1,
+        last_name: 1,
+        year_level: 1,
+        section: 1,
+        email: '$user.email',
+        active: '$user.active',
+      },
+    },
+    { $sort: { last_name: 1, first_name: 1, student_id: 1 } },
+  ]
+
+  const students = await db.collection('students').aggregate(pipeline).toArray()
+  return res.json({ students })
+})
+
 app.post('/api/create-user', authMiddleware, requireAdmin, async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  if (!parsed.success) {
+    const first = parsed.error.issues?.[0]
+    return res.status(400).json({ message: first?.message || 'Invalid input' })
+  }
 
   const { email, password, role } = parsed.data
   const faculty_type = role === 'faculty' ? (parsed.data.faculty_type ?? null) : null

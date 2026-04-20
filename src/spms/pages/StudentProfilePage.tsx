@@ -271,7 +271,7 @@ export function StudentProfilePage() {
               ) : isStudentViewer ? (
                 <span className="small spms-muted">View only</span>
               ) : (
-                <span className="small spms-muted">Registrar maintains details</span>
+                <span className="small spms-muted">Admin maintains details</span>
               )}
             </div>
             <div className="card-body">

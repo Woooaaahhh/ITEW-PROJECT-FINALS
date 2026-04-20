@@ -132,7 +132,7 @@ export function LoginPage() {
 
             <div className="mt-4 pt-3 border-top text-center">
               <p className="spms-muted small mb-0">
-                Demo: registrar@spms.edu / reg123 · faculty@spms.edu / faculty123
+                Demo Admin: admin@spms.edu / admin123 · faculty@spms.edu / faculty123
               </p>
             </div>
           </div>

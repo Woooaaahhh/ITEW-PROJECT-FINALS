@@ -46,7 +46,7 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
       </div>
 
       <nav className="spms-nav nav flex-column">
-        <NavLink className={navClass} to={role === 'admin' ? '/registrar' : role === 'faculty' ? '/faculty' : '/student'} end>
+        <NavLink className={navClass} to={role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student'} end>
           <i className="bi bi-grid-1x2" /> Dashboard
         </NavLink>
         {isStudent && (
@@ -95,7 +95,7 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
               </>
             )}
             {role === 'admin' && (
-              <NavLink className={navClass} to="/registrar/records">
+              <NavLink className={navClass} to="/admin/records">
                 <i className="bi bi-clipboard-check" /> Behavior records
               </NavLink>
             )}

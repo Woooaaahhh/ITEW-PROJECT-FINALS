@@ -41,7 +41,7 @@ export function MedicalModulePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [actingId, setActingId] = useState<string | null>(null)
 
-  /** Registrar: view-only modal */
+  /** Admin: view-only modal */
   const [viewRecordId, setViewRecordId] = useState<string | null>(null)
   /** Student role (shared class login): create/edit clearance for whichever row is chosen */
   const [studentFormOpen, setStudentFormOpen] = useState(false)
@@ -232,7 +232,7 @@ export function MedicalModulePage() {
               ? 'Students create and update their own medical information. Open View submission to see vitals and documents, then Approve or Reject.'
               : isAdmin
                 ? 'View clearance status for all students. Students enter data; faculty approves or rejects.'
-                : 'Everyone the registrar added under Student List appears here (same browser profile). Use Create / edit clearance on a row to enter or update that student’s record (shared class login). Open View to see their profile. Faculty approves or rejects afterward.'}
+                : 'Everyone the admin added under Student List appears here (same browser profile). Use Create / edit clearance on a row to enter or update that student’s record (shared class login). Open View to see their profile. Faculty approves or rejects afterward.'}
           </p>
 
           {isStudent && !myStudentId ? (

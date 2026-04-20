@@ -11,13 +11,13 @@ type Crumb = {
 function dashboardPathForRole(role: string | undefined) {
   if (role === 'faculty') return '/faculty'
   if (role === 'student') return '/student'
-  return '/registrar'
+  return '/admin'
 }
 
 function buildCrumbs(pathname: string, role: string | undefined): Crumb[] {
   const dashboardPath = dashboardPathForRole(role)
 
-  if (pathname === '/registrar' || pathname === '/faculty' || pathname === '/student' || pathname === '/') {
+  if (pathname === '/admin' || pathname === '/faculty' || pathname === '/student' || pathname === '/') {
     return [{ label: 'Dashboard', icon: 'bi bi-grid-1x2' }]
   }
 

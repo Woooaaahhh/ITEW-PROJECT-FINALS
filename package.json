@@ -7,11 +7,16 @@
     "dev": "vite",
     "dev:api": "node api/index.js",
     "dev:all": "concurrently -k \"npm:dev:api\" \"npm:dev\"",
+    "seed:sqlite": "node seed.js",
+    "seed:mongo": "node seed-mongo.js",
+    "cleanup:mongo": "node cleanup-mongo-duplicates.js",
+    "set:admin": "node set-admin-credentials.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.2",
     "bootstrap": "^5.3.8",

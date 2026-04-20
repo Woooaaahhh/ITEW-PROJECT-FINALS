@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import avatarUrl from '../../assets/react.svg'
 import axios from 'axios'
-import { createStudent, seedIfEmpty } from '../db/students'
 
 const apiPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
 
@@ -88,20 +87,6 @@ export function AddStudentPage() {
       } finally {
         if (!alive) return
         setSectionsLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        await seedIfEmpty()
-      } catch {
-        if (!alive) return
       }
     })()
     return () => {
@@ -209,20 +194,12 @@ export function AddStudentPage() {
                     },
                   })
 
-                  const student = await createStudent({
-                    profilePictureDataUrl: fileDataUrl,
-                    firstName: fn,
-                    middleName: form.middleName.trim() || null,
-                    lastName: ln,
-                    birthdate: form.birthdate || null,
-                    gender: form.gender || null,
-                    address: form.address.trim() || null,
-                    email: emailVal || null,
-                    contactNumber: form.contactNumber.trim() || null,
-                    yearLevel,
-                    section: sectionVal,
-                  })
-                  navigate(`/students/${student.id}`)
+                  try {
+                    window.dispatchEvent(new CustomEvent('spms-students-changed'))
+                  } catch {
+                    /* ignore */
+                  }
+                  navigate('/students')
                 } catch (err) {
                   if (axios.isAxiosError(err)) {
                     const status = err.response?.status
@@ -564,7 +541,7 @@ export function AddStudentPage() {
                       <i className="bi bi-check2-circle me-1" /> {saving ? 'Saving...' : 'Save Student'}
                     </button>
                   </div>
-                  <div className="spms-muted small mt-2">Students are saved to MongoDB and mirrored in this browser&apos;s IndexedDB.</div>
+                  <div className="spms-muted small mt-2">Students are saved directly to MongoDB and shown in Student List.</div>
                 </div>
               </div>
             </form>

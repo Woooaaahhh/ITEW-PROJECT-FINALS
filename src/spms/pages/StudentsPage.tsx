@@ -1,16 +1,23 @@
   /** Client-side routing (React Router): student list links via <Link> (no full page reload). */
-  import { useEffect, useMemo, useState } from 'react'
-  import { Link } from 'react-router-dom'
+  import { useCallback, useEffect, useMemo, useState } from 'react'
+  import axios from 'axios'
   import avatarUrl from '../../assets/react.svg'
   import { useAuth } from '../auth/AuthContext'
   import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
-  import { deleteStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
+  import type { Student } from '../db/students'
 
   const yearOptions = ['1st', '2nd', '3rd', '4th']
-  const sectionOptions = ['BSIT-2A', 'BSBA-1B', 'BSED-3C', 'BSIT-4A']
 
   function normalize(s: string) {
     return s.toLowerCase().trim()
+  }
+
+  function normalizeYear(value: string) {
+    return normalize(value).replace(/\s*year$/, '')
+  }
+
+  function normalizeSection(value: string) {
+    return normalize(value).replace(/[^a-z0-9]/g, '')
   }
 
   function fullName(s: Student) {
@@ -18,14 +25,64 @@
     return parts.replace(/\s+/g, ' ').trim()
   }
 
+  type ApiStudentRow = {
+    student_id: number
+    user_id: number
+    first_name: string
+    last_name: string
+    year_level?: string | null
+    section?: string | null
+    email?: string | null
+    active?: number
+  }
+
+  function fromApiRow(row: ApiStudentRow): Student {
+    return {
+      id: String(row.student_id),
+      firstName: row.first_name ?? '',
+      middleName: '',
+      lastName: row.last_name ?? '',
+      birthdate: '',
+      gender: 'Male',
+      address: '',
+      email: row.email ?? '',
+      contactNumber: '',
+      yearLevel: row.year_level ?? '',
+      section: row.section ?? '',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      medicalClearanceStatus: 'pending',
+      medicalClearanceUpdatedAt: null,
+      medicalClearanceNotes: null,
+      medicalHeight: null,
+      medicalWeight: null,
+      medicalBloodPressure: null,
+      medicalCondition: null,
+      medicalPhysicianName: null,
+      medicalExamDate: null,
+      medicalFormDetails: null,
+      medicalDocumentDataUrl: null,
+      medicalSubmittedAt: null,
+    }
+  }
+
   function matches(student: Student, q: string, year: string, section: string) {
-    const hitQ =
-      !q ||
-      normalize(fullName(student)).includes(q) ||
-      normalize(student.email ?? '').includes(q) ||
-      normalize(student.id).includes(q)
-    const hitYear = !year || normalize(student.yearLevel ?? '') === year
-    const hitSection = !section || normalize(student.section ?? '') === section
+    const searchable = [
+      fullName(student),
+      student.email ?? '',
+      student.id,
+      student.yearLevel ?? '',
+      student.section ?? '',
+    ]
+      .map((v) => normalize(v))
+      .join(' ')
+
+    const tokens = q.split(/\s+/).filter(Boolean)
+    const hitQ = tokens.length === 0 || tokens.every((token) => searchable.includes(token))
+    const hitYear = !year || normalizeYear(student.yearLevel ?? '') === normalizeYear(year)
+    const hitSection = !section || normalizeSection(student.section ?? '') === normalizeSection(section)
     return hitQ && hitYear && hitSection
   }
 
@@ -37,6 +94,7 @@
     const [section, setSection] = useState('')
     const [students, setStudents] = useState<Student[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [recordsRev, setRecordsRev] = useState(0)
     const canEdit = user?.role === 'admin'
     const canDelete = user?.role === 'admin'
@@ -46,26 +104,54 @@
     const y = useMemo(() => normalize(year), [year])
     const s = useMemo(() => normalize(section), [section])
 
-    useEffect(() => {
-      let alive = true
-      ;(async () => {
-        setLoading(true)
-        await seedIfEmpty()
-        const all = await listStudents()
-        if (!alive) return
+    const sectionOptions = useMemo(() => {
+      const uniq = Array.from(new Set(students.map((st) => (st.section ?? '').trim()).filter(Boolean)))
+      return uniq.sort((a, b) => a.localeCompare(b))
+    }, [students])
+
+    const loadStudents = useCallback(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
+        const all = (res.data.students ?? []).map(fromApiRow)
         setStudents(all)
+      } catch (e: unknown) {
+        let msg = 'Failed to load students.'
+        if (axios.isAxiosError(e)) {
+          if (!e.response) {
+            msg = 'Cannot reach API server. Make sure backend is running.'
+          } else {
+            msg = (e.response.data as { message?: string } | undefined)?.message || msg
+          }
+        }
+        setError(msg)
+      } finally {
         setLoading(false)
-      })()
-      return () => {
-        alive = false
       }
     }, [])
 
     useEffect(() => {
+      void loadStudents()
+    }, [loadStudents])
+
+    useEffect(() => {
       const onRecords = () => setRecordsRev((n) => n + 1)
+      const onStudentsChanged = () => {
+        void loadStudents()
+      }
+      const onFocus = () => {
+        void loadStudents()
+      }
       window.addEventListener('spms-student-records-changed', onRecords)
-      return () => window.removeEventListener('spms-student-records-changed', onRecords)
-    }, [])
+      window.addEventListener('spms-students-changed', onStudentsChanged)
+      window.addEventListener('focus', onFocus)
+      return () => {
+        window.removeEventListener('spms-student-records-changed', onRecords)
+        window.removeEventListener('spms-students-changed', onStudentsChanged)
+        window.removeEventListener('focus', onFocus)
+      }
+    }, [loadStudents])
 
     const behaviorCounts = useMemo(() => (showBehaviorCounts ? getBehaviorCountIndex() : {}), [showBehaviorCounts, recordsRev])
 
@@ -144,6 +230,16 @@
                   </td>
                 </tr>
               ) : null}
+              {!loading && error ? (
+                <tr>
+                  <td className="ps-3 py-4" colSpan={showBehaviorCounts ? 7 : 5}>
+                    <div className="text-danger mb-2">{error}</div>
+                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => void loadStudents()}>
+                      Retry
+                    </button>
+                  </td>
+                </tr>
+              ) : null}
               {filtered.map((st) => (
                 <tr key={st.id}>
                   <td className="ps-3">
@@ -174,35 +270,16 @@
                   ) : null}
                   <td className="text-end pe-3">
                     <div className="btn-group">
-                      <Link className="btn btn-sm btn-outline-primary" to={`/students/${st.id}`} aria-label="View Profile">
+                      <span className="btn btn-sm btn-outline-primary disabled" aria-label="View Profile">
                         <i className="bi bi-eye" />
-                      </Link>
-                      {canEdit && (
-                        <Link className="btn btn-sm btn-outline-secondary" to={`/students/${st.id}/edit`} aria-label="Edit">
-                          <i className="bi bi-pencil" />
-                        </Link>
-                      )}
-                      {canDelete && (
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          type="button"
-                          aria-label="Delete"
-                          onClick={async () => {
-                            const ok = confirm(`Delete ${fullName(st)}?`)
-                            if (!ok) return
-                            await deleteStudent(st.id)
-                            const all = await listStudents()
-                            setStudents(all)
-                          }}
-                        >
-                          <i className="bi bi-trash" />
-                        </button>
-                      )}
+                      </span>
+                      {canEdit && <span className="btn btn-sm btn-outline-secondary disabled"><i className="bi bi-pencil" /></span>}
+                      {canDelete && <span className="btn btn-sm btn-outline-danger disabled"><i className="bi bi-trash" /></span>}
                     </div>
                   </td>
                 </tr>
               ))}
-              {!loading && filtered.length === 0 ? (
+              {!loading && !error && filtered.length === 0 ? (
                 <tr>
                   <td className="ps-3 py-4" colSpan={showBehaviorCounts ? 7 : 5}>
                     <div className="spms-muted">No students matched your filters.</div>

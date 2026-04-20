@@ -10,7 +10,7 @@ export type AuthUser = {
 }
 
 export const ROLES: Record<UserRole, string> = {
-  admin: 'Registrar',
+  admin: 'Admin',
   faculty: 'Faculty',
   student: 'Student',
 }

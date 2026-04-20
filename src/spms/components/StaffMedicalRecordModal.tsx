@@ -7,7 +7,7 @@ type StaffMedicalRecordModalProps = {
   studentId: string
   studentName: string
   mode: 'staff' | 'readonly'
-  /** Overrides default “Registrar · view only” badge when mode is readonly */
+  /** Overrides default “Admin · view only” badge when mode is readonly */
   readOnlyBadgeLabel?: string
   onAfterSave?: () => void
 }
@@ -65,7 +65,7 @@ export function StaffMedicalRecordModal({
                   </p>
                   {isReadOnly ? (
                     <span className="badge rounded-pill bg-secondary-subtle text-secondary border mt-2">
-                      {readOnlyBadgeLabel ?? 'Registrar · view only'}
+                      {readOnlyBadgeLabel ?? 'Admin · view only'}
                     </span>
                   ) : (
                     <span className="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle mt-2">

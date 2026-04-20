@@ -14,6 +14,8 @@ type UserRow = {
 
 type FacultyTypePreset = 'Teacher' | 'Coach' | 'Adviser' | 'Other'
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
+
 export function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,9 +38,10 @@ export function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return users
-    return users.filter((u) => {
-      const roleLabel = u.role === 'admin' ? 'registrar' : u.role
+    const facultyOnly = users.filter((u) => u.role === 'faculty')
+    if (!q) return facultyOnly
+    return facultyOnly.filter((u) => {
+      const roleLabel = u.role === 'admin' ? 'admin' : u.role
       return (
         u.username.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
@@ -80,6 +83,11 @@ export function UsersPage() {
 
     if (!facultyType) {
       setError('Please select a faculty type.')
+      return
+    }
+
+    if (!passwordRegex.test(password)) {
+      setError('Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number. Allowed symbols: @$!%*?&')
       return
     }
 
@@ -235,7 +243,7 @@ export function UsersPage() {
                         <tr key={u.user_id}>
                           <td className="ps-4 py-3 fw-semibold">{u.username}</td>
                           <td className="py-3">{u.email}</td>
-                          <td className="py-3 text-capitalize">{u.role === 'admin' ? 'Registrar' : u.role}</td>
+                          <td className="py-3 text-capitalize">{u.role === 'admin' ? 'Admin' : u.role}</td>
                           <td className="py-3">{u.role === 'faculty' ? (u.faculty_type ?? '—') : '—'}</td>
                           <td className="py-3">
                             <span className={`badge ${u.active ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 'bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25'}`}>

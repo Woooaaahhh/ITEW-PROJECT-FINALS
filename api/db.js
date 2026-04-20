@@ -21,8 +21,10 @@ async function getNextSequence(db, name) {
 }
 
 async function ensureIndexes(db) {
+  await db.collection('users').createIndex({ user_id: 1 }, { unique: true })
   await db.collection('users').createIndex({ username: 1 }, { unique: true })
   await db.collection('users').createIndex({ email: 1 }, { unique: true })
+  await db.collection('students').createIndex({ student_id: 1 }, { unique: true })
   await db.collection('students').createIndex({ user_id: 1 }, { unique: true })
   await db.collection('sections').createIndex({ year_level: 1, section: 1 }, { unique: true })
   await db.collection('skills').createIndex({ name: 1, category: 1 }, { unique: true })

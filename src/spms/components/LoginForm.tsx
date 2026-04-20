@@ -45,7 +45,7 @@ export function LoginForm({ onSubmit, onError, showInlineError = true }: LoginFo
           <input
             type="text"
             className="form-control"
-            placeholder="e.g. registrar@spms.edu"
+            placeholder="e.g. admin@spms.edu"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             autoComplete="username"

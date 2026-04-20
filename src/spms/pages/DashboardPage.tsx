@@ -67,7 +67,7 @@ export function DashboardPage() {
           <div className="spms-card card">
             <div className="card-body">
               <p className="spms-muted small mb-0">
-                Your account is not linked to a student record. Contact the registrar.
+                Your account is not linked to a student record. Contact the admin.
               </p>
             </div>
           </div>

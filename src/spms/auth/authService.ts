@@ -85,7 +85,7 @@ export function logout(): void {
 export function getAllowedPaths(role: UserRole): string[] {
   switch (role) {
     case 'admin':
-      return ['/', '/registrar', '/students', '/reports', '/medical', '/instruction']
+      return ['/', '/admin', '/students', '/reports', '/medical', '/instruction']
     case 'faculty':
       return [
         '/',
@@ -111,7 +111,7 @@ export function getAllowedPaths(role: UserRole): string[] {
 export function getDefaultDashboardPath(role: UserRole): string {
   switch (role) {
     case 'admin':
-      return '/registrar'
+      return '/admin'
     case 'faculty':
       return '/faculty'
     case 'student':
@@ -135,7 +135,7 @@ export function canAccessPath(
   }
 
   if (role === 'faculty') {
-    if (path === '/registrar' || path === '/student' || path.startsWith('/students/new'))
+    if (path === '/admin' || path === '/student' || path.startsWith('/students/new'))
       return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/sections')) return false
@@ -160,8 +160,8 @@ export function canAccessPath(
     // Rubric note for /reports:
     // - student: blocked here
     // - faculty: allowed (see faculty branch above)
-    // - admin/registrar: allowed by admin branch
-    if (path === '/registrar' || path === '/faculty' || path === '/students' || path === '/reports') return false
+    // - admin: allowed by admin branch
+    if (path === '/admin' || path === '/faculty' || path === '/students' || path === '/reports') return false
     if (path.startsWith('/students/new')) return false
     if (path.startsWith('/students/') && path.endsWith('/edit')) return false
     if (path.startsWith('/students/')) {
