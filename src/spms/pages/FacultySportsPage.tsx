@@ -132,9 +132,11 @@ export function FacultySportsPage() {
     const collectMatches = (st: Student): string[] => {
       const ids = Array.isArray(st.sportsAffiliations) ? st.sportsAffiliations : []
       const names: string[] = []
+      
       for (const sid of ids) {
         const sp = activeSportsById.get(sid)
         if (!sp) continue
+        
         if (qualSportId === OTHER_SPORT_VALUE) {
           if (qualOtherNorm && normalize(sp.name).includes(qualOtherNorm)) names.push(sp.name)
         } else if (qualSportId) {

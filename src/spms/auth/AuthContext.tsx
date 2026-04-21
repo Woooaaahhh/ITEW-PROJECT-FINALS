@@ -1,7 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { AuthUser } from './types'
-import { getStoredAuth, setStoredAuth, clearStoredAuth, login as doLogin, logout as doLogout } from './authService'
+import {
+  getStoredAuth,
+  setStoredAuth,
+  clearStoredAuth,
+  login as doLogin,
+  logout as doLogout,
+} from './authService'
 import axios from 'axios'
 
 type AuthContextValue = {
@@ -27,6 +33,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user?.token) axios.defaults.headers.common.Authorization = `Bearer ${user.token}`
     else delete axios.defaults.headers.common.Authorization
   }, [user])
+
+  // After refresh, stored auth may still have a wrong `studentId` from an old client bug; sync from API.
+  useEffect(() => {
+    if (!user?.token || user.role !== 'student') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await axios.get<{ user: { student_id?: number | null } }>('/api/user')
+        const sid = res.data.user?.student_id
+        if (cancelled || sid == null || Number.isNaN(Number(sid))) return
+        const nextId = String(sid)
+        setUserState((prev) => {
+          if (!prev?.token || prev.role !== 'student') return prev
+          if (prev.studentId === nextId) return prev
+          const updated = { ...prev, studentId: nextId }
+          setStoredAuth(updated)
+          return updated
+        })
+      } catch {
+        /* invalid session or offline */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.token, user?.role])
 
   const setUser = useCallback((u: AuthUser | null) => {
     setUserState(u)

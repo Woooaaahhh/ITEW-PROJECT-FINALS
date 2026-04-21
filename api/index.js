@@ -9,7 +9,7 @@ const PORT = Number(process.env.API_PORT || 3001)
 
 const app = express()
 app.use(cors({ origin: true, credentials: true }))
-app.use(express.json({ limit: '100kb' }))
+app.use(express.json({ limit: '8mb' }))
 
 function isDuplicateKeyError(error) {
   return error && typeof error === 'object' && error.code === 11000
@@ -61,6 +61,12 @@ function pickUser(row) {
   }
 }
 
+async function studentIdForUserId(db, userId) {
+  if (userId == null || Number.isNaN(Number(userId))) return null
+  const st = await db.collection('students').findOne({ user_id: Number(userId) }, { projection: { student_id: 1 } })
+  return st?.student_id ?? null
+}
+
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || ''
   const [, token] = header.split(' ')
@@ -83,6 +89,33 @@ function requireStaff(req, res, next) {
     return res.status(403).json({ message: 'Forbidden' })
   }
   return next()
+}
+
+function requireStaffOrStudent(req, res, next) {
+  if (req.auth?.role === 'admin' || req.auth?.role === 'faculty' || req.auth?.role === 'student') {
+    return next()
+  }
+  return res.status(403).json({ message: 'Forbidden' })
+}
+
+/** Students may read only their own profile by numeric student_id; staff unchanged. */
+async function requireStaffOrOwnStudentProfile(req, res, next) {
+  const role = req.auth?.role
+  if (role === 'admin' || role === 'faculty') return next()
+  if (role !== 'student') return res.status(403).json({ message: 'Forbidden' })
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid student id' })
+  try {
+    const db = await getDb()
+    const userId = Number(req.auth?.sub)
+    const st = await db.collection('students').findOne({ user_id: userId }, { projection: { student_id: 1 } })
+    if (!st || Number(st.student_id) !== id) {
+      return res.status(403).json({ message: 'Forbidden' })
+    }
+    return next()
+  } catch {
+    return res.status(500).json({ message: 'Server error' })
+  }
 }
 
 function requireInstructionEditor(req, res, next) {
@@ -131,7 +164,13 @@ app.post('/api/login', async (req, res) => {
   if (!ok) return res.status(401).json({ message: 'Invalid username/email or password' })
 
   const token = signToken({ sub: String(row.user_id), role: row.role })
-  return res.json({ token, user: pickUser(row) })
+  const base = pickUser(row)
+  let userOut = base
+  if (row.role === 'student') {
+    const student_id = await studentIdForUserId(db, row.user_id)
+    userOut = { ...base, student_id }
+  }
+  return res.json({ token, user: userOut })
 })
 
 app.get('/api/user', authMiddleware, async (req, res) => {
@@ -146,7 +185,12 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 
   if (!row) return res.status(404).json({ message: 'User not found' })
   if ((row.active ?? 1) !== 1) return res.status(403).json({ message: 'Account is deactivated' })
-  return res.json({ user: row })
+  let userPayload = row
+  if (row.role === 'student') {
+    const student_id = await studentIdForUserId(db, userId)
+    userPayload = { ...row, student_id }
+  }
+  return res.json({ user: userPayload })
 })
 
 // Public read: Add Student and other forms need sections even when the API was started
@@ -285,11 +329,29 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
         student_id: { $first: '$student_id' },
         user_id: { $first: '$user_id' },
         first_name: { $first: '$first_name' },
+        middle_name: { $first: '$middle_name' },
         last_name: { $first: '$last_name' },
+        birthdate: { $first: '$birthdate' },
+        gender: { $first: '$gender' },
+        address: { $first: '$address' },
+        contact_number: { $first: '$contact_number' },
         year_level: { $first: '$year_level' },
         section: { $first: '$section' },
+        profile_picture_data_url: { $first: '$profile_picture_data_url' },
         email: { $first: '$user.email' },
         active: { $first: '$user.active' },
+        medical_clearance_status: { $first: '$medical_clearance_status' },
+        medical_clearance_updated_at: { $first: '$medical_clearance_updated_at' },
+        medical_clearance_notes: { $first: '$medical_clearance_notes' },
+        medical_height: { $first: '$medical_height' },
+        medical_weight: { $first: '$medical_weight' },
+        medical_blood_pressure: { $first: '$medical_blood_pressure' },
+        medical_condition: { $first: '$medical_condition' },
+        medical_physician_name: { $first: '$medical_physician_name' },
+        medical_exam_date: { $first: '$medical_exam_date' },
+        medical_form_details: { $first: '$medical_form_details' },
+        medical_document_data_url: { $first: '$medical_document_data_url' },
+        medical_submitted_at: { $first: '$medical_submitted_at' },
       },
     },
     {
@@ -298,11 +360,29 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
         student_id: 1,
         user_id: 1,
         first_name: 1,
+        middle_name: 1,
         last_name: 1,
+        birthdate: 1,
+        gender: 1,
+        address: 1,
+        contact_number: 1,
         year_level: 1,
         section: 1,
-        email: '$user.email',
-        active: '$user.active',
+        profile_picture_data_url: 1,
+        email: 1,
+        active: 1,
+        medical_clearance_status: 1,
+        medical_clearance_updated_at: 1,
+        medical_clearance_notes: 1,
+        medical_height: 1,
+        medical_weight: 1,
+        medical_blood_pressure: 1,
+        medical_condition: 1,
+        medical_physician_name: 1,
+        medical_exam_date: 1,
+        medical_form_details: 1,
+        medical_document_data_url: 1,
+        medical_submitted_at: 1,
       },
     },
     { $sort: { last_name: 1, first_name: 1, student_id: 1 } },
@@ -311,6 +391,8 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
   const students = await db.collection('students').aggregate(pipeline).toArray()
   return res.json({ students })
 })
+
+const medicalClearanceStatusZ = z.enum(['pending', 'approved', 'rejected'])
 
 const updateStudentSchema = z.object({
   first_name: z.string().trim().min(1).max(80).optional(),
@@ -324,9 +406,60 @@ const updateStudentSchema = z.object({
   year_level: z.string().trim().max(20).nullable().optional(),
   section: z.string().trim().max(40).nullable().optional(),
   profile_picture_data_url: z.string().trim().max(200000).nullable().optional(),
+  medical_clearance_status: medicalClearanceStatusZ.optional(),
+  medical_clearance_updated_at: z.string().trim().max(80).nullable().optional(),
+  medical_clearance_notes: z.string().trim().max(8000).nullable().optional(),
+  medical_height: z.string().trim().max(40).nullable().optional(),
+  medical_weight: z.string().trim().max(40).nullable().optional(),
+  medical_blood_pressure: z.string().trim().max(40).nullable().optional(),
+  medical_condition: z.string().trim().max(4000).nullable().optional(),
+  medical_physician_name: z.string().trim().max(120).nullable().optional(),
+  medical_exam_date: z.string().trim().max(40).nullable().optional(),
+  medical_form_details: z.string().trim().max(12000).nullable().optional(),
+  medical_document_data_url: z.string().trim().max(4000000).nullable().optional(),
+  medical_submitted_at: z.string().trim().max(80).nullable().optional(),
 })
 
-app.get('/api/students/:id', authMiddleware, requireStaff, async (req, res) => {
+const PROFILE_UPDATE_KEYS = new Set([
+  'first_name',
+  'middle_name',
+  'last_name',
+  'birthdate',
+  'gender',
+  'address',
+  'school_email',
+  'contact_number',
+  'year_level',
+  'section',
+  'profile_picture_data_url',
+])
+
+const MEDICAL_UPDATE_KEYS = new Set([
+  'medical_clearance_status',
+  'medical_clearance_updated_at',
+  'medical_clearance_notes',
+  'medical_height',
+  'medical_weight',
+  'medical_blood_pressure',
+  'medical_condition',
+  'medical_physician_name',
+  'medical_exam_date',
+  'medical_form_details',
+  'medical_document_data_url',
+  'medical_submitted_at',
+])
+
+function pickDefinedKeys(obj, allowedKeys) {
+  const out = {}
+  for (const key of allowedKeys) {
+    if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined) {
+      out[key] = obj[key]
+    }
+  }
+  return out
+}
+
+app.get('/api/students/:id', authMiddleware, requireStaffOrOwnStudentProfile, async (req, res) => {
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ message: 'Invalid student id' })
   const db = await getDb()
@@ -344,7 +477,7 @@ app.get('/api/students/:id', authMiddleware, requireStaff, async (req, res) => {
   })
 })
 
-app.put('/api/students/:id', authMiddleware, requireAdmin, async (req, res) => {
+app.put('/api/students/:id', authMiddleware, async (req, res) => {
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ message: 'Invalid student id' })
   const parsed = updateStudentSchema.safeParse(req.body)
@@ -353,12 +486,43 @@ app.put('/api/students/:id', authMiddleware, requireAdmin, async (req, res) => {
     return res.status(400).json({ message: first?.message || 'Invalid input' })
   }
 
-  const fields = { ...parsed.data }
-  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
-
   const db = await getDb()
   const existing = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0, student_id: 1, user_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Student not found' })
+
+  const role = req.auth?.role
+  const userId = Number(req.auth?.sub)
+  const data = parsed.data
+
+  let fields = {}
+  if (role === 'admin') {
+    fields = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+  } else if (role === 'faculty') {
+    fields = pickDefinedKeys(data, MEDICAL_UPDATE_KEYS)
+  } else if (role === 'student') {
+    // `user_id` may be stored as a string in some DBs; compare numerically.
+    if (Number(existing.user_id) !== Number(userId)) {
+      return res.status(403).json({ message: 'Forbidden' })
+    }
+    fields = pickDefinedKeys(data, MEDICAL_UPDATE_KEYS)
+    if (
+      Object.prototype.hasOwnProperty.call(fields, 'medical_clearance_status') &&
+      fields.medical_clearance_status !== 'pending'
+    ) {
+      return res.status(403).json({ message: 'Students may only submit medical records for review (pending).' })
+    }
+  } else {
+    return res.status(403).json({ message: 'Forbidden' })
+  }
+
+  if (role === 'faculty' || role === 'student') {
+    const leakedProfile = Object.keys(data).filter((k) => PROFILE_UPDATE_KEYS.has(k) && data[k] !== undefined)
+    if (leakedProfile.length > 0) {
+      return res.status(403).json({ message: 'Forbidden' })
+    }
+  }
+
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
 
   await db.collection('students').updateOne({ student_id: id }, { $set: fields })
   const updated = await db.collection('students').findOne({ student_id: id }, { projection: { _id: 0 } })
@@ -563,7 +727,7 @@ const updateSkillSchema = z.object({
   is_active: z.number().int().min(0).max(1).optional(),
 })
 
-app.get('/api/skills', authMiddleware, requireStaff, async (req, res) => {
+app.get('/api/skills', authMiddleware, requireStaffOrStudent, async (req, res) => {
   const db = await getDb()
   const activeOnly = String(req.query.activeOnly || '').toLowerCase() === 'true'
   const query = activeOnly ? { is_active: 1 } : {}
