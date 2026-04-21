@@ -29,7 +29,14 @@ export function clearStoredAuth(): void {
 
 type ApiLoginResponse = {
   token: string
-  user: { user_id: number; username: string; email: string; role: UserRole }
+  user: {
+    user_id: number
+    username: string
+    email: string
+    role: UserRole
+    /** Present for student accounts; links to Mongo `students.student_id`. */
+    student_id?: number | null
+  }
 }
 
 /** Real login via backend API. */
@@ -58,13 +65,19 @@ export async function login(identifier: string, password: string): Promise<AuthU
 
   let studentId: string | undefined
   if (role === 'student') {
-    try {
-      const { listStudents } = await import('../db/students')
-      const list = await listStudents()
-      const found = list.find((s) => (s.email ?? '').toLowerCase() === (email ?? '').toLowerCase())
-      studentId = found?.id ?? list[0]?.id
-    } catch {
-      studentId = undefined
+    const fromApi = data.user.student_id
+    if (fromApi != null && !Number.isNaN(Number(fromApi))) {
+      studentId = String(fromApi)
+    } else {
+      // Legacy: email match only if the client can read the roster (normally staff-only).
+      try {
+        const { listStudents } = await import('../db/students')
+        const list = await listStudents()
+        const found = list.find((s) => (s.email ?? '').toLowerCase() === (email ?? '').toLowerCase())
+        studentId = found?.id
+      } catch {
+        studentId = undefined
+      }
     }
   }
 
@@ -102,7 +115,7 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/instruction',
       ]
     case 'student':
-      return ['/', '/student', '/student/medical', '/medical', '/instruction']
+      return ['/', '/student', '/student/medical', '/student/records', '/medical', '/instruction']
     default:
       return ['/']
   }
@@ -181,6 +194,7 @@ export function canAccessPath(
       path === '/' ||
       path === '/student' ||
       path === '/student/medical' ||
+      path === '/student/records' ||
       path === '/medical' ||
       path === '/instruction'
     )

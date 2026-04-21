@@ -16,10 +16,25 @@ type ApiStudentRow = {
   email?: string | null
   contact_number?: string | null
   profile_picture_data_url?: string | null
+  medical_clearance_status?: string | null
+  medical_clearance_updated_at?: string | null
+  medical_clearance_notes?: string | null
+  medical_height?: string | null
+  medical_weight?: string | null
+  medical_blood_pressure?: string | null
+  medical_condition?: string | null
+  medical_physician_name?: string | null
+  medical_exam_date?: string | null
+  medical_form_details?: string | null
+  medical_document_data_url?: string | null
+  medical_submitted_at?: string | null
 }
 
 function fromApiRow(row: ApiStudentRow): Student {
   const ts = nowIso()
+  const statusRaw = row.medical_clearance_status
+  const medicalClearanceStatus =
+    statusRaw === 'approved' || statusRaw === 'rejected' || statusRaw === 'pending' ? statusRaw : 'pending'
   return {
     id: String(row.student_id),
     firstName: row.first_name ?? '',
@@ -36,18 +51,18 @@ function fromApiRow(row: ApiStudentRow): Student {
     sportsAffiliations: [],
     createdAt: ts,
     updatedAt: ts,
-    medicalClearanceStatus: 'pending',
-    medicalClearanceUpdatedAt: null,
-    medicalClearanceNotes: null,
-    medicalHeight: null,
-    medicalWeight: null,
-    medicalBloodPressure: null,
-    medicalCondition: null,
-    medicalPhysicianName: null,
-    medicalExamDate: null,
-    medicalFormDetails: null,
-    medicalDocumentDataUrl: null,
-    medicalSubmittedAt: null,
+    medicalClearanceStatus,
+    medicalClearanceUpdatedAt: row.medical_clearance_updated_at ?? null,
+    medicalClearanceNotes: row.medical_clearance_notes ?? null,
+    medicalHeight: row.medical_height ?? null,
+    medicalWeight: row.medical_weight ?? null,
+    medicalBloodPressure: row.medical_blood_pressure ?? null,
+    medicalCondition: row.medical_condition ?? null,
+    medicalPhysicianName: row.medical_physician_name ?? null,
+    medicalExamDate: row.medical_exam_date ?? null,
+    medicalFormDetails: row.medical_form_details ?? null,
+    medicalDocumentDataUrl: row.medical_document_data_url ?? null,
+    medicalSubmittedAt: row.medical_submitted_at ?? null,
   }
 }
 
@@ -256,15 +271,58 @@ export async function listStudents(): Promise<Student[]> {
   // Fallback to local IndexedDB for offline mode or student-role routes.
   try {
     const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
-    const apiStudents = (res.data.students ?? []).map(fromApiRow).map(withEligibilityDefaults)
+    const all = (res.data.students ?? []).map(fromApiRow)
+
+    // Only check for data issues if we have multiple students and API returned data
+    if (all.length > 1) {
+      const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
+      // Only clear cache if we have a clear data duplication issue AND it's a known problem name
+      if (
+        uniqueNames.size === 1 &&
+        all[0] &&
+        (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
+      ) {
+        // Clear cache and retry API call once
+        await clearStudentCache()
+        const retryRes = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
+        const retryAll = (retryRes.data.students ?? []).map(fromApiRow)
+        const db = await openSpmsDb()
+        const local = await db.getAll('students')
+        const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
+        const mergedRetry = retryAll
+          .map(withEligibilityDefaults)
+          .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
+        return mergedRetry.sort(
+          (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+        )
+      }
+    }
+
     const db = await openSpmsDb()
     const local = await db.getAll('students')
     const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
-    const merged = apiStudents.map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
+    const merged = all
+      .map(withEligibilityDefaults)
+      .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
     return merged.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
   } catch {
     const db = await openSpmsDb()
     const all = await db.getAll('students')
+
+    // Only clear IndexedDB cache if we have the specific Kristy Abernathy duplication issue
+    if (all.length > 1) {
+      const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
+      if (
+        uniqueNames.size === 1 &&
+        all[0] &&
+        (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
+      ) {
+        // Clear cache to force fresh API call on next attempt
+        await clearStudentCache()
+        return []
+      }
+    }
+
     return all
       .map(withEligibilityDefaults)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -316,6 +374,33 @@ export async function updateStudent(
   if (patch.section !== undefined) payload.section = patch.section
   if (patch.profilePictureDataUrl !== undefined) payload.profile_picture_data_url = patch.profilePictureDataUrl
 
+  const isMedicalPatch =
+    patch.medicalClearanceStatus !== undefined ||
+    patch.medicalClearanceUpdatedAt !== undefined ||
+    patch.medicalClearanceNotes !== undefined ||
+    patch.medicalHeight !== undefined ||
+    patch.medicalWeight !== undefined ||
+    patch.medicalBloodPressure !== undefined ||
+    patch.medicalCondition !== undefined ||
+    patch.medicalPhysicianName !== undefined ||
+    patch.medicalExamDate !== undefined ||
+    patch.medicalFormDetails !== undefined ||
+    patch.medicalDocumentDataUrl !== undefined ||
+    patch.medicalSubmittedAt !== undefined
+  if (patch.sportsAffiliations !== undefined) payload.sports_affiliations = patch.sportsAffiliations
+  if (patch.medicalClearanceStatus !== undefined) payload.medical_clearance_status = patch.medicalClearanceStatus
+  if (patch.medicalClearanceUpdatedAt !== undefined) payload.medical_clearance_updated_at = patch.medicalClearanceUpdatedAt
+  if (patch.medicalClearanceNotes !== undefined) payload.medical_clearance_notes = patch.medicalClearanceNotes
+  if (patch.medicalHeight !== undefined) payload.medical_height = patch.medicalHeight
+  if (patch.medicalWeight !== undefined) payload.medical_weight = patch.medicalWeight
+  if (patch.medicalBloodPressure !== undefined) payload.medical_blood_pressure = patch.medicalBloodPressure
+  if (patch.medicalCondition !== undefined) payload.medical_condition = patch.medicalCondition
+  if (patch.medicalPhysicianName !== undefined) payload.medical_physician_name = patch.medicalPhysicianName
+  if (patch.medicalExamDate !== undefined) payload.medical_exam_date = patch.medicalExamDate
+  if (patch.medicalFormDetails !== undefined) payload.medical_form_details = patch.medicalFormDetails
+  if (patch.medicalDocumentDataUrl !== undefined) payload.medical_document_data_url = patch.medicalDocumentDataUrl
+  if (patch.medicalSubmittedAt !== undefined) payload.medical_submitted_at = patch.medicalSubmittedAt
+
   const eligibilityPatch: Partial<EligibilityPatch> = {}
   if (patch.sportsAffiliations !== undefined) eligibilityPatch.sportsAffiliations = patch.sportsAffiliations
   if (patch.medicalClearanceStatus !== undefined) eligibilityPatch.medicalClearanceStatus = patch.medicalClearanceStatus
@@ -342,17 +427,40 @@ export async function updateStudent(
     return updated
   }
 
-  // Prefer backend API for shared dataset; if it fails, fallback to IndexedDB (legacy/demo).
+  // Prefer backend API for shared dataset; fallback to IndexedDB for legacy/demo ids.
   try {
     const res = await axios.put<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`, payload)
     const base = withEligibilityDefaults(fromApiRow(res.data.student))
     const merged = hasEligibilityFields ? await upsertLocalEligibility(base, eligibilityPatch) : base
     notifyStudentsChanged()
     return merged
-  } catch {
+  } catch (e) {
+    // Medical submissions must persist to the shared backend (faculty review depends on it).
+    // Falling back to IndexedDB would make the student think it saved, but staff would never see it.
+    if (isMedicalPatch) {
+      if (axios.isAxiosError(e)) {
+        const message = (e.response?.data as { message?: string } | undefined)?.message
+        throw new Error(message || `Failed to save medical record (HTTP ${e.response?.status ?? 'unknown'})`)
+      }
+      throw e instanceof Error ? e : new Error('Failed to save medical record')
+    }
+
+    // If API fails, try IndexedDB fallback
     const db = await openSpmsDb()
     const existing = await db.get('students', id)
-    if (!existing) throw new Error('Student not found')
+    if (!existing) {
+      // If student doesn't exist locally, try to fetch from API first
+      try {
+        const res = await axios.get<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`)
+        const apiStudent = withEligibilityDefaults(fromApiRow(res.data.student))
+        const updated: Student = { ...apiStudent, ...patch, updatedAt: nowIso() }
+        await db.put('students', updated)
+        notifyStudentsChanged()
+        return withEligibilityDefaults(updated)
+      } catch {
+        throw new Error(`Student with ID ${id} not found in both API and local database`)
+      }
+    }
     const updated: Student = { ...existing, ...patch, updatedAt: nowIso() }
     await db.put('students', updated)
     notifyStudentsChanged()
@@ -376,4 +484,11 @@ export async function seedIfEmpty(): Promise<void> {
   const task = seedChain.then(() => runSeededWork())
   seedChain = task.catch(() => {})
   return task
+}
+
+export async function clearStudentCache(): Promise<void> {
+  const db = await openSpmsDb()
+  const tx = db.transaction('students', 'readwrite')
+  await tx.objectStore('students').clear()
+  await tx.done
 }

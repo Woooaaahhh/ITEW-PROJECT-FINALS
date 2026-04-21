@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { StaffMedicalRecordModal } from '../components/StaffMedicalRecordModal'
 import { StudentMedicalFormModal } from '../components/StudentMedicalFormModal'
 import { nowIso } from '../db/spmsDb'
-import { updateStudent, listStudents, seedIfEmpty, type Student } from '../db/students'
+import { updateStudent, listStudents, getStudent, seedIfEmpty, type Student } from '../db/students'
 import {
   getMedicalListStatus,
   medicalListStatusBadgeClass,
@@ -22,6 +22,14 @@ function courseYearLabel(s: Student) {
   const y = s.yearLevel ?? '—'
   const sec = s.section ?? '—'
   return `${y} · ${sec}`
+}
+
+function medicalSortRank(s: Student) {
+  const status = getMedicalListStatus(s)
+  if (status === 'pending' && (s.medicalSubmittedAt ?? '').trim()) return 0
+  if (status === 'rejected') return 1
+  if (status === 'approved') return 2
+  return 3
 }
 
 type StatusFilter = 'all' | MedicalListStatus
@@ -50,26 +58,34 @@ export function MedicalModulePage() {
   const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
 
-  const refetch = useCallback(async () => {
+  const loadRoster = useCallback(async (): Promise<Student[]> => {
     await seedIfEmpty()
-    const all = await listStudents()
-    setStudents(all)
-  }, [])
+    if (isStudent) {
+      if (!myStudentId) return []
+      const one = await getStudent(myStudentId)
+      return one ? [one] : []
+    }
+    return listStudents()
+  }, [isStudent, myStudentId])
+
+  const refetch = useCallback(async () => {
+    const next = await loadRoster()
+    setStudents(next)
+  }, [loadRoster])
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
-      await seedIfEmpty()
-      const all = await listStudents()
+      const next = await loadRoster()
       if (!alive) return
-      setStudents(all)
+      setStudents(next)
       setLoading(false)
     })()
     return () => {
       alive = false
     }
-  }, [])
+  }, [loadRoster])
 
   useEffect(() => {
     const onRosterChanged = () => {
@@ -88,18 +104,40 @@ export function MedicalModulePage() {
     }
   }, [refetch])
 
-  /** All roles (including students) see every student in the roster; search/status filters apply on top. */
+  /** Students see only their own record; faculty/admin see all students; search/status filters apply on top. */
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = students
+    let list = [...students]
+    
+    // Filter by user role: students only see their own record
+    if (isStudent && myStudentId) {
+      list = list.filter((s) => s.id === myStudentId)
+    }
+    
     if (q) {
       list = list.filter((s) => fullName(s).toLowerCase().includes(q) || (s.email ?? '').toLowerCase().includes(q))
     }
     if (statusFilter !== 'all') {
       list = list.filter((s) => getMedicalListStatus(s) === statusFilter)
     }
+
+    if (!isStudent) {
+      list.sort((a, b) => {
+        const rankDiff = medicalSortRank(a) - medicalSortRank(b)
+        if (rankDiff !== 0) return rankDiff
+
+        const submittedDiff = (b.medicalSubmittedAt ?? '').localeCompare(a.medicalSubmittedAt ?? '')
+        if (submittedDiff !== 0) return submittedDiff
+
+        const updatedDiff = (b.medicalClearanceUpdatedAt ?? '').localeCompare(a.medicalClearanceUpdatedAt ?? '')
+        if (updatedDiff !== 0) return updatedDiff
+
+        return fullName(a).localeCompare(fullName(b))
+      })
+    }
+
     return list
-  }, [students, search, statusFilter])
+  }, [students, search, statusFilter, isStudent, myStudentId])
 
   const viewRecordStudent = viewRecordId ? students.find((s) => s.id === viewRecordId) ?? null : null
   const viewRecordName = viewRecordStudent ? fullName(viewRecordStudent) : ''
@@ -232,12 +270,12 @@ export function MedicalModulePage() {
               ? 'Students create and update their own medical information. Open View submission to see vitals and documents, then Approve or Reject.'
               : isAdmin
                 ? 'View clearance status for all students. Students enter data; faculty approves or rejects.'
-                : 'Everyone the admin added under Student List appears here (same browser profile). Use Create / edit clearance on a row to enter or update that student’s record (shared class login). Open View to see their profile. Faculty approves or rejects afterward.'}
+                : 'View and manage your own medical clearance record. Submit your medical information for faculty approval.'}
           </p>
 
           {isStudent && !myStudentId ? (
-            <div className="alert alert-info py-2 small mb-3 mb-md-0">
-              This is a shared student account: choose the correct row for each person when submitting medical clearance.
+            <div className="alert alert-warning py-2 small mb-3 mb-md-0">
+              Your login is not linked to a student profile yet, so medical clearance cannot be loaded. Contact an administrator.
             </div>
           ) : null}
 
@@ -299,7 +337,13 @@ export function MedicalModulePage() {
             {loading ? (
               <div className="p-4 spms-muted small">Loading students…</div>
             ) : filtered.length === 0 ? (
-              <div className="p-4 spms-muted small">No students match your filters.</div>
+              <div className="p-4 spms-muted small">
+                {isStudent && !myStudentId
+                  ? 'Your account is not linked to a student record. Contact an administrator.'
+                  : isStudent && students.length === 0
+                    ? 'Could not load your student record. Try refreshing the page or logging in again.'
+                    : 'No students match your filters.'}
+              </div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0 spms-table">
