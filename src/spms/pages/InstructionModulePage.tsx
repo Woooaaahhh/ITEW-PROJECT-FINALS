@@ -7,6 +7,8 @@ type SyllabusRow = {
   title: string
   description?: string
   course_code?: string
+  faculty_user_id?: number | null
+  faculty_name?: string | null
   is_archived?: number
 }
 
@@ -21,23 +23,38 @@ type LessonRow = {
   is_archived?: number
 }
 
+type FacultyRow = {
+  user_id: number
+  username: string
+  faculty_type?: string | null
+}
+
 export function InstructionModulePage() {
   const { user } = useAuth()
   const canEdit = user?.role === 'admin' || user?.role === 'faculty'
+  const canAssignCourseFaculty = user?.role === 'admin'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syllabi, setSyllabi] = useState<SyllabusRow[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [lessons, setLessons] = useState<LessonRow[]>([])
+  const [faculty, setFaculty] = useState<FacultyRow[]>([])
+  const [loadingFaculty, setLoadingFaculty] = useState(false)
+  const [selectedFacultyUserId, setSelectedFacultyUserId] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const [newSyllabus, setNewSyllabus] = useState({ title: '', course_code: '', description: '' })
+  const [newSyllabus, setNewSyllabus] = useState({ title: '', course_code: '', description: '', faculty_user_id: '' })
   const [newLesson, setNewLesson] = useState({ title: '', curriculum_unit: '', week_number: '', content: '' })
 
   const selectedSyllabus = useMemo(
     () => syllabi.find((row) => row.syllabus_id === selectedId) ?? null,
     [syllabi, selectedId],
   )
+  const facultyNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const f of faculty) map.set(f.user_id, f.username)
+    return map
+  }, [faculty])
 
   const fetchSyllabi = async () => {
     const res = await axios.get<{ syllabi: SyllabusRow[] }>('/api/instruction/syllabi')
@@ -69,12 +86,37 @@ export function InstructionModulePage() {
   }, [])
 
   useEffect(() => {
+    if (!canAssignCourseFaculty) return
+    const fetchFaculty = async () => {
+      setLoadingFaculty(true)
+      try {
+        const res = await axios.get<{ faculty: FacultyRow[] }>('/api/scheduling/faculty')
+        setFaculty(res.data.faculty ?? [])
+      } catch {
+        setError('Failed to load faculty list.')
+      } finally {
+        setLoadingFaculty(false)
+      }
+    }
+    void fetchFaculty()
+  }, [canAssignCourseFaculty])
+
+  useEffect(() => {
     if (!selectedId) {
       setLessons([])
+      setSelectedFacultyUserId('')
       return
     }
     void fetchLessons(selectedId)
   }, [selectedId])
+
+  useEffect(() => {
+    if (!selectedSyllabus) {
+      setSelectedFacultyUserId('')
+      return
+    }
+    setSelectedFacultyUserId(selectedSyllabus.faculty_user_id ? String(selectedSyllabus.faculty_user_id) : '')
+  }, [selectedSyllabus?.syllabus_id, selectedSyllabus?.faculty_user_id])
 
   const createSyllabus = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,8 +132,11 @@ export function InstructionModulePage() {
         title: newSyllabus.title.trim(),
         course_code: newSyllabus.course_code.trim(),
         description: newSyllabus.description.trim(),
+        faculty_user_id: canAssignCourseFaculty
+          ? (newSyllabus.faculty_user_id ? Number(newSyllabus.faculty_user_id) : null)
+          : undefined,
       })
-      setNewSyllabus({ title: '', course_code: '', description: '' })
+      setNewSyllabus({ title: '', course_code: '', description: '', faculty_user_id: '' })
       await fetchSyllabi()
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
@@ -204,6 +249,23 @@ export function InstructionModulePage() {
     }
   }
 
+  const saveAssignedFaculty = async () => {
+    if (!canAssignCourseFaculty || !selectedSyllabus) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      await axios.put(`/api/instruction/syllabi/${selectedSyllabus.syllabus_id}`, {
+        faculty_user_id: selectedFacultyUserId ? Number(selectedFacultyUserId) : null,
+      })
+      await fetchSyllabi()
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+      setError(msg || 'Failed to assign faculty.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const archiveLesson = async (lessonId: number) => {
     if (!canEdit || !selectedId) return
     const ok = window.confirm('Archive this lesson?')
@@ -259,6 +321,16 @@ export function InstructionModulePage() {
                 <input className="form-control" placeholder="Syllabus title" value={newSyllabus.title} onChange={(e) => setNewSyllabus((v) => ({ ...v, title: e.target.value }))} disabled={submitting} />
                 <input className="form-control" placeholder="Course code (optional)" value={newSyllabus.course_code} onChange={(e) => setNewSyllabus((v) => ({ ...v, course_code: e.target.value }))} disabled={submitting} />
                 <textarea className="form-control" rows={3} placeholder="Description (optional)" value={newSyllabus.description} onChange={(e) => setNewSyllabus((v) => ({ ...v, description: e.target.value }))} disabled={submitting} />
+                {canAssignCourseFaculty ? (
+                  <select className="form-select" value={newSyllabus.faculty_user_id} onChange={(e) => setNewSyllabus((v) => ({ ...v, faculty_user_id: e.target.value }))} disabled={submitting || loadingFaculty}>
+                    <option value="">Assigned faculty (optional)</option>
+                    {faculty.map((f) => (
+                      <option key={f.user_id} value={String(f.user_id)}>
+                        {f.username} ({f.faculty_type ?? 'Faculty'})
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
                 <button type="submit" className="btn btn-primary btn-sm rounded-3" disabled={submitting}>Create syllabus</button>
               </form>
             ) : null}
@@ -275,6 +347,7 @@ export function InstructionModulePage() {
                 >
                   <div className="fw-semibold">{row.title}</div>
                   <div className="small opacity-75">{row.course_code || 'No course code'}</div>
+                  <div className="small opacity-75">Faculty: {row.faculty_name || (row.faculty_user_id ? (facultyNameById.get(row.faculty_user_id) ?? `#${row.faculty_user_id}`) : 'Unassigned')}</div>
                 </button>
               ))}
             </div>
@@ -286,6 +359,24 @@ export function InstructionModulePage() {
                 <button type="button" className="btn btn-outline-warning btn-sm rounded-3" onClick={() => void archiveSyllabus()} disabled={submitting}>
                   Archive selected syllabus
                 </button>
+              </div>
+            ) : null}
+            {canAssignCourseFaculty && selectedId ? (
+              <div className="mt-3 border rounded-3 p-2">
+                <div className="small fw-semibold mb-2">Assign faculty</div>
+                <div className="d-flex gap-2">
+                  <select className="form-select form-select-sm" value={selectedFacultyUserId} onChange={(e) => setSelectedFacultyUserId(e.target.value)} disabled={submitting || loadingFaculty}>
+                    <option value="">Unassigned</option>
+                    {faculty.map((f) => (
+                      <option key={f.user_id} value={String(f.user_id)}>
+                        {f.username} ({f.faculty_type ?? 'Faculty'})
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn btn-sm btn-primary rounded-3" onClick={() => void saveAssignedFaculty()} disabled={submitting}>
+                    Save
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
