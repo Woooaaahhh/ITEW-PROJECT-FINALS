@@ -885,7 +885,7 @@ export function SchedulingPage() {
                     disabled={!selectedLab}
                     onClick={() => setAssignFacultyModalOpen(true)}
                   >
-                    Assign Faculty (Modal)
+                    Assign Faculty 
                   </button>
                   <div className="spms-muted small align-self-center">
                     {loadingFaculty ? 'Loading faculty list...' : `Faculty available: ${faculty.length}`}

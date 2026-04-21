@@ -36,10 +36,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (err: unknown) => {
         if (axios.isAxiosError(err)) {
           const status = err.response?.status
-          const message = (err.response?.data as { message?: string } | undefined)?.message
           const url = String(err.config?.url || '')
-          const isAuthCall = url.includes('/api/login') || url.includes('/api/user')
-          if (!isAuthCall && status === 401 && (message === 'Invalid token' || message === 'Missing token')) {
+          const isLoginCall = url.includes('/api/login')
+          const isApiCall = url.includes('/api/')
+          // Any 401 from protected API calls means the session is no longer valid.
+          if (!isLoginCall && isApiCall && status === 401) {
             doLogout()
             setUserState(null)
             delete axios.defaults.headers.common.Authorization
