@@ -57,6 +57,9 @@ export function MedicalModulePage() {
   /** Faculty: reject confirmation */
   const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
+  /** Faculty: approve confirmation + success feedback */
+  const [approveTarget, setApproveTarget] = useState<{ id: string; name: string } | null>(null)
+  const [approveSuccessName, setApproveSuccessName] = useState<string | null>(null)
 
   const loadRoster = useCallback(async (): Promise<Student[]> => {
     await seedIfEmpty()
@@ -157,15 +160,20 @@ export function MedicalModulePage() {
     setMedicalFormStudentId(null)
   }
 
-  const handleApprove = async (s: Student) => {
-    const nm = fullName(s)
-    if (!window.confirm(`Approve medical clearance for ${nm}?`)) return
-    setActingId(s.id)
+  const openApprove = (s: Student) => {
+    setApproveTarget({ id: s.id, name: fullName(s) })
+  }
+
+  const confirmApprove = async () => {
+    if (!approveTarget) return
+    setActingId(approveTarget.id)
     try {
-      await updateStudent(s.id, {
+      await updateStudent(approveTarget.id, {
         medicalClearanceStatus: 'approved',
         medicalClearanceUpdatedAt: nowIso(),
       })
+      setApproveSuccessName(approveTarget.name)
+      setApproveTarget(null)
       await refetch()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Approve failed')
@@ -260,6 +268,83 @@ export function MedicalModulePage() {
             </div>
           </div>
           <div className="modal-backdrop fade show" onClick={() => setRejectTarget(null)} />
+        </>
+      ) : null}
+
+      {approveTarget ? (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0 rounded-3 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header border-0">
+                  <h5 className="modal-title fw-bold">Approve medical clearance</h5>
+                  <button type="button" className="btn-close" onClick={() => setApproveTarget(null)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-0">
+                  <div className="d-flex align-items-center gap-3 rounded-3 border bg-success bg-opacity-10 border-success border-opacity-25 p-3 mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success flex-shrink-0"
+                      style={{ width: 40, height: 40 }}
+                    >
+                      <i className="bi bi-emoji-smile fs-5" />
+                    </div>
+                    <p className="mb-0 small text-body">
+                      Approve medical clearance for <span className="fw-semibold">{approveTarget.name}</span>?
+                    </p>
+                  </div>
+                  <p className="spms-muted small mb-0">The student will become eligible once all try-out requirements are met.</p>
+                </div>
+                <div className="modal-footer border-0">
+                  <button type="button" className="btn btn-outline-secondary rounded-3" onClick={() => setApproveTarget(null)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success rounded-3"
+                    disabled={actingId === approveTarget.id}
+                    onClick={() => void confirmApprove()}
+                  >
+                    {actingId === approveTarget.id ? 'Approving…' : 'Yes, approve'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setApproveTarget(null)} />
+        </>
+      ) : null}
+
+      {approveSuccessName ? (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0 rounded-3 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header border-0">
+                  <h5 className="modal-title fw-bold text-success">Approval successful</h5>
+                  <button type="button" className="btn-close" onClick={() => setApproveSuccessName(null)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-0">
+                  <div className="d-flex align-items-center gap-3 rounded-3 border bg-success bg-opacity-10 border-success border-opacity-25 p-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success flex-shrink-0"
+                      style={{ width: 48, height: 48 }}
+                    >
+                      <i className="bi bi-emoji-smile-fill fs-4" />
+                    </div>
+                    <p className="mb-0">
+                      Approved medical clearance for <span className="fw-semibold">{approveSuccessName}</span>.
+                    </p>
+                  </div>
+                </div>
+                <div className="modal-footer border-0">
+                  <button type="button" className="btn btn-success rounded-3" onClick={() => setApproveSuccessName(null)}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setApproveSuccessName(null)} />
         </>
       ) : null}
 
@@ -390,7 +475,7 @@ export function MedicalModulePage() {
                                         type="button"
                                         className="btn btn-sm btn-success rounded-3"
                                         disabled={busy}
-                                        onClick={() => void handleApprove(s)}
+                                        onClick={() => openApprove(s)}
                                       >
                                         <i className="bi bi-check2-circle me-1" />
                                         Approve clearance

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
-import { addAchievement, addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
+import { addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
 
 type ViolationPayload = {
   violation_type: string
@@ -11,27 +11,12 @@ type ViolationPayload = {
   status: string
 }
 
-type AchievementPayload = {
-  title: string
-  description: string
-  date: string
-  category: string
-}
-
 type ApiViolation = {
   id: string
   violation_type: string
   description: string
   date: string
   status: string
-}
-
-type ApiAchievement = {
-  id: string
-  title: string
-  description: string
-  date: string
-  category: string
 }
 
 function fullName(s: Student) {
@@ -45,8 +30,7 @@ export function FacultyViolationsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
 
   const [violations, setViolations] = useState<ApiViolation[]>([])
-  const [achievements, setAchievements] = useState<ApiAchievement[]>([])
-  const [submitting, setSubmitting] = useState<null | 'violation' | 'achievement'>(null)
+  const [submitting, setSubmitting] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -55,13 +39,6 @@ export function FacultyViolationsPage() {
     description: '',
     date: '',
     status: 'Pending',
-  })
-
-  const [achievementForm, setAchievementForm] = useState<AchievementPayload>({
-    title: '',
-    description: '',
-    date: '',
-    category: '',
   })
 
   useEffect(() => {
@@ -84,7 +61,6 @@ export function FacultyViolationsPage() {
   useEffect(() => {
     if (!selectedStudentId) {
       setViolations([])
-      setAchievements([])
       return
     }
     const r = getStudentRecords(selectedStudentId)
@@ -97,25 +73,11 @@ export function FacultyViolationsPage() {
         status: v.status,
       })),
     )
-    setAchievements(
-      r.achievements.map((a) => ({
-        id: a.id,
-        title: a.title,
-        description: a.description,
-        date: a.date,
-        category: a.category ?? '',
-      })),
-    )
   }, [selectedStudentId])
 
   const sortedViolations = useMemo(
     () => [...violations].sort((a, b) => (a.date < b.date ? 1 : -1)),
     [violations],
-  )
-
-  const sortedAchievements = useMemo(
-    () => [...achievements].sort((a, b) => (a.date < b.date ? 1 : -1)),
-    [achievements],
   )
 
   const handleViolationSubmit = async (e: React.FormEvent) => {
@@ -127,7 +89,7 @@ export function FacultyViolationsPage() {
       return
     }
     try {
-      setSubmitting('violation')
+      setSubmitting(true)
       const created = addViolation(selectedStudentId, { ...violationForm })
       const newItem: ApiViolation = {
         id: created.id,
@@ -147,40 +109,7 @@ export function FacultyViolationsPage() {
     } catch {
       setError('Unable to save violation. Please check the form and try again.')
     } finally {
-      setSubmitting(null)
-    }
-  }
-
-  const handleAchievementSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    if (!selectedStudentId) {
-      setError('Please select a student first.')
-      return
-    }
-    try {
-      setSubmitting('achievement')
-      const created = addAchievement(selectedStudentId, { ...achievementForm })
-      const newItem: ApiAchievement = {
-        id: created.id,
-        title: created.title,
-        description: created.description,
-        date: created.date,
-        category: created.category ?? '',
-      }
-      setAchievements((prev) => [newItem, ...prev])
-      setAchievementForm({
-        title: '',
-        description: '',
-        date: '',
-        category: '',
-      })
-      setSuccess('Achievement saved successfully.')
-    } catch {
-      setError('Unable to save achievement. Please check the form and try again.')
-    } finally {
-      setSubmitting(null)
+      setSubmitting(false)
     }
   }
 
@@ -195,7 +124,7 @@ export function FacultyViolationsPage() {
             <div>
               <h5 className="fw-bold mb-1">Student Conduct &amp; Participation</h5>
               <p className="spms-muted small mb-0">
-                Record violations and non-academic achievements for a selected student.
+                Record violations for a selected student.
               </p>
             </div>
             <div className="d-flex gap-2">
@@ -264,7 +193,7 @@ export function FacultyViolationsPage() {
                 value={violationForm.violation_type}
                 onChange={(e) => setViolationForm((prev) => ({ ...prev, violation_type: e.target.value }))}
                 required
-                disabled={submitting !== null}
+                disabled={submitting}
               />
             </div>
             <div className="col-md-3">
@@ -275,7 +204,7 @@ export function FacultyViolationsPage() {
                 value={violationForm.date}
                 onChange={(e) => setViolationForm((prev) => ({ ...prev, date: e.target.value }))}
                 required
-                disabled={submitting !== null}
+                disabled={submitting}
               />
             </div>
             <div className="col-md-3">
@@ -284,7 +213,7 @@ export function FacultyViolationsPage() {
                 className="form-select form-select-sm rounded-3"
                 value={violationForm.status}
                 onChange={(e) => setViolationForm((prev) => ({ ...prev, status: e.target.value }))}
-                disabled={submitting !== null}
+                disabled={submitting}
               >
                 <option value="Pending">Pending</option>
                 <option value="Resolved">Resolved</option>
@@ -299,73 +228,16 @@ export function FacultyViolationsPage() {
                 value={violationForm.description}
                 onChange={(e) => setViolationForm((prev) => ({ ...prev, description: e.target.value }))}
                 required
-                disabled={submitting !== null}
+                disabled={submitting}
               />
             </div>
             <div className="col-12 d-flex justify-content-end">
               <button
                 type="submit"
                 className="btn btn-primary btn-sm rounded-3 px-4"
-                disabled={submitting !== null}
+                disabled={submitting}
               >
-                {submitting === 'violation' ? 'Saving…' : 'Save violation'}
-              </button>
-            </div>
-          </form>
-
-          <hr className="my-4" />
-
-          <h6 className="fw-semibold mb-3">Record achievement</h6>
-          <form onSubmit={handleAchievementSubmit} className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label small fw-semibold">Achievement Title</label>
-              <input
-                type="text"
-                className="form-control form-control-sm rounded-3"
-                placeholder="e.g. Programming Contest Winner"
-                value={achievementForm.title}
-                onChange={(e) => setAchievementForm((prev) => ({ ...prev, title: e.target.value }))}
-                required
-                disabled={submitting !== null}
-              />
-            </div>
-            <div className="col-md-3">
-              <label className="form-label small fw-semibold">Date</label>
-              <input
-                type="date"
-                className="form-control form-control-sm rounded-3"
-                value={achievementForm.date}
-                onChange={(e) => setAchievementForm((prev) => ({ ...prev, date: e.target.value }))}
-                required
-                disabled={submitting !== null}
-              />
-            </div>
-            <div className="col-md-3">
-              <label className="form-label small fw-semibold">Category</label>
-              <input
-                type="text"
-                className="form-control form-control-sm rounded-3"
-                placeholder="e.g. Sports, Programming, Leadership"
-                value={achievementForm.category}
-                onChange={(e) => setAchievementForm((prev) => ({ ...prev, category: e.target.value }))}
-                disabled={submitting !== null}
-              />
-            </div>
-            <div className="col-12">
-              <label className="form-label small fw-semibold">Description</label>
-              <textarea
-                rows={3}
-                className="form-control form-control-sm rounded-3"
-                placeholder="Provide brief details of the achievement or recognition."
-                value={achievementForm.description}
-                onChange={(e) => setAchievementForm((prev) => ({ ...prev, description: e.target.value }))}
-                required
-                disabled={submitting !== null}
-              />
-            </div>
-            <div className="col-12 d-flex justify-content-end">
-              <button type="submit" className="btn btn-primary btn-sm rounded-3 px-4" disabled={submitting !== null}>
-                {submitting === 'achievement' ? 'Saving…' : 'Save achievement'}
+                {submitting ? 'Saving...' : 'Save violation'}
               </button>
             </div>
           </form>
@@ -373,7 +245,7 @@ export function FacultyViolationsPage() {
       </div>
 
       <div className="row g-3">
-        <div className="col-12 col-xl-6">
+        <div className="col-12">
           <div
             className="spms-card card border-0 overflow-hidden h-100"
             style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
@@ -422,60 +294,6 @@ export function FacultyViolationsPage() {
                           </td>
                           <td className="pe-4 py-3 text-end spms-muted small">
                             {new Date(v.date).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-xl-6">
-          <div
-            className="spms-card card border-0 overflow-hidden h-100"
-            style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}
-          >
-            <div className="card-header bg-transparent border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="fw-semibold mb-0">Non-Academic Achievements</h6>
-              <span className="spms-muted small">{sortedAchievements.length} record(s)</span>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0 spms-table">
-                  <thead>
-                    <tr className="spms-muted small">
-                      <th className="ps-4 py-3 fw-semibold">Title</th>
-                      <th className="py-3 fw-semibold">Description</th>
-                      <th className="py-3 fw-semibold">Category</th>
-                      <th className="pe-4 py-3 fw-semibold text-end">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedAchievements.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
-                          No achievements recorded.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedAchievements.map((a) => (
-                        <tr key={a.id}>
-                          <td className="ps-4 py-3">{a.title}</td>
-                          <td className="py-3">{a.description}</td>
-                          <td className="py-3">
-                            {a.category ? (
-                              <span className="badge rounded-pill bg-primary-subtle text-primary">
-                                {a.category}
-                              </span>
-                            ) : (
-                              <span className="spms-muted small">—</span>
-                            )}
-                          </td>
-                          <td className="pe-4 py-3 text-end spms-muted small">
-                            {new Date(a.date).toLocaleDateString()}
                           </td>
                         </tr>
                       ))

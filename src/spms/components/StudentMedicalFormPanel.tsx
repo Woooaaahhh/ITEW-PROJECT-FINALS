@@ -271,6 +271,20 @@ export function StudentMedicalFormPanel({
                 ) : null}
               </div>
             </div>
+            {mode === 'student' && status === 'rejected' ? (
+              <div className="alert alert-danger py-2 small mt-3 mb-0" role="alert">
+                <div className="fw-semibold mb-1">
+                  <i className="bi bi-exclamation-triangle-fill me-1" />
+                  Your medical clearance was rejected.
+                </div>
+                <div>Please review and update your medical information, then submit again for faculty review.</div>
+                {student?.medicalClearanceNotes?.trim() ? (
+                  <div className="mt-1">
+                    Faculty note: <span className="fw-semibold">{student.medicalClearanceNotes.trim()}</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
