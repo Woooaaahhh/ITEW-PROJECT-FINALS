@@ -199,8 +199,49 @@ app.get('/api/sections', async (_req, res) => {
   const db = await getDb()
   const rows = await db
     .collection('sections')
-    .find({}, { projection: { _id: 0 } })
-    .sort({ year_level: 1, section: 1 })
+    .aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          let: { facultyUserId: '$faculty_user_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ['$user_id', '$$facultyUserId'] },
+                    { $eq: [{ $toString: '$user_id' }, { $toString: '$$facultyUserId' }] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: { _id: 0, username: 1 },
+            },
+          ],
+          as: 'faculty_user',
+        },
+      },
+      {
+        $addFields: {
+          faculty_name: {
+            $let: {
+              vars: { faculty: { $arrayElemAt: ['$faculty_user', 0] } },
+              in: '$$faculty.username',
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          faculty_user: 0,
+        },
+      },
+      {
+        $sort: { year_level: 1, section: 1 },
+      },
+    ])
     .toArray()
   return res.json({ sections: rows })
 })
@@ -208,6 +249,13 @@ app.get('/api/sections', async (_req, res) => {
 const createSectionSchema = z.object({
   year_level: z.string().trim().min(1).max(20),
   section: z.string().trim().min(1).max(40),
+  faculty_user_id: z.number().int().positive().nullable().optional(),
+})
+
+const updateSectionSchema = z.object({
+  year_level: z.string().trim().min(1).max(20).optional(),
+  section: z.string().trim().min(1).max(40).optional(),
+  faculty_user_id: z.number().int().positive().nullable().optional(),
 })
 
 app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
@@ -216,11 +264,19 @@ app.post('/api/sections', authMiddleware, requireAdmin, async (req, res) => {
 
   const { year_level, section } = parsed.data
   const db = await getDb()
+  if (parsed.data.faculty_user_id != null) {
+    const faculty = await db.collection('users').findOne(
+      { user_id: parsed.data.faculty_user_id, role: 'faculty', active: 1 },
+      { projection: { _id: 0, user_id: 1 } },
+    )
+    if (!faculty) return res.status(400).json({ message: 'Invalid faculty user' })
+  }
   try {
     const created = {
       section_id: await nextSequence(db, 'sections'),
       year_level,
       section,
+      faculty_user_id: parsed.data.faculty_user_id ?? null,
       created_at: new Date(),
     }
     await db.collection('sections').insertOne(created)
@@ -237,22 +293,32 @@ app.put('/api/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ message: 'Invalid section id' })
 
-  const parsed = createSectionSchema.safeParse(req.body)
+  const parsed = updateSectionSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
 
   const db = await getDb()
   const existing = await db.collection('sections').findOne({ section_id: id }, { projection: { _id: 0, section_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Section not found' })
+  if (parsed.data.faculty_user_id != null) {
+    const faculty = await db.collection('users').findOne(
+      { user_id: parsed.data.faculty_user_id, role: 'faculty', active: 1 },
+      { projection: { _id: 0, user_id: 1 } },
+    )
+    if (!faculty) return res.status(400).json({ message: 'Invalid faculty user' })
+  }
+  const fields = {}
+  if (parsed.data.year_level !== undefined) fields.year_level = parsed.data.year_level
+  if (parsed.data.section !== undefined) fields.section = parsed.data.section
+  if (parsed.data.faculty_user_id !== undefined) fields.faculty_user_id = parsed.data.faculty_user_id
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
 
   try {
-    await db
-      .collection('sections')
-      .updateOne({ section_id: id }, { $set: { year_level: parsed.data.year_level, section: parsed.data.section } })
+    await db.collection('sections').updateOne({ section_id: id }, { $set: fields })
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       return res.status(409).json({ message: 'Section already exists for this year level' })
     }
-    return res.status(409).json({ message: 'Section already exists for this year level' })
+    return res.status(500).json({ message: 'Failed to update section' })
   }
 
   const updated = await db.collection('sections').findOne({ section_id: id }, { projection: { _id: 0 } })
@@ -863,12 +929,14 @@ const syllabusSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(4000).optional().default(''),
   course_code: z.string().trim().max(50).optional().default(''),
+  faculty_user_id: z.number().int().positive().nullable().optional(),
 })
 
 const syllabusUpdateSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(4000).optional(),
   course_code: z.string().trim().max(50).optional(),
+  faculty_user_id: z.number().int().positive().nullable().optional(),
   is_archived: z.number().int().min(0).max(1).optional(),
 })
 
@@ -929,8 +997,48 @@ app.get('/api/instruction/syllabi', authMiddleware, async (req, res) => {
   const query = includeArchived ? {} : { is_archived: { $ne: 1 } }
   const syllabi = await db
     .collection('syllabi')
-    .find(query, { projection: { _id: 0 } })
-    .sort({ created_at: -1 })
+    .aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'users',
+          let: { facultyUserId: '$faculty_user_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ['$user_id', '$$facultyUserId'] },
+                    { $eq: [{ $toString: '$user_id' }, { $toString: '$$facultyUserId' }] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: { _id: 0, username: 1 },
+            },
+          ],
+          as: 'faculty_user',
+        },
+      },
+      {
+        $addFields: {
+          faculty_name: {
+            $let: {
+              vars: { faculty: { $arrayElemAt: ['$faculty_user', 0] } },
+              in: '$$faculty.username',
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          faculty_user: 0,
+        },
+      },
+      { $sort: { created_at: -1 } },
+    ])
     .toArray()
   return res.json({ syllabi })
 })
@@ -939,11 +1047,22 @@ app.post('/api/instruction/syllabi', authMiddleware, requireInstructionEditor, a
   const parsed = syllabusSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
   const db = await getDb()
+  if (parsed.data.faculty_user_id !== undefined && req.auth?.role !== 'admin') {
+    return res.status(403).json({ message: 'Only admin can assign faculty to courses' })
+  }
+  if (parsed.data.faculty_user_id != null) {
+    const faculty = await db.collection('users').findOne(
+      { user_id: parsed.data.faculty_user_id, role: 'faculty', active: 1 },
+      { projection: { _id: 0, user_id: 1 } },
+    )
+    if (!faculty) return res.status(400).json({ message: 'Invalid faculty user' })
+  }
   const created = {
     syllabus_id: await nextSequence(db, 'syllabi'),
     title: parsed.data.title,
     description: parsed.data.description,
     course_code: parsed.data.course_code,
+    faculty_user_id: parsed.data.faculty_user_id ?? null,
     is_archived: 0,
     created_by: Number(req.auth?.sub) || null,
     created_at: new Date(),
@@ -958,16 +1077,27 @@ app.put('/api/instruction/syllabi/:id', authMiddleware, requireInstructionEditor
   if (!id) return res.status(400).json({ message: 'Invalid syllabus id' })
   const parsed = syllabusUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
 
   const fields = {}
   if (parsed.data.title !== undefined) fields.title = parsed.data.title
   if (parsed.data.description !== undefined) fields.description = parsed.data.description
   if (parsed.data.course_code !== undefined) fields.course_code = parsed.data.course_code
+  if (parsed.data.faculty_user_id !== undefined) {
+    if (req.auth?.role !== 'admin') return res.status(403).json({ message: 'Only admin can assign faculty to courses' })
+    if (parsed.data.faculty_user_id != null) {
+      const faculty = await db.collection('users').findOne(
+        { user_id: parsed.data.faculty_user_id, role: 'faculty', active: 1 },
+        { projection: { _id: 0, user_id: 1 } },
+      )
+      if (!faculty) return res.status(400).json({ message: 'Invalid faculty user' })
+    }
+    fields.faculty_user_id = parsed.data.faculty_user_id
+  }
   if (parsed.data.is_archived !== undefined) fields.is_archived = parsed.data.is_archived
   fields.updated_at = new Date()
   if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
 
-  const db = await getDb()
   const existing = await db.collection('syllabi').findOne({ syllabus_id: id }, { projection: { _id: 0, syllabus_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Syllabus not found' })
   await db.collection('syllabi').updateOne({ syllabus_id: id }, { $set: fields })

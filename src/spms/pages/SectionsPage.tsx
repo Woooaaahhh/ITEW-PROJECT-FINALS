@@ -6,27 +6,45 @@ export function SectionsPage() {
   )
 }
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 
 type SectionRow = {
   section_id: number
   year_level: string
   section: string
+  faculty_user_id?: number | null
+  faculty_name?: string | null
   created_at?: string | null
+}
+
+type FacultyRow = {
+  user_id: number
+  username: string
+  faculty_type?: string | null
 }
 
 function SectionsManager() {
   const [sections, setSections] = useState<SectionRow[]>([])
+  const [faculty, setFaculty] = useState<FacultyRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingFaculty, setLoadingFaculty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [editModal, setEditModal] = useState<null | SectionRow>(null)
   const [editYearLevel, setEditYearLevel] = useState<'1st' | '2nd' | '3rd' | '4th'>('1st')
   const [editSection, setEditSection] = useState('')
+  const [editFacultyUserId, setEditFacultyUserId] = useState('')
 
   const [yearLevel, setYearLevel] = useState<'1st' | '2nd' | '3rd' | '4th'>('1st')
   const [section, setSection] = useState('')
+  const [facultyUserId, setFacultyUserId] = useState('')
+
+  const facultyNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const f of faculty) map.set(f.user_id, f.username)
+    return map
+  }, [faculty])
 
   const fetchSections = async () => {
     setLoading(true)
@@ -47,6 +65,21 @@ function SectionsManager() {
     void fetchSections()
   }, [])
 
+  useEffect(() => {
+    const fetchFaculty = async () => {
+      setLoadingFaculty(true)
+      try {
+        const res = await axios.get<{ faculty: FacultyRow[] }>('/api/scheduling/faculty')
+        setFaculty(res.data.faculty ?? [])
+      } catch {
+        setError('Failed to load faculty list.')
+      } finally {
+        setLoadingFaculty(false)
+      }
+    }
+    void fetchFaculty()
+  }, [])
+
   const createSection = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -58,8 +91,13 @@ function SectionsManager() {
 
     setSubmitting(true)
     try {
-      await axios.post('/api/sections', { year_level: yearLevel, section: sec })
+      await axios.post('/api/sections', {
+        year_level: yearLevel,
+        section: sec,
+        faculty_user_id: facultyUserId ? Number(facultyUserId) : null,
+      })
       setSection('')
+      setFacultyUserId('')
       await fetchSections()
     } catch (e: unknown) {
       const msg =
@@ -75,11 +113,13 @@ function SectionsManager() {
     setEditModal(s)
     setEditYearLevel((s.year_level as typeof editYearLevel) ?? '1st')
     setEditSection(s.section)
+    setEditFacultyUserId(s.faculty_user_id ? String(s.faculty_user_id) : '')
   }
 
   const closeEdit = () => {
     setEditModal(null)
     setEditSection('')
+    setEditFacultyUserId('')
     setError(null)
   }
 
@@ -93,7 +133,21 @@ function SectionsManager() {
     }
     setSubmitting(true)
     try {
-      await axios.put(`/api/sections/${editModal.section_id}`, { year_level: editYearLevel, section: sec })
+      const payload: {
+        year_level?: string
+        section?: string
+        faculty_user_id?: number | null
+      } = {}
+      if (editYearLevel !== editModal.year_level) payload.year_level = editYearLevel
+      if (sec !== editModal.section) payload.section = sec
+      const currentFacultyId = editModal.faculty_user_id ?? null
+      const nextFacultyId = editFacultyUserId ? Number(editFacultyUserId) : null
+      if (nextFacultyId !== currentFacultyId) payload.faculty_user_id = nextFacultyId
+      if (Object.keys(payload).length === 0) {
+        closeEdit()
+        return
+      }
+      await axios.put(`/api/sections/${editModal.section_id}`, payload)
       closeEdit()
       await fetchSections()
     } catch (e: unknown) {
@@ -148,6 +202,17 @@ function SectionsManager() {
                       <label className="form-label small fw-semibold">Section</label>
                       <input className="form-control" value={editSection} onChange={(e) => setEditSection(e.target.value)} disabled={submitting} />
                     </div>
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Assigned Faculty</label>
+                      <select className="form-select" value={editFacultyUserId} onChange={(e) => setEditFacultyUserId(e.target.value)} disabled={submitting || loadingFaculty}>
+                        <option value="">Unassigned</option>
+                        {faculty.map((f) => (
+                          <option key={f.user_id} value={String(f.user_id)}>
+                            {f.username} ({f.faculty_type ?? 'Faculty'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   {error && (
                     <div className="alert alert-danger py-2 mt-3 mb-0">
@@ -190,6 +255,17 @@ function SectionsManager() {
                 <label className="form-label small fw-semibold">Section</label>
                 <input className="form-control" value={section} onChange={(e) => setSection(e.target.value)} placeholder="e.g. BSIT-2A" disabled={submitting} />
               </div>
+              <div>
+                <label className="form-label small fw-semibold">Assigned Faculty</label>
+                <select className="form-select" value={facultyUserId} onChange={(e) => setFacultyUserId(e.target.value)} disabled={submitting || loadingFaculty}>
+                  <option value="">Unassigned</option>
+                  {faculty.map((f) => (
+                    <option key={f.user_id} value={String(f.user_id)}>
+                      {f.username} ({f.faculty_type ?? 'Faculty'})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {error && (
                 <div className="alert alert-danger py-2 mb-0">
@@ -228,6 +304,7 @@ function SectionsManager() {
                     <tr className="spms-muted small">
                       <th className="ps-4 py-3 fw-semibold">Year Level</th>
                       <th className="py-3 fw-semibold">Section</th>
+                      <th className="py-3 fw-semibold">Assigned Faculty</th>
                       <th className="py-3 fw-semibold">Created</th>
                       <th className="pe-4 py-3 fw-semibold text-end">Actions</th>
                     </tr>
@@ -235,7 +312,7 @@ function SectionsManager() {
                   <tbody>
                     {sections.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="ps-4 py-4 spms-muted text-center">
+                        <td colSpan={5} className="ps-4 py-4 spms-muted text-center">
                           No sections yet.
                         </td>
                       </tr>
@@ -244,6 +321,7 @@ function SectionsManager() {
                         <tr key={s.section_id}>
                           <td className="ps-4 py-3 fw-semibold">{s.year_level}</td>
                           <td className="py-3 fw-semibold">{s.section}</td>
+                          <td className="py-3 spms-muted small">{s.faculty_name || (s.faculty_user_id ? (facultyNameById.get(s.faculty_user_id) ?? `#${s.faculty_user_id}`) : 'Unassigned')}</td>
                           <td className="py-3 spms-muted small">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
                           <td className="pe-4 py-3 text-end">
                             <div className="btn-group btn-group-sm">

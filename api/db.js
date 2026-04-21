@@ -27,10 +27,12 @@ async function ensureIndexes(db) {
   await db.collection('students').createIndex({ student_id: 1 }, { unique: true })
   await db.collection('students').createIndex({ user_id: 1 }, { unique: true })
   await db.collection('sections').createIndex({ year_level: 1, section: 1 }, { unique: true })
+  await db.collection('sections').createIndex({ faculty_user_id: 1 })
   await db.collection('skills').createIndex({ name: 1, category: 1 }, { unique: true })
   await db.collection('student_skills').createIndex({ student_id: 1, skill_id: 1 }, { unique: true })
   await db.collection('syllabi').createIndex({ syllabus_id: 1 }, { unique: true })
   await db.collection('syllabi').createIndex({ title: 1 })
+  await db.collection('syllabi').createIndex({ faculty_user_id: 1 })
   await db.collection('lessons').createIndex({ lesson_id: 1 }, { unique: true })
   await db.collection('lessons').createIndex({ syllabus_id: 1, order_index: 1 })
   await db.collection('rooms').createIndex({ room_id: 1 }, { unique: true })
@@ -99,6 +101,7 @@ export async function getDb() {
           section_id: sectionId,
           year_level: item.year_level,
           section: item.section,
+          faculty_user_id: null,
           created_at: new Date(),
         })
       }
