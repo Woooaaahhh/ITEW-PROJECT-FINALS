@@ -32,6 +32,8 @@ function fmtDate(value?: string | null) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
 }
 
+type ScheduleStep = 1 | 2 | 3
+
 export function SchedulingPage() {
   const [rooms, setRooms] = useState<RoomRow[]>([])
   const [labs, setLabs] = useState<LabRow[]>([])
@@ -66,6 +68,12 @@ export function SchedulingPage() {
   const [editLabName, setEditLabName] = useState('')
 
   const [assignFacultyId, setAssignFacultyId] = useState<string>('')
+  const [step, setStep] = useState<ScheduleStep>(1)
+  const [createRoomModalOpen, setCreateRoomModalOpen] = useState(false)
+  const [viewRoomsModalOpen, setViewRoomsModalOpen] = useState(false)
+  const [createLabModalOpen, setCreateLabModalOpen] = useState(false)
+  const [viewLabsModalOpen, setViewLabsModalOpen] = useState(false)
+  const [assignFacultyModalOpen, setAssignFacultyModalOpen] = useState(false)
 
   const fetchRooms = async () => {
     setLoadingRooms(true)
@@ -162,6 +170,7 @@ export function SchedulingPage() {
         capacity,
       })
       setNewRoom({ name: '', building: '', capacity: '' })
+      setCreateRoomModalOpen(false)
       await fetchRooms()
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
@@ -255,6 +264,7 @@ export function SchedulingPage() {
     try {
       await axios.post(`/api/scheduling/rooms/${selectedRoomId}/labs`, { name })
       setNewLabName('')
+      setCreateLabModalOpen(false)
       await fetchLabs(selectedRoomId)
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
@@ -327,6 +337,7 @@ export function SchedulingPage() {
     setSubmitting(true)
     try {
       await axios.put(`/api/scheduling/labs/${selectedLab.lab_id}`, { faculty_user_id: facultyId })
+      setAssignFacultyModalOpen(false)
       if (selectedRoomId) await fetchLabs(selectedRoomId)
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
@@ -334,6 +345,15 @@ export function SchedulingPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const canGoLabs = Boolean(selectedRoomId)
+  const canGoFaculty = Boolean(selectedRoomId && selectedLabId)
+
+  const goToStep = (next: ScheduleStep) => {
+    if (next === 2 && !canGoLabs) return
+    if (next === 3 && !canGoFaculty) return
+    setStep(next)
   }
 
   return (
@@ -422,211 +442,492 @@ export function SchedulingPage() {
         </>
       )}
 
+      {createRoomModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Create Room</h5>
+                  <button type="button" className="btn-close" onClick={() => setCreateRoomModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <form onSubmit={createRoom} className="row g-2">
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Room Name</label>
+                      <input className="form-control" value={newRoom.name} onChange={(e) => setNewRoom((p) => ({ ...p, name: e.target.value }))} disabled={submitting} placeholder="e.g. Room 301" />
+                    </div>
+                    <div className="col-7">
+                      <label className="form-label small fw-semibold">Building</label>
+                      <input className="form-control" value={newRoom.building} onChange={(e) => setNewRoom((p) => ({ ...p, building: e.target.value }))} disabled={submitting} placeholder="optional" />
+                    </div>
+                    <div className="col-5">
+                      <label className="form-label small fw-semibold">Capacity</label>
+                      <input className="form-control" inputMode="numeric" value={newRoom.capacity} onChange={(e) => setNewRoom((p) => ({ ...p, capacity: e.target.value }))} disabled={submitting} placeholder="optional" />
+                    </div>
+                    <div className="col-12 mt-3 d-flex justify-content-end">
+                      <button type="submit" className="btn btn-primary rounded-3" disabled={submitting}>
+                        {submitting ? 'Saving...' : 'Create Room'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setCreateRoomModalOpen(false)} />
+        </>
+      )}
+
+      {viewRoomsModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">All Created Rooms</h5>
+                  <button type="button" className="btn-close" onClick={() => setViewRoomsModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  {rooms.length === 0 ? (
+                    <div className="spms-muted small">No rooms yet.</div>
+                  ) : (
+                    <div className="list-group">
+                      {rooms.map((r) => (
+                        <button key={r.room_id} type="button" className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${selectedRoomId === r.room_id ? 'active' : ''}`} onClick={() => { setSelectedRoomId(r.room_id); setViewRoomsModalOpen(false) }}>
+                          <div className="text-start">
+                            <div className="fw-semibold">{r.name}</div>
+                            <div className={`small ${selectedRoomId === r.room_id ? 'text-white-50' : 'text-muted'}`}>{r.building ? `${r.building} • ` : ''}{r.capacity != null ? `Cap ${r.capacity}` : 'No capacity set'}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setViewRoomsModalOpen(false)} />
+        </>
+      )}
+
+      {createLabModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Create Lab</h5>
+                  <button type="button" className="btn-close" onClick={() => setCreateLabModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <div className="spms-muted small mb-2">Room: <span className="fw-semibold">{selectedRoom?.name ?? 'No room selected'}</span></div>
+                  <form onSubmit={createLab} className="row g-2">
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Lab Name</label>
+                      <input className="form-control" value={newLabName} onChange={(e) => setNewLabName(e.target.value)} disabled={submitting || !selectedRoomId} placeholder="e.g. Computer Lab 1" />
+                    </div>
+                    <div className="col-12 mt-3 d-flex justify-content-end">
+                      <button type="submit" className="btn btn-primary rounded-3" disabled={submitting || !selectedRoomId}>
+                        {submitting ? 'Saving...' : 'Create Lab'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setCreateLabModalOpen(false)} />
+        </>
+      )}
+
+      {viewLabsModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">All Created Labs</h5>
+                  <button type="button" className="btn-close" onClick={() => setViewLabsModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  {!selectedRoomId ? (
+                    <div className="spms-muted small">Select a room first.</div>
+                  ) : labs.length === 0 ? (
+                    <div className="spms-muted small">No labs yet for this room.</div>
+                  ) : (
+                    <div className="list-group">
+                      {labs.map((l) => (
+                        <button key={l.lab_id} type="button" className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${selectedLabId === l.lab_id ? 'active' : ''}`} onClick={() => { setSelectedLabId(l.lab_id); setViewLabsModalOpen(false) }}>
+                          <div className="text-start">
+                            <div className="fw-semibold">{l.name}</div>
+                            <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>Faculty: {l.faculty_user_id ? `#${l.faculty_user_id}` : 'Unassigned'}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setViewLabsModalOpen(false)} />
+        </>
+      )}
+
+      {assignFacultyModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Assign Faculty</h5>
+                  <button type="button" className="btn-close" onClick={() => setAssignFacultyModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <div className="spms-muted small mb-2">
+                    Room: <span className="fw-semibold">{selectedRoom?.name ?? '—'}</span><br />
+                    Lab: <span className="fw-semibold">{selectedLab?.name ?? '—'}</span>
+                  </div>
+                  <label className="form-label small fw-semibold">Faculty</label>
+                  <select className="form-select" value={assignFacultyId} onChange={(e) => setAssignFacultyId(e.target.value)} disabled={!selectedLab || submitting || loadingFaculty}>
+                    <option value="">Unassigned</option>
+                    {faculty.map((f) => (
+                      <option key={f.user_id} value={String(f.user_id)}>
+                        {f.username} ({f.faculty_type ?? 'Faculty'})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-3 d-flex justify-content-end">
+                    <button type="button" className="btn btn-primary rounded-3" disabled={!selectedLab || submitting} onClick={() => void saveFacultyAssignment()}>
+                      {submitting ? 'Saving...' : 'Save Assignment'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setAssignFacultyModalOpen(false)} />
+        </>
+      )}
+
       <div className="row g-4">
-        <div className="col-12 col-xl-4">
+        <div className="col-12">
           <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
             <div className="card-body">
-              <h6 className="fw-semibold mb-3">Rooms</h6>
-              <form onSubmit={createRoom} className="d-flex flex-column gap-2">
-                <div>
-                  <label className="form-label small fw-semibold">Room Name</label>
-                  <input className="form-control" value={newRoom.name} onChange={(e) => setNewRoom((p) => ({ ...p, name: e.target.value }))} disabled={submitting} placeholder="e.g. Room 301" />
-                </div>
-                <div className="row g-2">
-                  <div className="col-7">
-                    <label className="form-label small fw-semibold">Building</label>
-                    <input className="form-control" value={newRoom.building} onChange={(e) => setNewRoom((p) => ({ ...p, building: e.target.value }))} disabled={submitting} placeholder="optional" />
-                  </div>
-                  <div className="col-5">
-                    <label className="form-label small fw-semibold">Capacity</label>
-                    <input className="form-control" inputMode="numeric" value={newRoom.capacity} onChange={(e) => setNewRoom((p) => ({ ...p, capacity: e.target.value }))} disabled={submitting} placeholder="optional" />
-                  </div>
-                </div>
-                <button type="submit" className="btn btn-primary rounded-4 py-2 fw-semibold mt-2" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Create Room'}
-                </button>
-              </form>
-
-              <div className="d-flex align-items-center justify-content-between mt-4">
-                <div className="fw-semibold">Room List</div>
-                <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => void fetchRooms()} disabled={loadingRooms}>
-                  <i className="bi bi-arrow-clockwise me-1" />
-                  Refresh
-                </button>
-              </div>
-
-              <div className="mt-2">
-                {loadingRooms ? (
-                  <div className="spms-muted small py-2">Loading rooms...</div>
-                ) : rooms.length === 0 ? (
-                  <div className="spms-muted small py-2">No rooms yet.</div>
-                ) : (
-                  <div className="list-group">
-                    {rooms.map((r) => (
-                      <button
-                        type="button"
-                        key={r.room_id}
-                        className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${selectedRoomId === r.room_id ? 'active' : ''}`}
-                        onClick={() => setSelectedRoomId(r.room_id)}
-                        disabled={submitting}
-                      >
-                        <div className="me-2 text-start">
-                          <div className="fw-semibold">{r.name}</div>
-                          <div className={`small ${selectedRoomId === r.room_id ? 'text-white-50' : 'text-muted'}`}>
-                            {r.building ? `${r.building} • ` : ''}
-                            {r.capacity != null ? `Cap ${r.capacity}` : 'No capacity set'}
-                          </div>
-                        </div>
-                        <div className="btn-group btn-group-sm">
-                          <button type="button" className={`btn ${selectedRoomId === r.room_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`} onClick={(e) => { e.stopPropagation(); openEditRoom(r) }} disabled={submitting}>
-                            Edit
-                          </button>
-                          <button type="button" className={`btn ${selectedRoomId === r.room_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`} onClick={(e) => { e.stopPropagation(); void deleteRoom(r) }} disabled={submitting}>
-                            Delete
-                          </button>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-xl-4">
-          <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
-            <div className="card-body">
-              <h6 className="fw-semibold mb-1">Labs</h6>
-              <div className="spms-muted small mb-3">
-                {selectedRoom ? (
-                  <>Selected room: <span className="fw-semibold">{selectedRoom.name}</span></>
-                ) : (
-                  'Select a room to manage its labs.'
-                )}
-              </div>
-
-              <form onSubmit={createLab} className="d-flex flex-column gap-2">
-                <div>
-                  <label className="form-label small fw-semibold">New Lab Name</label>
-                  <input className="form-control" value={newLabName} onChange={(e) => setNewLabName(e.target.value)} disabled={submitting || !selectedRoomId} placeholder="e.g. Computer Lab 1" />
-                </div>
-                <button type="submit" className="btn btn-primary rounded-4 py-2 fw-semibold" disabled={submitting || !selectedRoomId}>
-                  {submitting ? 'Saving...' : 'Add Lab'}
-                </button>
-              </form>
-
-              <div className="d-flex align-items-center justify-content-between mt-4">
-                <div className="fw-semibold">Lab List</div>
-                <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => selectedRoomId && void fetchLabs(selectedRoomId)} disabled={loadingLabs || !selectedRoomId}>
-                  <i className="bi bi-arrow-clockwise me-1" />
-                  Refresh
-                </button>
-              </div>
-
-              <div className="mt-2">
-                {!selectedRoomId ? (
-                  <div className="spms-muted small py-2">No room selected.</div>
-                ) : loadingLabs ? (
-                  <div className="spms-muted small py-2">Loading labs...</div>
-                ) : labs.length === 0 ? (
-                  <div className="spms-muted small py-2">No labs yet for this room.</div>
-                ) : (
-                  <div className="list-group">
-                    {labs.map((l) => (
-                      <button
-                        type="button"
-                        key={l.lab_id}
-                        className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${selectedLabId === l.lab_id ? 'active' : ''}`}
-                        onClick={() => setSelectedLabId(l.lab_id)}
-                        disabled={submitting}
-                      >
-                        <div className="me-2 text-start">
-                          <div className="fw-semibold">{l.name}</div>
-                          <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>
-                            Faculty: {l.faculty_user_id ? `#${l.faculty_user_id}` : 'Unassigned'}
-                          </div>
-                        </div>
-                        <div className="btn-group btn-group-sm">
-                          <button type="button" className={`btn ${selectedLabId === l.lab_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`} onClick={(e) => { e.stopPropagation(); openEditLab(l) }} disabled={submitting}>
-                            Edit
-                          </button>
-                          <button type="button" className={`btn ${selectedLabId === l.lab_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`} onClick={(e) => { e.stopPropagation(); void deleteLab(l) }} disabled={submitting}>
-                            Delete
-                          </button>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-xl-4">
-          <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
-            <div className="card-body">
-              <h6 className="fw-semibold mb-1">Faculty Assignment</h6>
-              <div className="spms-muted small mb-3">
-                {selectedLab ? (
-                  <>Selected lab: <span className="fw-semibold">{selectedLab.name}</span></>
-                ) : (
-                  'Select a lab to assign a faculty.'
-                )}
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Faculty</label>
-                <select
-                  className="form-select"
-                  value={assignFacultyId}
-                  onChange={(e) => setAssignFacultyId(e.target.value)}
-                  disabled={!selectedLab || submitting || loadingFaculty}
+              <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  className={`btn btn-sm rounded-pill ${step === 1 ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => goToStep(1)}
                 >
-                  <option value="">Unassigned</option>
-                  {faculty.map((f) => (
-                    <option key={f.user_id} value={String(f.user_id)}>
-                      {f.username} ({f.faculty_type ?? 'Faculty'})
-                    </option>
-                  ))}
-                </select>
-                <div className="spms-muted small mt-2">
-                  {loadingFaculty ? 'Loading faculty list...' : `Faculty available: ${faculty.length}`}
-                </div>
+                  1. Rooms
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm rounded-pill ${step === 2 ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => goToStep(2)}
+                  disabled={!canGoLabs}
+                >
+                  2. Labs
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm rounded-pill ${step === 3 ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => goToStep(3)}
+                  disabled={!canGoFaculty}
+                >
+                  3. Faculty Assignment
+                </button>
               </div>
 
-              <button type="button" className="btn btn-primary rounded-4 py-2 fw-semibold w-100" disabled={!selectedLab || submitting} onClick={() => void saveFacultyAssignment()}>
-                {submitting ? 'Saving...' : 'Save Assignment'}
-              </button>
-
-              <div className="mt-4">
-                <div className="fw-semibold mb-2">Details</div>
-                <div className="small">
-                  <div className="d-flex justify-content-between">
-                    <span className="text-muted">Room</span>
-                    <span className="fw-semibold">{selectedRoom?.name ?? '—'}</span>
-                  </div>
-                  <div className="d-flex justify-content-between">
-                    <span className="text-muted">Lab created</span>
-                    <span className="fw-semibold">{fmtDate(selectedLab?.created_at ?? null)}</span>
-                  </div>
-                  <div className="d-flex justify-content-between">
-                    <span className="text-muted">Lab updated</span>
-                    <span className="fw-semibold">{fmtDate(selectedLab?.updated_at ?? null)}</span>
-                  </div>
-                </div>
+              <div className="spms-muted small">
+                {step === 1 ? 'Create or select a room first.' : null}
+                {step === 2 ? 'Create labs under the selected room.' : null}
+                {step === 3 ? 'Assign faculty to the selected lab.' : null}
               </div>
-
-              {error && (
-                <div className="alert alert-danger py-2 mt-3 mb-0">
-                  <i className="bi bi-exclamation-circle me-2" />
-                  {error}
-                </div>
-              )}
             </div>
           </div>
         </div>
+
+        {step === 1 && (
+          <div className="col-12">
+            <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+              <div className="card-body">
+                <h6 className="fw-semibold mb-3">Step 1: Rooms</h6>
+                <div className="d-flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary rounded-4 px-4" onClick={() => setCreateRoomModalOpen(true)}>
+                    Create Room
+                  </button>
+                  <button type="button" className="btn btn-outline-primary rounded-4 px-4" onClick={() => setViewRoomsModalOpen(true)}>
+                    View All Created Rooms
+                  </button>
+                </div>
+
+                <div className="d-flex align-items-center justify-content-between mt-4">
+                  <div className="fw-semibold">Room List</div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-3"
+                    onClick={() => void fetchRooms()}
+                    disabled={loadingRooms}
+                  >
+                    <i className="bi bi-arrow-clockwise me-1" />
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  {loadingRooms ? (
+                    <div className="spms-muted small py-2">Loading rooms...</div>
+                  ) : rooms.length === 0 ? (
+                    <div className="spms-muted small py-2">No rooms yet.</div>
+                  ) : (
+                    <div className="list-group">
+                      {rooms.map((r) => (
+                        <button
+                          type="button"
+                          key={r.room_id}
+                          className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
+                            selectedRoomId === r.room_id ? 'active' : ''
+                          }`}
+                          onClick={() => setSelectedRoomId(r.room_id)}
+                          disabled={submitting}
+                        >
+                          <div className="me-2 text-start">
+                            <div className="fw-semibold">{r.name}</div>
+                            <div className={`small ${selectedRoomId === r.room_id ? 'text-white-50' : 'text-muted'}`}>
+                              {r.building ? `${r.building} • ` : ''}
+                              {r.capacity != null ? `Cap ${r.capacity}` : 'No capacity set'}
+                            </div>
+                          </div>
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              type="button"
+                              className={`btn ${selectedRoomId === r.room_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEditRoom(r)
+                              }}
+                              disabled={submitting}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn ${selectedRoomId === r.room_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void deleteRoom(r)
+                              }}
+                              disabled={submitting}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="d-flex justify-content-end mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-primary rounded-4 px-4"
+                    onClick={() => goToStep(2)}
+                    disabled={!canGoLabs}
+                  >
+                    Next: Labs <i className="bi bi-arrow-right ms-1" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="col-12">
+            <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+              <div className="card-body">
+                <h6 className="fw-semibold mb-1">Step 2: Labs</h6>
+                <div className="spms-muted small mb-3">
+                  {selectedRoom ? (
+                    <>Selected room: <span className="fw-semibold">{selectedRoom.name}</span></>
+                  ) : (
+                    'Select a room in Step 1 first.'
+                  )}
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary rounded-4 px-4"
+                    disabled={!selectedRoomId}
+                    onClick={() => setCreateLabModalOpen(true)}
+                  >
+                    Create Lab
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary rounded-4 px-4"
+                    disabled={!selectedRoomId}
+                    onClick={() => setViewLabsModalOpen(true)}
+                  >
+                    View All Created Labs
+                  </button>
+                </div>
+
+                <div className="d-flex align-items-center justify-content-between mt-4">
+                  <div className="fw-semibold">Lab List</div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-3"
+                    onClick={() => selectedRoomId && void fetchLabs(selectedRoomId)}
+                    disabled={loadingLabs || !selectedRoomId}
+                  >
+                    <i className="bi bi-arrow-clockwise me-1" />
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  {!selectedRoomId ? (
+                    <div className="spms-muted small py-2">No room selected.</div>
+                  ) : loadingLabs ? (
+                    <div className="spms-muted small py-2">Loading labs...</div>
+                  ) : labs.length === 0 ? (
+                    <div className="spms-muted small py-2">No labs yet for this room.</div>
+                  ) : (
+                    <div className="list-group">
+                      {labs.map((l) => (
+                        <button
+                          type="button"
+                          key={l.lab_id}
+                          className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
+                            selectedLabId === l.lab_id ? 'active' : ''
+                          }`}
+                          onClick={() => setSelectedLabId(l.lab_id)}
+                          disabled={submitting}
+                        >
+                          <div className="me-2 text-start">
+                            <div className="fw-semibold">{l.name}</div>
+                            <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>
+                              Faculty: {l.faculty_user_id ? `#${l.faculty_user_id}` : 'Unassigned'}
+                            </div>
+                          </div>
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              type="button"
+                              className={`btn ${selectedLabId === l.lab_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEditLab(l)
+                              }}
+                              disabled={submitting}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn ${selectedLabId === l.lab_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void deleteLab(l)
+                              }}
+                              disabled={submitting}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="d-flex justify-content-between mt-4">
+                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(1)}>
+                    <i className="bi bi-arrow-left me-1" /> Back: Rooms
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary rounded-4 px-4"
+                    onClick={() => goToStep(3)}
+                    disabled={!canGoFaculty}
+                  >
+                    Next: Faculty Assignment <i className="bi bi-arrow-right ms-1" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="col-12">
+            <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+              <div className="card-body">
+                <h6 className="fw-semibold mb-1">Step 3: Faculty Assignment</h6>
+                <div className="spms-muted small mb-3">
+                  {selectedLab ? (
+                    <>
+                      Selected lab: <span className="fw-semibold">{selectedLab.name}</span> (
+                      <span className="fw-semibold">{selectedRoom?.name ?? 'No room'}</span>)
+                    </>
+                  ) : (
+                    'Select a lab in Step 2 first.'
+                  )}
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary rounded-4 px-4"
+                    disabled={!selectedLab}
+                    onClick={() => setAssignFacultyModalOpen(true)}
+                  >
+                    Assign Faculty 
+                  </button>
+                  <div className="spms-muted small align-self-center">
+                    {loadingFaculty ? 'Loading faculty list...' : `Faculty available: ${faculty.length}`}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="fw-semibold mb-2">Details</div>
+                  <div className="small">
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Room</span>
+                      <span className="fw-semibold">{selectedRoom?.name ?? '—'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Lab created</span>
+                      <span className="fw-semibold">{fmtDate(selectedLab?.created_at ?? null)}</span>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Lab updated</span>
+                      <span className="fw-semibold">{fmtDate(selectedLab?.updated_at ?? null)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex justify-content-start mt-4">
+                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(2)}>
+                    <i className="bi bi-arrow-left me-1" /> Back: Labs
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="col-12">
+            <div className="alert alert-danger py-2 mb-0">
+              <i className="bi bi-exclamation-circle me-2" />
+              {error}
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
