@@ -40,6 +40,7 @@ export function EditStudentPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -91,22 +92,36 @@ export function EditStudentPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault()
+                setSubmitError(null)
+
+                const firstName = form.firstName.trim()
+                const lastName = form.lastName.trim()
+                if (!firstName || !lastName) {
+                  setSubmitError('First name and last name are required.')
+                  return
+                }
+
                 setSaving(true)
-                await updateStudent(id, {
-                  profilePictureDataUrl: fileDataUrl,
-                  firstName: form.firstName,
-                  middleName: form.middleName || null,
-                  lastName: form.lastName,
-                  birthdate: form.birthdate || null,
-                  gender: form.gender || null,
-                  address: form.address || null,
-                  email: form.email || null,
-                  contactNumber: form.contactNumber || null,
-                  yearLevel: form.yearLevel || null,
-                  section: form.section || null,
-                })
-                setSaving(false)
-                navigate(`/students/${id}`)
+                try {
+                  await updateStudent(id, {
+                    profilePictureDataUrl: fileDataUrl,
+                    firstName,
+                    middleName: form.middleName.trim() ? form.middleName.trim() : null,
+                    lastName,
+                    birthdate: form.birthdate.trim() ? form.birthdate.trim() : null,
+                    gender: form.gender.trim() ? form.gender.trim() : null,
+                    address: form.address.trim() ? form.address.trim() : null,
+                    email: form.email.trim() ? form.email.trim().toLowerCase() : null,
+                    contactNumber: form.contactNumber.trim() ? form.contactNumber.trim() : null,
+                    yearLevel: form.yearLevel || null,
+                    section: form.section.trim() ? form.section.trim() : null,
+                  })
+                  navigate(`/students/${id}`)
+                } catch (err) {
+                  setSubmitError(err instanceof Error ? err.message : 'Failed to save changes.')
+                } finally {
+                  setSaving(false)
+                }
               }}
             >
               <div className="row g-3">
@@ -152,6 +167,8 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.firstName}
                       onChange={(e) => setForm((f) => (f ? { ...f, firstName: e.target.value } : f))}
+                      disabled={saving}
+                      required
                     />
                   </div>
                 </div>
@@ -165,6 +182,7 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.middleName}
                       onChange={(e) => setForm((f) => (f ? { ...f, middleName: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -178,6 +196,8 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.lastName}
                       onChange={(e) => setForm((f) => (f ? { ...f, lastName: e.target.value } : f))}
+                      disabled={saving}
+                      required
                     />
                   </div>
                 </div>
@@ -193,6 +213,7 @@ export function EditStudentPage() {
                       type="date"
                       value={form.birthdate}
                       onChange={(e) => setForm((f) => (f ? { ...f, birthdate: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -206,6 +227,7 @@ export function EditStudentPage() {
                       className="form-select"
                       value={form.gender}
                       onChange={(e) => setForm((f) => (f ? { ...f, gender: e.target.value } : f))}
+                      disabled={saving}
                     >
                       <option value="">Select</option>
                       <option>Male</option>
@@ -224,6 +246,7 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.contactNumber}
                       onChange={(e) => setForm((f) => (f ? { ...f, contactNumber: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -239,6 +262,7 @@ export function EditStudentPage() {
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm((f) => (f ? { ...f, email: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -252,6 +276,7 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.address}
                       onChange={(e) => setForm((f) => (f ? { ...f, address: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
@@ -266,6 +291,7 @@ export function EditStudentPage() {
                       className="form-select"
                       value={form.yearLevel}
                       onChange={(e) => setForm((f) => (f ? { ...f, yearLevel: e.target.value as FormState['yearLevel'] } : f))}
+                      disabled={saving}
                     >
                       <option value="">Select</option>
                       <option>1st</option>
@@ -285,11 +311,17 @@ export function EditStudentPage() {
                       className="form-control"
                       value={form.section}
                       onChange={(e) => setForm((f) => (f ? { ...f, section: e.target.value } : f))}
+                      disabled={saving}
                     />
                   </div>
                 </div>
 
                 <div className="col-12">
+                  {submitError ? (
+                    <div className="alert alert-danger" role="alert">
+                      {submitError}
+                    </div>
+                  ) : null}
                   <div className="d-flex flex-column flex-md-row gap-2 justify-content-end">
                     <Link className="btn btn-outline-secondary rounded-4 px-4" to={`/students/${id}`}>
                       Cancel

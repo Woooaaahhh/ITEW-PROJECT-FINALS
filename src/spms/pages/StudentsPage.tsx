@@ -1,10 +1,9 @@
   /** Client-side routing (React Router): student list links via <Link> (no full page reload). */
   import { useCallback, useEffect, useMemo, useState } from 'react'
-  import axios from 'axios'
   import avatarUrl from '../../assets/react.svg'
   import { useAuth } from '../auth/AuthContext'
   import { Link } from 'react-router-dom'
-  import { deleteStudent } from '../db/students'
+  import { deleteStudent, listStudents } from '../db/students'
   import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
   import type { Student } from '../db/students'
 
@@ -25,49 +24,6 @@
   function fullName(s: Student) {
     const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
     return parts.replace(/\s+/g, ' ').trim()
-  }
-
-  type ApiStudentRow = {
-    student_id: number
-    user_id: number
-    first_name: string
-    last_name: string
-    year_level?: string | null
-    section?: string | null
-    email?: string | null
-    active?: number
-  }
-
-  function fromApiRow(row: ApiStudentRow): Student {
-    return {
-      id: String(row.student_id),
-      firstName: row.first_name ?? '',
-      middleName: '',
-      lastName: row.last_name ?? '',
-      birthdate: '',
-      gender: 'Male',
-      address: '',
-      email: row.email ?? '',
-      contactNumber: '',
-      yearLevel: row.year_level ?? '',
-      section: row.section ?? '',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      medicalClearanceStatus: 'pending',
-      medicalClearanceUpdatedAt: null,
-      medicalClearanceNotes: null,
-      medicalHeight: null,
-      medicalWeight: null,
-      medicalBloodPressure: null,
-      medicalCondition: null,
-      medicalPhysicianName: null,
-      medicalExamDate: null,
-      medicalFormDetails: null,
-      medicalDocumentDataUrl: null,
-      medicalSubmittedAt: null,
-    }
   }
 
   function matches(student: Student, q: string, year: string, section: string) {
@@ -115,19 +71,10 @@
       setLoading(true)
       setError(null)
       try {
-        const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
-        const all = (res.data.students ?? []).map(fromApiRow)
+        const all = await listStudents()
         setStudents(all)
       } catch (e: unknown) {
-        let msg = 'Failed to load students.'
-        if (axios.isAxiosError(e)) {
-          if (!e.response) {
-            msg = 'Cannot reach API server. Make sure backend is running.'
-          } else {
-            msg = (e.response.data as { message?: string } | undefined)?.message || msg
-          }
-        }
-        setError(msg)
+        setError(e instanceof Error ? e.message : 'Failed to load students.')
       } finally {
         setLoading(false)
       }
@@ -142,16 +89,11 @@
       const onStudentsChanged = () => {
         void loadStudents()
       }
-      const onFocus = () => {
-        void loadStudents()
-      }
       window.addEventListener('spms-student-records-changed', onRecords)
       window.addEventListener('spms-students-changed', onStudentsChanged)
-      window.addEventListener('focus', onFocus)
       return () => {
         window.removeEventListener('spms-student-records-changed', onRecords)
         window.removeEventListener('spms-students-changed', onStudentsChanged)
-        window.removeEventListener('focus', onFocus)
       }
     }, [loadStudents])
 

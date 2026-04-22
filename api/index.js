@@ -384,42 +384,12 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
   const db = await getDb()
   const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true'
 
+  // Students collection already has unique indexes on {student_id} and {user_id}.
+  // Using a simpler pipeline avoids unnecessary grouping for faster list loads.
   const pipeline = [
     { $lookup: { from: 'users', localField: 'user_id', foreignField: 'user_id', as: 'user' } },
     { $unwind: '$user' },
     { $match: { 'user.role': 'student', ...(includeInactive ? {} : { 'user.active': 1 }) } },
-    { $sort: { 'user.created_at': -1 } },
-    {
-      $group: {
-        _id: '$student_id',
-        student_id: { $first: '$student_id' },
-        user_id: { $first: '$user_id' },
-        first_name: { $first: '$first_name' },
-        middle_name: { $first: '$middle_name' },
-        last_name: { $first: '$last_name' },
-        birthdate: { $first: '$birthdate' },
-        gender: { $first: '$gender' },
-        address: { $first: '$address' },
-        contact_number: { $first: '$contact_number' },
-        year_level: { $first: '$year_level' },
-        section: { $first: '$section' },
-        profile_picture_data_url: { $first: '$profile_picture_data_url' },
-        email: { $first: '$user.email' },
-        active: { $first: '$user.active' },
-        medical_clearance_status: { $first: '$medical_clearance_status' },
-        medical_clearance_updated_at: { $first: '$medical_clearance_updated_at' },
-        medical_clearance_notes: { $first: '$medical_clearance_notes' },
-        medical_height: { $first: '$medical_height' },
-        medical_weight: { $first: '$medical_weight' },
-        medical_blood_pressure: { $first: '$medical_blood_pressure' },
-        medical_condition: { $first: '$medical_condition' },
-        medical_physician_name: { $first: '$medical_physician_name' },
-        medical_exam_date: { $first: '$medical_exam_date' },
-        medical_form_details: { $first: '$medical_form_details' },
-        medical_document_data_url: { $first: '$medical_document_data_url' },
-        medical_submitted_at: { $first: '$medical_submitted_at' },
-      },
-    },
     {
       $project: {
         _id: 0,
@@ -435,8 +405,8 @@ app.get('/api/students', authMiddleware, requireStaff, async (req, res) => {
         year_level: 1,
         section: 1,
         profile_picture_data_url: 1,
-        email: 1,
-        active: 1,
+        email: '$user.email',
+        active: '$user.active',
         medical_clearance_status: 1,
         medical_clearance_updated_at: 1,
         medical_clearance_notes: 1,
