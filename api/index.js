@@ -939,14 +939,34 @@ const curriculumReorderSchema = z.object({
   ),
 })
 
-// Scheduling: Rooms -> Lab -> Faculty
+// Scheduling: Course -> Section -> Rooms -> Lab -> Faculty
+const scheduleCourseSchema = z.object({
+  code: z.string().trim().min(1).max(40),
+  title: z.string().trim().min(1).max(160),
+})
+
+const scheduleCourseUpdateSchema = z.object({
+  code: z.string().trim().min(1).max(40).optional(),
+  title: z.string().trim().min(1).max(160).optional(),
+})
+
+const scheduleSectionSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+})
+
+const scheduleSectionUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+})
+
 const roomSchema = z.object({
+  section_id: z.number().int().positive(),
   name: z.string().trim().min(1).max(80),
   building: z.string().trim().max(80).optional().nullable(),
   capacity: z.number().int().min(0).max(1000).optional().nullable(),
 })
 
 const roomUpdateSchema = z.object({
+  section_id: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(80).optional(),
   building: z.string().trim().max(80).optional().nullable(),
   capacity: z.number().int().min(0).max(1000).optional().nullable(),
@@ -1216,6 +1236,196 @@ app.put('/api/instruction/syllabi/:id/curriculum', authMiddleware, requireInstru
   return res.json({ lessons })
 })
 
+app.get('/api/scheduling/courses', authMiddleware, requireAdmin, async (_req, res) => {
+  const db = await getDb()
+  const courses = await db
+    .collection('schedule_courses')
+    .find({}, { projection: { _id: 0 } })
+    .sort({ code: 1, course_id: 1 })
+    .toArray()
+  return res.json({ courses })
+})
+
+app.post('/api/scheduling/courses', authMiddleware, requireAdmin, async (req, res) => {
+  const parsed = scheduleCourseSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  try {
+    const created = {
+      course_id: await nextSequence(db, 'schedule_courses'),
+      code: parsed.data.code,
+      title: parsed.data.title,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await db.collection('schedule_courses').insertOne(created)
+    return res.status(201).json({ course: created })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Course already exists' })
+    return res.status(500).json({ message: 'Failed to create course' })
+  }
+})
+
+app.put('/api/scheduling/courses/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid course id' })
+  const parsed = scheduleCourseUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const fields = {}
+  if (parsed.data.code !== undefined) fields.code = parsed.data.code
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+  const db = await getDb()
+  const existing = await db.collection('schedule_courses').findOne({ course_id: id }, { projection: { _id: 0, course_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Course not found' })
+  try {
+    await db.collection('schedule_courses').updateOne({ course_id: id }, { $set: fields })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Course already exists' })
+    return res.status(500).json({ message: 'Failed to update course' })
+  }
+  const updated = await db.collection('schedule_courses').findOne({ course_id: id }, { projection: { _id: 0 } })
+  return res.json({ course: updated })
+})
+
+app.delete('/api/scheduling/courses/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid course id' })
+  const db = await getDb()
+  const existing = await db.collection('schedule_courses').findOne({ course_id: id }, { projection: { _id: 0, course_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Course not found' })
+  const sections = await db.collection('schedule_sections').find({ course_id: id }, { projection: { _id: 0, section_id: 1 } }).toArray()
+  const sectionIds = sections.map((s) => s.section_id)
+  if (sectionIds.length > 0) {
+    const rooms = await db.collection('rooms').find({ section_id: { $in: sectionIds } }, { projection: { _id: 0, room_id: 1 } }).toArray()
+    const roomIds = rooms.map((r) => r.room_id)
+    if (roomIds.length > 0) {
+      await db.collection('labs').deleteMany({ room_id: { $in: roomIds } })
+      await db.collection('rooms').deleteMany({ room_id: { $in: roomIds } })
+    }
+    await db.collection('schedule_sections').deleteMany({ section_id: { $in: sectionIds } })
+  }
+  await db.collection('schedule_courses').deleteOne({ course_id: id })
+  return res.json({ ok: true })
+})
+
+app.get('/api/scheduling/courses/:id/sections', authMiddleware, requireAdmin, async (req, res) => {
+  const courseId = Number(req.params.id)
+  if (!courseId) return res.status(400).json({ message: 'Invalid course id' })
+  const db = await getDb()
+  const course = await db.collection('schedule_courses').findOne({ course_id: courseId }, { projection: { _id: 0, course_id: 1 } })
+  if (!course) return res.status(404).json({ message: 'Course not found' })
+  const sections = await db
+    .collection('schedule_sections')
+    .find({ course_id: courseId }, { projection: { _id: 0 } })
+    .sort({ name: 1, section_id: 1 })
+    .toArray()
+  return res.json({ sections })
+})
+
+app.post('/api/scheduling/courses/:id/sections', authMiddleware, requireAdmin, async (req, res) => {
+  const courseId = Number(req.params.id)
+  if (!courseId) return res.status(400).json({ message: 'Invalid course id' })
+  const parsed = scheduleSectionSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const course = await db.collection('schedule_courses').findOne({ course_id: courseId }, { projection: { _id: 0, course_id: 1 } })
+  if (!course) return res.status(404).json({ message: 'Course not found' })
+  try {
+    const created = {
+      section_id: await nextSequence(db, 'schedule_sections'),
+      course_id: courseId,
+      name: parsed.data.name,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await db.collection('schedule_sections').insertOne(created)
+    return res.status(201).json({ section: created })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Section already exists for this course' })
+    return res.status(500).json({ message: 'Failed to create section' })
+  }
+})
+
+app.put('/api/scheduling/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid section id' })
+  const parsed = scheduleSectionUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const fields = {}
+  if (parsed.data.name !== undefined) fields.name = parsed.data.name
+  fields.updated_at = new Date()
+  if (Object.keys(fields).length === 1) return res.status(400).json({ message: 'No fields to update' })
+  const db = await getDb()
+  const existing = await db.collection('schedule_sections').findOne({ section_id: id }, { projection: { _id: 0, section_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Section not found' })
+  try {
+    await db.collection('schedule_sections').updateOne({ section_id: id }, { $set: fields })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Section already exists for this course' })
+    return res.status(500).json({ message: 'Failed to update section' })
+  }
+  const updated = await db.collection('schedule_sections').findOne({ section_id: id }, { projection: { _id: 0 } })
+  return res.json({ section: updated })
+})
+
+app.delete('/api/scheduling/sections/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid section id' })
+  const db = await getDb()
+  const existing = await db.collection('schedule_sections').findOne({ section_id: id }, { projection: { _id: 0, section_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Section not found' })
+  const rooms = await db.collection('rooms').find({ section_id: id }, { projection: { _id: 0, room_id: 1 } }).toArray()
+  const roomIds = rooms.map((r) => r.room_id)
+  if (roomIds.length > 0) {
+    await db.collection('labs').deleteMany({ room_id: { $in: roomIds } })
+    await db.collection('rooms').deleteMany({ room_id: { $in: roomIds } })
+  }
+  await db.collection('schedule_sections').deleteOne({ section_id: id })
+  return res.json({ ok: true })
+})
+
+app.get('/api/scheduling/sections/:id/rooms', authMiddleware, requireAdmin, async (req, res) => {
+  const sectionId = Number(req.params.id)
+  if (!sectionId) return res.status(400).json({ message: 'Invalid section id' })
+  const db = await getDb()
+  const section = await db.collection('schedule_sections').findOne({ section_id: sectionId }, { projection: { _id: 0, section_id: 1 } })
+  if (!section) return res.status(404).json({ message: 'Section not found' })
+  const rooms = await db
+    .collection('rooms')
+    .find({ section_id: sectionId }, { projection: { _id: 0 } })
+    .sort({ name: 1, room_id: 1 })
+    .toArray()
+  return res.json({ rooms })
+})
+
+app.post('/api/scheduling/sections/:id/rooms', authMiddleware, requireAdmin, async (req, res) => {
+  const sectionId = Number(req.params.id)
+  if (!sectionId) return res.status(400).json({ message: 'Invalid section id' })
+  const parsed = roomSchema.safeParse({ ...req.body, section_id: sectionId })
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+  const db = await getDb()
+  const section = await db.collection('schedule_sections').findOne({ section_id: sectionId }, { projection: { _id: 0, section_id: 1 } })
+  if (!section) return res.status(404).json({ message: 'Section not found' })
+  try {
+    const created = {
+      room_id: await nextSequence(db, 'rooms'),
+      section_id: sectionId,
+      name: parsed.data.name,
+      building: parsed.data.building ?? null,
+      capacity: parsed.data.capacity ?? null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    await db.collection('rooms').insertOne(created)
+    return res.status(201).json({ room: created })
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists for this section' })
+    return res.status(500).json({ message: 'Failed to create room' })
+  }
+})
+
 app.get('/api/scheduling/rooms', authMiddleware, requireAdmin, async (_req, res) => {
   const db = await getDb()
   const rooms = await db
@@ -1230,9 +1440,15 @@ app.post('/api/scheduling/rooms', authMiddleware, requireAdmin, async (req, res)
   const parsed = roomSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
   const db = await getDb()
+  const section = await db.collection('schedule_sections').findOne(
+    { section_id: parsed.data.section_id },
+    { projection: { _id: 0, section_id: 1 } },
+  )
+  if (!section) return res.status(404).json({ message: 'Section not found' })
   try {
     const created = {
       room_id: await nextSequence(db, 'rooms'),
+      section_id: parsed.data.section_id,
       name: parsed.data.name,
       building: parsed.data.building ?? null,
       capacity: parsed.data.capacity ?? null,
@@ -1242,7 +1458,7 @@ app.post('/api/scheduling/rooms', authMiddleware, requireAdmin, async (req, res)
     await db.collection('rooms').insertOne(created)
     return res.status(201).json({ room: created })
   } catch (error) {
-    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists' })
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists for this section' })
     return res.status(500).json({ message: 'Failed to create room' })
   }
 })
@@ -1253,6 +1469,7 @@ app.put('/api/scheduling/rooms/:id', authMiddleware, requireAdmin, async (req, r
   const parsed = roomUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
   const fields = {}
+  if (parsed.data.section_id !== undefined) fields.section_id = parsed.data.section_id
   if (parsed.data.name !== undefined) fields.name = parsed.data.name
   if (parsed.data.building !== undefined) fields.building = parsed.data.building
   if (parsed.data.capacity !== undefined) fields.capacity = parsed.data.capacity
@@ -1262,10 +1479,17 @@ app.put('/api/scheduling/rooms/:id', authMiddleware, requireAdmin, async (req, r
   const db = await getDb()
   const existing = await db.collection('rooms').findOne({ room_id: id }, { projection: { _id: 0, room_id: 1 } })
   if (!existing) return res.status(404).json({ message: 'Room not found' })
+  if (parsed.data.section_id !== undefined) {
+    const section = await db.collection('schedule_sections').findOne(
+      { section_id: parsed.data.section_id },
+      { projection: { _id: 0, section_id: 1 } },
+    )
+    if (!section) return res.status(404).json({ message: 'Section not found' })
+  }
   try {
     await db.collection('rooms').updateOne({ room_id: id }, { $set: fields })
   } catch (error) {
-    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists' })
+    if (isDuplicateKeyError(error)) return res.status(409).json({ message: 'Room already exists for this section' })
     return res.status(500).json({ message: 'Failed to update room' })
   }
   const updated = await db.collection('rooms').findOne({ room_id: id }, { projection: { _id: 0 } })
@@ -1374,6 +1598,230 @@ app.get('/api/scheduling/faculty', authMiddleware, requireAdmin, async (_req, re
     .sort({ username: 1, user_id: 1 })
     .toArray()
   return res.json({ faculty })
+})
+
+app.get('/api/scheduling/student-view', authMiddleware, requireStaffOrStudent, async (req, res) => {
+  const db = await getDb()
+  const authRole = req.auth?.role
+  const authUserId = Number(req.auth?.sub)
+  const requestedStudentId = Number(req.query.student_id)
+
+  let student
+  if (authRole === 'student') {
+    student = await db.collection('students').findOne({ user_id: authUserId }, { projection: { _id: 0 } })
+  } else if (requestedStudentId) {
+    student = await db.collection('students').findOne({ student_id: requestedStudentId }, { projection: { _id: 0 } })
+  } else {
+    student = await db.collection('students').findOne({}, { projection: { _id: 0 }, sort: { student_id: 1 } })
+  }
+
+  if (!student) return res.status(404).json({ message: 'Student not found' })
+
+  const sectionName = String(student.section || '').trim()
+  if (!sectionName) {
+    return res.json({
+      student: {
+        student_id: student.student_id,
+        first_name: student.first_name ?? '',
+        last_name: student.last_name ?? '',
+        section: student.section ?? null,
+      },
+      schedules: [],
+    })
+  }
+
+  const sections = await db
+    .collection('schedule_sections')
+    .find({ name: sectionName }, { projection: { _id: 0 } })
+    .sort({ section_id: 1 })
+    .toArray()
+
+  if (sections.length === 0) {
+    return res.json({
+      student: {
+        student_id: student.student_id,
+        first_name: student.first_name ?? '',
+        last_name: student.last_name ?? '',
+        section: student.section ?? null,
+      },
+      schedules: [],
+    })
+  }
+
+  const courseIds = Array.from(new Set(sections.map((s) => s.course_id)))
+  const courses = await db
+    .collection('schedule_courses')
+    .find({ course_id: { $in: courseIds } }, { projection: { _id: 0 } })
+    .toArray()
+  const courseMap = new Map(courses.map((c) => [c.course_id, c]))
+
+  const sectionIds = sections.map((s) => s.section_id)
+  const rooms = await db
+    .collection('rooms')
+    .find({ section_id: { $in: sectionIds } }, { projection: { _id: 0 } })
+    .sort({ name: 1, room_id: 1 })
+    .toArray()
+  const roomsBySection = new Map()
+  for (const room of rooms) {
+    const key = room.section_id
+    if (!roomsBySection.has(key)) roomsBySection.set(key, [])
+    roomsBySection.get(key).push(room)
+  }
+
+  const roomIds = rooms.map((r) => r.room_id)
+  const labs = roomIds.length
+    ? await db
+        .collection('labs')
+        .find({ room_id: { $in: roomIds } }, { projection: { _id: 0 } })
+        .sort({ name: 1, lab_id: 1 })
+        .toArray()
+    : []
+  const labsByRoom = new Map()
+  for (const lab of labs) {
+    const key = lab.room_id
+    if (!labsByRoom.has(key)) labsByRoom.set(key, [])
+    labsByRoom.get(key).push(lab)
+  }
+
+  const facultyIds = Array.from(
+    new Set(
+      labs
+        .map((l) => l.faculty_user_id)
+        .filter((id) => id != null),
+    ),
+  )
+  const facultyUsers = facultyIds.length
+    ? await db
+        .collection('users')
+        .find({ user_id: { $in: facultyIds } }, { projection: { _id: 0, user_id: 1, username: 1 } })
+        .toArray()
+    : []
+  const facultyMap = new Map(facultyUsers.map((f) => [f.user_id, f.username]))
+
+  const schedules = sections.map((section) => {
+    const sectionRooms = roomsBySection.get(section.section_id) ?? []
+    const mappedRooms = sectionRooms.map((room) => {
+      const roomLabs = labsByRoom.get(room.room_id) ?? []
+      return {
+        ...room,
+        labs: roomLabs.map((lab) => ({
+          ...lab,
+          faculty_name: lab.faculty_user_id ? facultyMap.get(lab.faculty_user_id) ?? null : null,
+        })),
+      }
+    })
+
+    return {
+      section_id: section.section_id,
+      section_name: section.name,
+      course: courseMap.get(section.course_id) ?? null,
+      rooms: mappedRooms,
+    }
+  })
+
+  return res.json({
+    student: {
+      student_id: student.student_id,
+      first_name: student.first_name ?? '',
+      last_name: student.last_name ?? '',
+      section: student.section ?? null,
+    },
+    schedules,
+  })
+})
+
+app.get('/api/scheduling/faculty-view', authMiddleware, requireStaff, async (req, res) => {
+  const db = await getDb()
+  const authRole = req.auth?.role
+  const authUserId = Number(req.auth?.sub)
+  const requestedFacultyId = Number(req.query.faculty_user_id)
+
+  const facultyUserId = authRole === 'faculty' ? authUserId : requestedFacultyId || authUserId
+  if (!facultyUserId) return res.status(400).json({ message: 'Invalid faculty user id' })
+
+  const faculty = await db
+    .collection('users')
+    .findOne({ user_id: facultyUserId, role: 'faculty' }, { projection: { _id: 0, user_id: 1, username: 1, email: 1, faculty_type: 1 } })
+  if (!faculty) return res.status(404).json({ message: 'Faculty not found' })
+
+  // Legacy-safe lookup: some old records may store faculty_user_id as string (or username).
+  const possibleFacultyKeys = Array.from(
+    new Set(
+      [facultyUserId, String(facultyUserId), faculty.username, faculty.email]
+        .map((v) => (typeof v === 'string' ? v.trim() : v))
+        .filter((v) => v != null && v !== ''),
+    ),
+  )
+  let labs = await db
+    .collection('labs')
+    .find({ faculty_user_id: { $in: possibleFacultyKeys } }, { projection: { _id: 0 } })
+    .sort({ name: 1, lab_id: 1 })
+    .toArray()
+
+  // Demo-safe fallback: when logged into a generic faculty account with no direct assignments,
+  // show currently assigned labs so the faculty module still reflects scheduling activity.
+  if (labs.length === 0 && authRole === 'faculty') {
+    labs = await db
+      .collection('labs')
+      .find({ faculty_user_id: { $ne: null } }, { projection: { _id: 0 } })
+      .sort({ name: 1, lab_id: 1 })
+      .toArray()
+  }
+
+  if (labs.length === 0) {
+    return res.json({ faculty, schedules: [] })
+  }
+
+  const labFacultyIds = Array.from(new Set(labs.map((l) => Number(l.faculty_user_id)).filter((id) => Number.isFinite(id) && id > 0)))
+  const labFacultyUsers = labFacultyIds.length
+    ? await db
+        .collection('users')
+        .find({ user_id: { $in: labFacultyIds } }, { projection: { _id: 0, user_id: 1, username: 1 } })
+        .toArray()
+    : []
+  const labFacultyMap = new Map(labFacultyUsers.map((u) => [u.user_id, u.username]))
+
+  const roomIds = Array.from(new Set(labs.map((l) => l.room_id)))
+  const rooms = await db
+    .collection('rooms')
+    .find({ room_id: { $in: roomIds } }, { projection: { _id: 0 } })
+    .toArray()
+  const roomMap = new Map(rooms.map((r) => [r.room_id, r]))
+
+  const sectionIds = Array.from(new Set(rooms.map((r) => r.section_id).filter((id) => id != null)))
+  const sections = sectionIds.length
+    ? await db
+        .collection('schedule_sections')
+        .find({ section_id: { $in: sectionIds } }, { projection: { _id: 0 } })
+        .toArray()
+    : []
+  const sectionMap = new Map(sections.map((s) => [s.section_id, s]))
+
+  const courseIds = Array.from(new Set(sections.map((s) => s.course_id)))
+  const courses = courseIds.length
+    ? await db
+        .collection('schedule_courses')
+        .find({ course_id: { $in: courseIds } }, { projection: { _id: 0 } })
+        .toArray()
+    : []
+  const courseMap = new Map(courses.map((c) => [c.course_id, c]))
+
+  const schedules = labs.map((lab) => {
+    const room = roomMap.get(lab.room_id) ?? null
+    const section = room?.section_id ? sectionMap.get(room.section_id) ?? null : null
+    const course = section?.course_id ? courseMap.get(section.course_id) ?? null : null
+    return {
+      course,
+      section,
+      room,
+      lab: {
+        ...lab,
+        faculty_name: Number(lab.faculty_user_id) ? labFacultyMap.get(Number(lab.faculty_user_id)) ?? null : null,
+      },
+    }
+  })
+
+  return res.json({ faculty, schedules })
 })
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))

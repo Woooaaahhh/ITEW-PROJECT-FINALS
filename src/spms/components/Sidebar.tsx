@@ -54,7 +54,7 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             <NavLink className={navClass} to={`/students/${user?.studentId ?? ''}`}>
               <i className="bi bi-person" /> My Profile
             </NavLink>
-            <NavLink className={navClass} to="#">
+            <NavLink className={navClass} to="/student/schedule">
               <i className="bi bi-calendar3" /> My Schedule
             </NavLink>
             <NavLink className={navClass} to="/instruction">
@@ -77,6 +77,9 @@ export function Sidebar({ mobileOpen, desktopHidden }: SidebarProps) {
             )}
             {role === 'faculty' && (
               <>
+                <NavLink className={navClass} to="/faculty/schedule">
+                  <i className="bi bi-calendar-week" /> My Schedule
+                </NavLink>
                 <NavLink className={navClass} to="/faculty/violations">
                   <i className="bi bi-exclamation-triangle" /> Violations
                 </NavLink>
