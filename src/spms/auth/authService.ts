@@ -103,6 +103,7 @@ export function getAllowedPaths(role: UserRole): string[] {
       return [
         '/',
         '/faculty',
+        '/faculty/schedule',
         '/faculty/violations',
         '/faculty/achievements',
         '/faculty/skills',
@@ -115,7 +116,7 @@ export function getAllowedPaths(role: UserRole): string[] {
         '/instruction',
       ]
     case 'student':
-      return ['/', '/student', '/student/medical', '/student/records', '/medical', '/instruction']
+      return ['/', '/student', '/student/medical', '/student/records', '/student/schedule', '/medical', '/instruction']
     default:
       return ['/']
   }
@@ -155,6 +156,7 @@ export function canAccessPath(
     return (
       path === '/' ||
       path === '/faculty' ||
+      path === '/faculty/schedule' ||
       path === '/faculty/violations' ||
       path === '/faculty/achievements' ||
       path === '/faculty/skills' ||
@@ -195,6 +197,7 @@ export function canAccessPath(
       path === '/student' ||
       path === '/student/medical' ||
       path === '/student/records' ||
+      path === '/student/schedule' ||
       path === '/medical' ||
       path === '/instruction'
     )

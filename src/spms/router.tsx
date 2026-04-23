@@ -19,9 +19,11 @@ import { FacultyViolationsPage } from './pages/FacultyViolationsPage'
 import { FacultySkillsPage } from './pages/FacultySkillsPage'
 import { FacultySportsPage } from './pages/FacultySportsPage'
 import { FacultyAcademicPage } from './pages/FacultyAcademicPage'
+import { FacultySchedulePage } from './pages/FacultySchedulePage'
 import { MedicalModulePage } from './pages/MedicalModulePage'
 import { StudentMedicalSubmitPage } from './pages/StudentMedicalSubmitPage'
 import { StudentMyRecordsPage } from './pages/StudentMyRecordsPage'
+import { StudentSchedulePage } from './pages/StudentSchedulePage'
 import { StudentLegacyProfileRedirect } from './pages/StudentLegacyProfileRedirect'
 import { UsersPage } from './pages/UsersPage'
 import { InstructionModulePage } from './pages/InstructionModulePage'
@@ -79,6 +81,11 @@ const facultyAcademicHandle: PageMeta = {
   subtitle: 'View current term, history, and update student academic records',
 }
 
+const facultyScheduleHandle: PageMeta = {
+  title: 'My Schedule',
+  subtitle: 'View your assigned courses, sections, rooms, and labs',
+}
+
 const medicalModuleHandle: PageMeta = {
   title: 'Medical',
   subtitle: 'Search students, view clearance status, and manage medical records',
@@ -93,6 +100,11 @@ const studentMedicalHandle: PageMeta = {
 const studentRecordsHandle: PageMeta = {
   title: 'My Records',
   subtitle: 'View your violations and skills records',
+}
+
+const studentScheduleHandle: PageMeta = {
+  title: 'My Schedule',
+  subtitle: 'View your assigned course, section, room, lab, and faculty',
 }
 
 const studentHandle: PageMeta = {
@@ -157,7 +169,7 @@ const instructionHandle: PageMeta = {
 
 const schedulingHandle: PageMeta = {
   title: 'Scheduling',
-  subtitle: 'Manage rooms, labs, and faculty assignments',
+  subtitle: 'Manage course, section, room, lab, and faculty assignments',
 }
 
 const notFoundHandle: PageMeta = {
@@ -251,6 +263,15 @@ export const spmsRouter = createBrowserRouter([
         handle: facultyAcademicHandle,
       },
       {
+        path: '/faculty/schedule',
+        element: (
+          <RoleProtectedRoute allowedRoles={['faculty']}>
+            <FacultySchedulePage />
+          </RoleProtectedRoute>
+        ),
+        handle: facultyScheduleHandle,
+      },
+      {
         path: '/faculty/medical',
         element: <Navigate to="/medical" replace />,
       },
@@ -280,6 +301,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: studentMedicalHandle,
+      },
+      {
+        path: '/student/schedule',
+        element: (
+          <RoleProtectedRoute allowedRoles={['student']}>
+            <StudentSchedulePage />
+          </RoleProtectedRoute>
+        ),
+        handle: studentScheduleHandle,
       },
       {
         path: '/student',

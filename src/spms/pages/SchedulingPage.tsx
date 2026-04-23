@@ -1,8 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 
+type CourseRow = {
+  course_id: number
+  code: string
+  title: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+type SectionRow = {
+  section_id: number
+  course_id: number
+  name: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 type RoomRow = {
   room_id: number
+  section_id?: number
   name: string
   building?: string | null
   capacity?: number | null
@@ -32,16 +49,22 @@ function fmtDate(value?: string | null) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
 }
 
-type ScheduleStep = 1 | 2 | 3
+type ScheduleStep = 1 | 2 | 3 | 4 | 5
 
 export function SchedulingPage() {
+  const [courses, setCourses] = useState<CourseRow[]>([])
+  const [sections, setSections] = useState<SectionRow[]>([])
   const [rooms, setRooms] = useState<RoomRow[]>([])
   const [labs, setLabs] = useState<LabRow[]>([])
   const [faculty, setFaculty] = useState<FacultyRow[]>([])
 
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null)
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
   const [selectedLabId, setSelectedLabId] = useState<number | null>(null)
 
+  const [loadingCourses, setLoadingCourses] = useState(true)
+  const [loadingSections, setLoadingSections] = useState(false)
   const [loadingRooms, setLoadingRooms] = useState(true)
   const [loadingLabs, setLoadingLabs] = useState(false)
   const [loadingFaculty, setLoadingFaculty] = useState(false)
@@ -49,6 +72,14 @@ export function SchedulingPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const selectedCourse = useMemo(
+    () => courses.find((r) => r.course_id === selectedCourseId) ?? null,
+    [courses, selectedCourseId],
+  )
+  const selectedSection = useMemo(
+    () => sections.find((r) => r.section_id === selectedSectionId) ?? null,
+    [sections, selectedSectionId],
+  )
   const selectedRoom = useMemo(
     () => rooms.find((r) => r.room_id === selectedRoomId) ?? null,
     [rooms, selectedRoomId],
@@ -57,7 +88,15 @@ export function SchedulingPage() {
     () => labs.find((l) => l.lab_id === selectedLabId) ?? null,
     [labs, selectedLabId],
   )
+  const facultyById = useMemo(() => new Map(faculty.map((f) => [f.user_id, f])), [faculty])
+  const facultyLabel = (facultyUserId?: number | null) => {
+    if (!facultyUserId) return 'Unassigned'
+    const row = facultyById.get(Number(facultyUserId))
+    return row ? `${row.username} (#${row.user_id})` : `#${facultyUserId}`
+  }
 
+  const [newCourse, setNewCourse] = useState({ code: '', title: '' })
+  const [newSectionName, setNewSectionName] = useState('')
   const [newRoom, setNewRoom] = useState({ name: '', building: '', capacity: '' })
   const [newLabName, setNewLabName] = useState('')
 
@@ -69,17 +108,59 @@ export function SchedulingPage() {
 
   const [assignFacultyId, setAssignFacultyId] = useState<string>('')
   const [step, setStep] = useState<ScheduleStep>(1)
+  const [createCourseModalOpen, setCreateCourseModalOpen] = useState(false)
+  const [createSectionModalOpen, setCreateSectionModalOpen] = useState(false)
   const [createRoomModalOpen, setCreateRoomModalOpen] = useState(false)
   const [viewRoomsModalOpen, setViewRoomsModalOpen] = useState(false)
   const [createLabModalOpen, setCreateLabModalOpen] = useState(false)
   const [viewLabsModalOpen, setViewLabsModalOpen] = useState(false)
   const [assignFacultyModalOpen, setAssignFacultyModalOpen] = useState(false)
 
+  const fetchCourses = async () => {
+    setLoadingCourses(true)
+    setError(null)
+    try {
+      const res = await axios.get<{ courses: CourseRow[] }>('/api/scheduling/courses')
+      const rows = res.data.courses ?? []
+      setCourses(rows)
+      setSelectedCourseId((prev) => prev ?? rows[0]?.course_id ?? null)
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+      setError(msg || 'Failed to load courses.')
+    } finally {
+      setLoadingCourses(false)
+    }
+  }
+
+  const fetchSections = async (courseId: number) => {
+    setLoadingSections(true)
+    setError(null)
+    try {
+      const res = await axios.get<{ sections: SectionRow[] }>(`/api/scheduling/courses/${courseId}/sections`)
+      const rows = res.data.sections ?? []
+      setSections(rows)
+      setSelectedSectionId((prev) => prev ?? rows[0]?.section_id ?? null)
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+      setError(msg || 'Failed to load sections.')
+      setSections([])
+      setSelectedSectionId(null)
+    } finally {
+      setLoadingSections(false)
+    }
+  }
+
   const fetchRooms = async () => {
     setLoadingRooms(true)
     setError(null)
+    if (!selectedSectionId) {
+      setRooms([])
+      setSelectedRoomId(null)
+      setLoadingRooms(false)
+      return
+    }
     try {
-      const res = await axios.get<{ rooms: RoomRow[] }>('/api/scheduling/rooms')
+      const res = await axios.get<{ rooms: RoomRow[] }>(`/api/scheduling/sections/${selectedSectionId}/rooms`)
       const rows = res.data.rooms ?? []
       setRooms(rows)
       setSelectedRoomId((prev) => prev ?? rows[0]?.room_id ?? null)
@@ -88,6 +169,55 @@ export function SchedulingPage() {
       setError(msg || 'Failed to load rooms.')
     } finally {
       setLoadingRooms(false)
+    }
+  }
+
+  const createCourse = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    const code = newCourse.code.trim()
+    const title = newCourse.title.trim()
+    if (!code || !title) {
+      setError('Please enter course code and title.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await axios.post('/api/scheduling/courses', { code, title })
+      setNewCourse({ code: '', title: '' })
+      setCreateCourseModalOpen(false)
+      await fetchCourses()
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+      setError(msg || 'Failed to create course.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const createSection = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedCourseId) {
+      setError('Select a course first.')
+      return
+    }
+    setError(null)
+    const name = newSectionName.trim()
+    if (!name) {
+      setError('Please enter section name.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await axios.post(`/api/scheduling/courses/${selectedCourseId}/sections`, { name })
+      setNewSectionName('')
+      setCreateSectionModalOpen(false)
+      await fetchSections(selectedCourseId)
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
+      setError(msg || 'Failed to create section.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -124,9 +254,29 @@ export function SchedulingPage() {
   }
 
   useEffect(() => {
-    void fetchRooms()
+    void fetchCourses()
     void fetchFaculty()
   }, [])
+
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setSections([])
+      setSelectedSectionId(null)
+      return
+    }
+    setSelectedSectionId(null)
+    void fetchSections(selectedCourseId)
+  }, [selectedCourseId])
+
+  useEffect(() => {
+    if (!selectedSectionId) {
+      setRooms([])
+      setSelectedRoomId(null)
+      return
+    }
+    setSelectedRoomId(null)
+    void fetchRooms()
+  }, [selectedSectionId])
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -148,6 +298,10 @@ export function SchedulingPage() {
 
   const createRoom = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!selectedSectionId) {
+      setError('Select a section first.')
+      return
+    }
     setError(null)
     const name = newRoom.name.trim()
     if (!name) {
@@ -164,7 +318,7 @@ export function SchedulingPage() {
 
     setSubmitting(true)
     try {
-      await axios.post('/api/scheduling/rooms', {
+      await axios.post(`/api/scheduling/sections/${selectedSectionId}/rooms`, {
         name,
         building: building || null,
         capacity,
@@ -178,16 +332,6 @@ export function SchedulingPage() {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const openEditRoom = (r: RoomRow) => {
-    setError(null)
-    setEditRoomModal(r)
-    setEditRoom({
-      name: r.name ?? '',
-      building: r.building ?? '',
-      capacity: r.capacity == null ? '' : String(r.capacity),
-    })
   }
 
   const closeEditRoom = () => {
@@ -227,27 +371,6 @@ export function SchedulingPage() {
     }
   }
 
-  const deleteRoom = async (r: RoomRow) => {
-    setError(null)
-    const ok = window.confirm(`Delete room "${r.name}"?\n\nThis will also delete labs under it.`)
-    if (!ok) return
-    setSubmitting(true)
-    try {
-      await axios.delete(`/api/scheduling/rooms/${r.room_id}`)
-      if (selectedRoomId === r.room_id) {
-        setSelectedRoomId(null)
-        setSelectedLabId(null)
-        setLabs([])
-      }
-      await fetchRooms()
-    } catch (e: unknown) {
-      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
-      setError(msg || 'Failed to delete room.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const createLab = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedRoomId) {
@@ -274,12 +397,6 @@ export function SchedulingPage() {
     }
   }
 
-  const openEditLab = (l: LabRow) => {
-    setError(null)
-    setEditLabModal(l)
-    setEditLabName(l.name ?? '')
-  }
-
   const closeEditLab = () => {
     setEditLabModal(null)
     setEditLabName('')
@@ -301,23 +418,6 @@ export function SchedulingPage() {
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setError(msg || 'Failed to update lab.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const deleteLab = async (l: LabRow) => {
-    setError(null)
-    const ok = window.confirm(`Delete lab "${l.name}"?`)
-    if (!ok) return
-    setSubmitting(true)
-    try {
-      await axios.delete(`/api/scheduling/labs/${l.lab_id}`)
-      if (selectedLabId === l.lab_id) setSelectedLabId(null)
-      if (selectedRoomId) await fetchLabs(selectedRoomId)
-    } catch (e: unknown) {
-      const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
-      setError(msg || 'Failed to delete lab.')
     } finally {
       setSubmitting(false)
     }
@@ -347,12 +447,16 @@ export function SchedulingPage() {
     }
   }
 
-  const canGoLabs = Boolean(selectedRoomId)
-  const canGoFaculty = Boolean(selectedRoomId && selectedLabId)
+  const canGoSections = Boolean(selectedCourseId)
+  const canGoRooms = Boolean(selectedCourseId && selectedSectionId)
+  const canGoLabs = Boolean(selectedCourseId && selectedSectionId && selectedRoomId)
+  const canGoFaculty = Boolean(selectedCourseId && selectedSectionId && selectedRoomId && selectedLabId)
 
   const goToStep = (next: ScheduleStep) => {
-    if (next === 2 && !canGoLabs) return
-    if (next === 3 && !canGoFaculty) return
+    if (next === 2 && !canGoSections) return
+    if (next === 3 && !canGoRooms) return
+    if (next === 4 && !canGoLabs) return
+    if (next === 5 && !canGoFaculty) return
     setStep(next)
   }
 
@@ -439,6 +543,69 @@ export function SchedulingPage() {
             </div>
           </div>
           <div className="modal-backdrop fade show" onClick={closeEditLab} />
+        </>
+      )}
+
+      {createCourseModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Create Course</h5>
+                  <button type="button" className="btn-close" onClick={() => setCreateCourseModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <form onSubmit={createCourse} className="row g-2">
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Course Code</label>
+                      <input className="form-control" value={newCourse.code} onChange={(e) => setNewCourse((p) => ({ ...p, code: e.target.value }))} disabled={submitting} placeholder="e.g. BSIT" />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Course Title</label>
+                      <input className="form-control" value={newCourse.title} onChange={(e) => setNewCourse((p) => ({ ...p, title: e.target.value }))} disabled={submitting} placeholder="e.g. Bachelor of Science in IT" />
+                    </div>
+                    <div className="col-12 mt-3 d-flex justify-content-end">
+                      <button type="submit" className="btn btn-primary rounded-3" disabled={submitting}>
+                        {submitting ? 'Saving...' : 'Create Course'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setCreateCourseModalOpen(false)} />
+        </>
+      )}
+
+      {createSectionModalOpen && (
+        <>
+          <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">Create Section</h5>
+                  <button type="button" className="btn-close" onClick={() => setCreateSectionModalOpen(false)} aria-label="Close" />
+                </div>
+                <div className="modal-body pt-2">
+                  <div className="spms-muted small mb-2">Course: <span className="fw-semibold">{selectedCourse ? `${selectedCourse.code} - ${selectedCourse.title}` : 'No course selected'}</span></div>
+                  <form onSubmit={createSection} className="row g-2">
+                    <div className="col-12">
+                      <label className="form-label small fw-semibold">Section Name</label>
+                      <input className="form-control" value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} disabled={submitting || !selectedCourseId} placeholder="e.g. BSIT-3A" />
+                    </div>
+                    <div className="col-12 mt-3 d-flex justify-content-end">
+                      <button type="submit" className="btn btn-primary rounded-3" disabled={submitting || !selectedCourseId}>
+                        {submitting ? 'Saving...' : 'Create Section'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setCreateSectionModalOpen(false)} />
         </>
       )}
 
@@ -561,7 +728,7 @@ export function SchedulingPage() {
                         <button key={l.lab_id} type="button" className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${selectedLabId === l.lab_id ? 'active' : ''}`} onClick={() => { setSelectedLabId(l.lab_id); setViewLabsModalOpen(false) }}>
                           <div className="text-start">
                             <div className="fw-semibold">{l.name}</div>
-                            <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>Faculty: {l.faculty_user_id ? `#${l.faculty_user_id}` : 'Unassigned'}</div>
+                            <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>Faculty: {facultyLabel(l.faculty_user_id)}</div>
                           </div>
                         </button>
                       ))}
@@ -615,36 +782,37 @@ export function SchedulingPage() {
         <div className="col-12">
           <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
             <div className="card-body">
-              <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <button
-                  type="button"
-                  className={`btn btn-sm rounded-pill ${step === 1 ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => goToStep(1)}
-                >
-                  1. Rooms
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm rounded-pill ${step === 2 ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => goToStep(2)}
-                  disabled={!canGoLabs}
-                >
-                  2. Labs
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm rounded-pill ${step === 3 ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => goToStep(3)}
-                  disabled={!canGoFaculty}
-                >
-                  3. Faculty Assignment
-                </button>
-              </div>
-
-              <div className="spms-muted small">
-                {step === 1 ? 'Create or select a room first.' : null}
-                {step === 2 ? 'Create labs under the selected room.' : null}
-                {step === 3 ? 'Assign faculty to the selected lab.' : null}
+              <div className="row g-2 row-cols-1 row-cols-sm-2 row-cols-lg-5">
+                <div className="col">
+                  <button type="button" className={`w-100 text-start border rounded-3 p-3 ${step === 1 ? 'bg-primary text-white border-primary' : 'bg-white border-light-subtle'}`} onClick={() => goToStep(1)}>
+                    <div className="fw-semibold">Course</div>
+                    <div className={`small ${step === 1 ? 'text-white-50' : 'text-muted'}`}>{selectedCourse ? selectedCourse.code : 'Choose course'}</div>
+                  </button>
+                </div>
+                <div className="col">
+                  <button type="button" className={`w-100 text-start border rounded-3 p-3 ${step === 2 ? 'bg-primary text-white border-primary' : 'bg-white border-light-subtle'}`} onClick={() => goToStep(2)} disabled={!canGoSections}>
+                    <div className="fw-semibold">Section</div>
+                    <div className={`small ${step === 2 ? 'text-white-50' : 'text-muted'}`}>{selectedSection ? selectedSection.name : 'Choose section'}</div>
+                  </button>
+                </div>
+                <div className="col">
+                  <button type="button" className={`w-100 text-start border rounded-3 p-3 ${step === 3 ? 'bg-primary text-white border-primary' : 'bg-white border-light-subtle'}`} onClick={() => goToStep(3)} disabled={!canGoRooms}>
+                    <div className="fw-semibold">Rooms</div>
+                    <div className={`small ${step === 3 ? 'text-white-50' : 'text-muted'}`}>{selectedRoom ? selectedRoom.name : 'Choose room'}</div>
+                  </button>
+                </div>
+                <div className="col">
+                  <button type="button" className={`w-100 text-start border rounded-3 p-3 ${step === 4 ? 'bg-primary text-white border-primary' : 'bg-white border-light-subtle'}`} onClick={() => goToStep(4)} disabled={!canGoLabs}>
+                    <div className="fw-semibold">Lab</div>
+                    <div className={`small ${step === 4 ? 'text-white-50' : 'text-muted'}`}>{selectedLab ? selectedLab.name : 'Choose lab'}</div>
+                  </button>
+                </div>
+                <div className="col">
+                  <button type="button" className={`w-100 text-start border rounded-3 p-3 ${step === 5 ? 'bg-primary text-white border-primary' : 'bg-white border-light-subtle'}`} onClick={() => goToStep(5)} disabled={!canGoFaculty}>
+                    <div className="fw-semibold">Faculty</div>
+                    <div className={`small ${step === 5 ? 'text-white-50' : 'text-muted'}`}>{selectedLab?.faculty_user_id ? `Assigned ${facultyLabel(selectedLab.faculty_user_id)}` : 'Assign faculty'}</div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -654,23 +822,20 @@ export function SchedulingPage() {
           <div className="col-12">
             <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
               <div className="card-body">
-                <h6 className="fw-semibold mb-3">Step 1: Rooms</h6>
+                <h6 className="fw-semibold mb-3">Course</h6>
                 <div className="d-flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-primary rounded-4 px-4" onClick={() => setCreateRoomModalOpen(true)}>
-                    Create Room
-                  </button>
-                  <button type="button" className="btn btn-outline-primary rounded-4 px-4" onClick={() => setViewRoomsModalOpen(true)}>
-                    View All Created Rooms
+                  <button type="button" className="btn btn-primary rounded-4 px-4" onClick={() => setCreateCourseModalOpen(true)}>
+                    Create Course
                   </button>
                 </div>
 
                 <div className="d-flex align-items-center justify-content-between mt-4">
-                  <div className="fw-semibold">Room List</div>
+                  <div className="fw-semibold">Course List</div>
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-secondary rounded-3"
-                    onClick={() => void fetchRooms()}
-                    disabled={loadingRooms}
+                    onClick={() => void fetchCourses()}
+                    disabled={loadingCourses}
                   >
                     <i className="bi bi-arrow-clockwise me-1" />
                     Refresh
@@ -678,52 +843,27 @@ export function SchedulingPage() {
                 </div>
 
                 <div className="mt-2">
-                  {loadingRooms ? (
-                    <div className="spms-muted small py-2">Loading rooms...</div>
-                  ) : rooms.length === 0 ? (
-                    <div className="spms-muted small py-2">No rooms yet.</div>
+                  {loadingCourses ? (
+                    <div className="spms-muted small py-2">Loading courses...</div>
+                  ) : courses.length === 0 ? (
+                    <div className="spms-muted small py-2">No courses yet.</div>
                   ) : (
                     <div className="list-group">
-                      {rooms.map((r) => (
+                      {courses.map((c) => (
                         <button
                           type="button"
-                          key={r.room_id}
+                          key={c.course_id}
                           className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
-                            selectedRoomId === r.room_id ? 'active' : ''
+                            selectedCourseId === c.course_id ? 'active' : ''
                           }`}
-                          onClick={() => setSelectedRoomId(r.room_id)}
+                          onClick={() => setSelectedCourseId(c.course_id)}
                           disabled={submitting}
                         >
                           <div className="me-2 text-start">
-                            <div className="fw-semibold">{r.name}</div>
-                            <div className={`small ${selectedRoomId === r.room_id ? 'text-white-50' : 'text-muted'}`}>
-                              {r.building ? `${r.building} • ` : ''}
-                              {r.capacity != null ? `Cap ${r.capacity}` : 'No capacity set'}
+                            <div className="fw-semibold">{c.code}</div>
+                            <div className={`small ${selectedCourseId === c.course_id ? 'text-white-50' : 'text-muted'}`}>
+                              {c.title}
                             </div>
-                          </div>
-                          <div className="btn-group btn-group-sm">
-                            <button
-                              type="button"
-                              className={`btn ${selectedRoomId === r.room_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditRoom(r)
-                              }}
-                              disabled={submitting}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn ${selectedRoomId === r.room_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                void deleteRoom(r)
-                              }}
-                              disabled={submitting}
-                            >
-                              Delete
-                            </button>
                           </div>
                         </button>
                       ))}
@@ -736,9 +876,9 @@ export function SchedulingPage() {
                     type="button"
                     className="btn btn-primary rounded-4 px-4"
                     onClick={() => goToStep(2)}
-                    disabled={!canGoLabs}
+                    disabled={!canGoSections}
                   >
-                    Next: Labs <i className="bi bi-arrow-right ms-1" />
+                    Continue to Section <i className="bi bi-arrow-right ms-1" />
                   </button>
                 </div>
               </div>
@@ -750,40 +890,32 @@ export function SchedulingPage() {
           <div className="col-12">
             <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
               <div className="card-body">
-                <h6 className="fw-semibold mb-1">Step 2: Labs</h6>
+                <h6 className="fw-semibold mb-1">Section</h6>
                 <div className="spms-muted small mb-3">
-                  {selectedRoom ? (
-                    <>Selected room: <span className="fw-semibold">{selectedRoom.name}</span></>
+                  {selectedCourse ? (
+                    <>Selected course: <span className="fw-semibold">{selectedCourse.code} - {selectedCourse.title}</span></>
                   ) : (
-                    'Select a room in Step 1 first.'
+                    'Select a course first.'
                   )}
                 </div>
                 <div className="d-flex flex-wrap gap-2">
                   <button
                     type="button"
                     className="btn btn-primary rounded-4 px-4"
-                    disabled={!selectedRoomId}
-                    onClick={() => setCreateLabModalOpen(true)}
+                    disabled={!selectedCourseId}
+                    onClick={() => setCreateSectionModalOpen(true)}
                   >
-                    Create Lab
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary rounded-4 px-4"
-                    disabled={!selectedRoomId}
-                    onClick={() => setViewLabsModalOpen(true)}
-                  >
-                    View All Created Labs
+                    Create Section
                   </button>
                 </div>
 
                 <div className="d-flex align-items-center justify-content-between mt-4">
-                  <div className="fw-semibold">Lab List</div>
+                  <div className="fw-semibold">Section List</div>
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-secondary rounded-3"
-                    onClick={() => selectedRoomId && void fetchLabs(selectedRoomId)}
-                    disabled={loadingLabs || !selectedRoomId}
+                    onClick={() => selectedCourseId && void fetchSections(selectedCourseId)}
+                    disabled={loadingSections || !selectedCourseId}
                   >
                     <i className="bi bi-arrow-clockwise me-1" />
                     Refresh
@@ -791,53 +923,27 @@ export function SchedulingPage() {
                 </div>
 
                 <div className="mt-2">
-                  {!selectedRoomId ? (
-                    <div className="spms-muted small py-2">No room selected.</div>
-                  ) : loadingLabs ? (
-                    <div className="spms-muted small py-2">Loading labs...</div>
-                  ) : labs.length === 0 ? (
-                    <div className="spms-muted small py-2">No labs yet for this room.</div>
+                  {!selectedCourseId ? (
+                    <div className="spms-muted small py-2">No course selected.</div>
+                  ) : loadingSections ? (
+                    <div className="spms-muted small py-2">Loading sections...</div>
+                  ) : sections.length === 0 ? (
+                    <div className="spms-muted small py-2">No sections yet for this course.</div>
                   ) : (
                     <div className="list-group">
-                      {labs.map((l) => (
+                      {sections.map((s) => (
                         <button
                           type="button"
-                          key={l.lab_id}
+                          key={s.section_id}
                           className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
-                            selectedLabId === l.lab_id ? 'active' : ''
+                            selectedSectionId === s.section_id ? 'active' : ''
                           }`}
-                          onClick={() => setSelectedLabId(l.lab_id)}
+                          onClick={() => setSelectedSectionId(s.section_id)}
                           disabled={submitting}
                         >
                           <div className="me-2 text-start">
-                            <div className="fw-semibold">{l.name}</div>
-                            <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>
-                              Faculty: {l.faculty_user_id ? `#${l.faculty_user_id}` : 'Unassigned'}
-                            </div>
-                          </div>
-                          <div className="btn-group btn-group-sm">
-                            <button
-                              type="button"
-                              className={`btn ${selectedLabId === l.lab_id ? 'btn-light' : 'btn-outline-secondary'} rounded-3`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditLab(l)
-                              }}
-                              disabled={submitting}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn ${selectedLabId === l.lab_id ? 'btn-outline-light' : 'btn-outline-danger'} rounded-3`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                void deleteLab(l)
-                              }}
-                              disabled={submitting}
-                            >
-                              Delete
-                            </button>
+                            <div className="fw-semibold">{s.name}</div>
+                            <div className={`small ${selectedSectionId === s.section_id ? 'text-white-50' : 'text-muted'}`}>Section ID: {s.section_id}</div>
                           </div>
                         </button>
                       ))}
@@ -847,15 +953,15 @@ export function SchedulingPage() {
 
                 <div className="d-flex justify-content-between mt-4">
                   <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(1)}>
-                    <i className="bi bi-arrow-left me-1" /> Back: Rooms
+                    <i className="bi bi-arrow-left me-1" /> Back to Course
                   </button>
                   <button
                     type="button"
                     className="btn btn-primary rounded-4 px-4"
                     onClick={() => goToStep(3)}
-                    disabled={!canGoFaculty}
+                    disabled={!canGoRooms}
                   >
-                    Next: Faculty Assignment <i className="bi bi-arrow-right ms-1" />
+                    Continue to Rooms <i className="bi bi-arrow-right ms-1" />
                   </button>
                 </div>
               </div>
@@ -867,7 +973,123 @@ export function SchedulingPage() {
           <div className="col-12">
             <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
               <div className="card-body">
-                <h6 className="fw-semibold mb-1">Step 3: Faculty Assignment</h6>
+                <h6 className="fw-semibold mb-1">Rooms</h6>
+                <div className="spms-muted small mb-3">
+                  {selectedSection ? (
+                    <>Selected section: <span className="fw-semibold">{selectedSection.name}</span></>
+                  ) : (
+                    'Select a section first.'
+                  )}
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary rounded-4 px-4" disabled={!selectedSectionId} onClick={() => setCreateRoomModalOpen(true)}>
+                    Create Room
+                  </button>
+                  <button type="button" className="btn btn-outline-primary rounded-4 px-4" disabled={!selectedSectionId} onClick={() => setViewRoomsModalOpen(true)}>
+                    View All Created Rooms
+                  </button>
+                </div>
+
+                <div className="d-flex align-items-center justify-content-between mt-4">
+                  <div className="fw-semibold">Room List</div>
+                  <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => void fetchRooms()} disabled={loadingRooms || !selectedSectionId}>
+                    <i className="bi bi-arrow-clockwise me-1" />
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-2">
+                  {!selectedSectionId ? (
+                    <div className="spms-muted small py-2">No section selected.</div>
+                  ) : loadingRooms ? (
+                    <div className="spms-muted small py-2">Loading rooms...</div>
+                  ) : rooms.length === 0 ? (
+                    <div className="spms-muted small py-2">No rooms yet for this section.</div>
+                  ) : (
+                    <div className="list-group">
+                      {rooms.map((r) => (
+                        <button key={r.room_id} type="button" className={`list-group-item list-group-item-action ${selectedRoomId === r.room_id ? 'active' : ''}`} onClick={() => setSelectedRoomId(r.room_id)}>
+                          <div className="fw-semibold">{r.name}</div>
+                          <div className={`small ${selectedRoomId === r.room_id ? 'text-white-50' : 'text-muted'}`}>{r.building ? `${r.building} • ` : ''}{r.capacity != null ? `Cap ${r.capacity}` : 'No capacity set'}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="d-flex justify-content-between mt-4">
+                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(2)}>
+                    <i className="bi bi-arrow-left me-1" /> Back to Section
+                  </button>
+                  <button type="button" className="btn btn-primary rounded-4 px-4" onClick={() => goToStep(4)} disabled={!canGoLabs}>
+                    Continue to Lab <i className="bi bi-arrow-right ms-1" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="col-12">
+            <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+              <div className="card-body">
+                <h6 className="fw-semibold mb-1">Lab</h6>
+                <div className="spms-muted small mb-3">
+                  {selectedRoom ? <>Selected room: <span className="fw-semibold">{selectedRoom.name}</span></> : 'Select a room first.'}
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary rounded-4 px-4" disabled={!selectedRoomId} onClick={() => setCreateLabModalOpen(true)}>
+                    Create Lab
+                  </button>
+                  <button type="button" className="btn btn-outline-primary rounded-4 px-4" disabled={!selectedRoomId} onClick={() => setViewLabsModalOpen(true)}>
+                    View All Created Labs
+                  </button>
+                </div>
+
+                <div className="d-flex align-items-center justify-content-between mt-4">
+                  <div className="fw-semibold">Lab List</div>
+                  <button type="button" className="btn btn-sm btn-outline-secondary rounded-3" onClick={() => selectedRoomId && void fetchLabs(selectedRoomId)} disabled={loadingLabs || !selectedRoomId}>
+                    <i className="bi bi-arrow-clockwise me-1" />
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-2">
+                  {!selectedRoomId ? (
+                    <div className="spms-muted small py-2">No room selected.</div>
+                  ) : loadingLabs ? (
+                    <div className="spms-muted small py-2">Loading labs...</div>
+                  ) : labs.length === 0 ? (
+                    <div className="spms-muted small py-2">No labs yet for this room.</div>
+                  ) : (
+                    <div className="list-group">
+                      {labs.map((l) => (
+                        <button key={l.lab_id} type="button" className={`list-group-item list-group-item-action ${selectedLabId === l.lab_id ? 'active' : ''}`} onClick={() => setSelectedLabId(l.lab_id)}>
+                          <div className="fw-semibold">{l.name}</div>
+                          <div className={`small ${selectedLabId === l.lab_id ? 'text-white-50' : 'text-muted'}`}>Faculty: {facultyLabel(l.faculty_user_id)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="d-flex justify-content-between mt-4">
+                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(3)}>
+                    <i className="bi bi-arrow-left me-1" /> Back to Rooms
+                  </button>
+                  <button type="button" className="btn btn-primary rounded-4 px-4" onClick={() => goToStep(5)} disabled={!canGoFaculty}>
+                    Continue to Faculty <i className="bi bi-arrow-right ms-1" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 5 && (
+          <div className="col-12">
+            <div className="spms-card card border-0" style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(15, 23, 42, .06)' }}>
+              <div className="card-body">
+                <h6 className="fw-semibold mb-1">Faculty Assignment</h6>
                 <div className="spms-muted small mb-3">
                   {selectedLab ? (
                     <>
@@ -875,7 +1097,7 @@ export function SchedulingPage() {
                       <span className="fw-semibold">{selectedRoom?.name ?? 'No room'}</span>)
                     </>
                   ) : (
-                    'Select a lab in Step 2 first.'
+                    'Select a lab first.'
                   )}
                 </div>
                 <div className="d-flex flex-wrap gap-2">
@@ -911,8 +1133,8 @@ export function SchedulingPage() {
                 </div>
 
                 <div className="d-flex justify-content-start mt-4">
-                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(2)}>
-                    <i className="bi bi-arrow-left me-1" /> Back: Labs
+                  <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(4)}>
+                    <i className="bi bi-arrow-left me-1" /> Back to Lab
                   </button>
                 </div>
               </div>
