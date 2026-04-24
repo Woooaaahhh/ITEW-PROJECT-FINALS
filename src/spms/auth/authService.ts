@@ -166,6 +166,7 @@ export function canAccessPath(
       path === '/medical' ||
       path === '/reports' ||
       path === '/instruction' ||
+      path === '/events' ||
       path === '/students' ||
       path.startsWith('/students/')
     )
@@ -199,7 +200,8 @@ export function canAccessPath(
       path === '/student/records' ||
       path === '/student/schedule' ||
       path === '/medical' ||
-      path === '/instruction'
+      path === '/instruction' ||
+      path === '/events'
     )
   }
 

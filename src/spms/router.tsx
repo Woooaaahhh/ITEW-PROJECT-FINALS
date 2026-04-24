@@ -31,6 +31,7 @@ import { SchedulingPage } from './pages/SchedulingPage'
 import { DashboardDebug } from './pages/DashboardDebug'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/LoginPage'
+import { EventsPage } from './pages/EventsPage'
 import { Link } from 'react-router-dom'
 
 const dashboardHandle: PageMeta = {
@@ -170,6 +171,11 @@ const instructionHandle: PageMeta = {
 const schedulingHandle: PageMeta = {
   title: 'Scheduling',
   subtitle: 'Manage course, section, room, lab, and faculty assignments',
+}
+
+const eventsHandle: PageMeta = {
+  title: 'Events',
+  subtitle: 'View upcoming curricular and extra-curricular events',
 }
 
 const notFoundHandle: PageMeta = {
@@ -430,6 +436,15 @@ export const spmsRouter = createBrowserRouter([
           </RoleProtectedRoute>
         ),
         handle: schedulingHandle,
+      },
+      {
+        path: '/events',
+        element: (
+          <RoleProtectedRoute allowedRoles={['admin', 'faculty', 'student']}>
+            <EventsPage />
+          </RoleProtectedRoute>
+        ),
+        handle: eventsHandle,
       },
       {
         path: '/debug',
