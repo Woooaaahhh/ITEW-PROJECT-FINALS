@@ -981,6 +981,30 @@ const labUpdateSchema = z.object({
   faculty_user_id: z.number().int().positive().nullable().optional(),
 })
 
+const eventCategorySchema = z.enum(['curricular', 'extra-curricular'])
+
+const createEventSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  subtitle: z.string().trim().max(200).optional(),
+  category: eventCategorySchema,
+  location: z.string().trim().min(1).max(200),
+  start_date: z.string().trim().min(1),
+  end_date: z.string().trim().min(1),
+  description: z.string().trim().min(1).max(4000),
+  image_url: z.string().trim().url().max(2000).optional(),
+})
+
+const updateEventSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  subtitle: z.string().trim().max(200).optional(),
+  category: eventCategorySchema.optional(),
+  location: z.string().trim().min(1).max(200).optional(),
+  start_date: z.string().trim().min(1).optional(),
+  end_date: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).max(4000).optional(),
+  image_url: z.string().trim().url().max(2000).optional(),
+})
+
 app.get('/api/instruction/syllabi', authMiddleware, async (req, res) => {
   const db = await getDb()
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true'
