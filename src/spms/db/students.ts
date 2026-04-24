@@ -3,11 +3,6 @@ import axios from 'axios'
 
 export type { Student } from './spmsDb'
 
-type CacheEntry<T> = {
-  value: T
-  fetchedAtMs: number
-}
-
 type ApiStudentRow = {
   student_id: number
   first_name: string
@@ -74,8 +69,6 @@ function fromApiRow(row: ApiStudentRow): Student {
 function notifyStudentsChanged() {
   if (typeof window === 'undefined') return
   try {
-    // Keep module-level caches coherent across pages.
-    clearStudentMemoryCache()
     window.dispatchEvent(new CustomEvent('spms-students-changed'))
   } catch {
     /* ignore */
@@ -198,32 +191,6 @@ async function dedupeDemoStudentsByEmail(db: Awaited<ReturnType<typeof openSpmsD
 /** Serializes seeding — many pages call seedIfEmpty(); without this, parallel runs each insert 3 students. */
 let seedChain: Promise<void> = Promise.resolve()
 
-const STUDENTS_CACHE_TTL_MS = 30_000
-let studentsCache: CacheEntry<Student[]> | null = null
-let studentsInFlight: Promise<Student[]> | null = null
-
-const studentByIdCache = new Map<string, CacheEntry<Student | undefined>>()
-const studentByIdInFlight = new Map<string, Promise<Student | undefined>>()
-
-function isFreshEntry<T>(entry: CacheEntry<T> | null, ttlMs: number): entry is CacheEntry<T> {
-  return !!entry && Date.now() - entry.fetchedAtMs < ttlMs
-}
-
-function setStudentsCache(value: Student[]) {
-  studentsCache = { value, fetchedAtMs: Date.now() }
-}
-
-function setStudentByIdCache(id: string, value: Student | undefined) {
-  studentByIdCache.set(id, { value, fetchedAtMs: Date.now() })
-}
-
-function clearStudentMemoryCache() {
-  studentsCache = null
-  studentsInFlight = null
-  studentByIdCache.clear()
-  studentByIdInFlight.clear()
-}
-
 async function runSeededWork(): Promise<void> {
   const db = await openSpmsDb()
   await dedupeDemoStudentsByEmail(db)
@@ -300,111 +267,80 @@ async function runSeededWork(): Promise<void> {
 }
 
 export async function listStudents(): Promise<Student[]> {
-  const cache = studentsCache
-  if (isFreshEntry(cache, STUDENTS_CACHE_TTL_MS)) return cache.value
-  if (studentsInFlight) return studentsInFlight
-
   // Prefer backend API (MongoDB) so admin/faculty views show the true shared dataset.
   // Fallback to local IndexedDB for offline mode or student-role routes.
-  studentsInFlight = (async () => {
-    try {
-      const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
-      const all = (res.data.students ?? []).map(fromApiRow)
+  try {
+    const res = await axios.get<{ students: ApiStudentRow[] }>('/api/students?includeHeavy=false')
+    const all = (res.data.students ?? []).map(fromApiRow)
 
-      // Only check for data issues if we have multiple students and API returned data
-      if (all.length > 1) {
-        const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
-        // Only clear cache if we have a clear data duplication issue AND it's a known problem name
-        if (
-          uniqueNames.size === 1 &&
-          all[0] &&
-          (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
-        ) {
-          // Clear cache and retry API call once
-          await clearStudentCache()
-          const retryRes = await axios.get<{ students: ApiStudentRow[] }>('/api/students')
-          const retryAll = (retryRes.data.students ?? []).map(fromApiRow)
-          const db = await openSpmsDb()
-          const local = await db.getAll('students')
-          const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
-          const mergedRetry = retryAll
-            .map(withEligibilityDefaults)
-            .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
-            .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
-
-          setStudentsCache(mergedRetry)
-          return mergedRetry
-        }
+    // Only check for data issues if we have multiple students and API returned data
+    if (all.length > 1) {
+      const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
+      // Only clear cache if we have a clear data duplication issue AND it's a known problem name
+      if (
+        uniqueNames.size === 1 &&
+        all[0] &&
+        (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
+      ) {
+        // Clear cache and retry API call once
+        await clearStudentCache()
+        const retryRes = await axios.get<{ students: ApiStudentRow[] }>('/api/students?includeHeavy=false')
+        const retryAll = (retryRes.data.students ?? []).map(fromApiRow)
+        const db = await openSpmsDb()
+        const local = await db.getAll('students')
+        const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
+        const mergedRetry = retryAll
+          .map(withEligibilityDefaults)
+          .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
+        return mergedRetry.sort(
+          (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+        )
       }
-
-      const db = await openSpmsDb()
-      const local = await db.getAll('students')
-      const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
-      const merged = all
-        .map(withEligibilityDefaults)
-        .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
-        .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
-
-      setStudentsCache(merged)
-      return merged
-    } catch {
-      const db = await openSpmsDb()
-      const all = await db.getAll('students')
-
-      // Only clear IndexedDB cache if we have the specific Kristy Abernathy duplication issue
-      if (all.length > 1) {
-        const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
-        if (
-          uniqueNames.size === 1 &&
-          all[0] &&
-          (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
-        ) {
-          // Clear cache to force fresh API call on next attempt
-          await clearStudentCache()
-          setStudentsCache([])
-          return []
-        }
-      }
-
-      const out = all.map(withEligibilityDefaults).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      setStudentsCache(out)
-      return out
-    } finally {
-      studentsInFlight = null
     }
-  })()
 
-  return studentsInFlight
+    const db = await openSpmsDb()
+    const local = await db.getAll('students')
+    const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
+    const merged = all
+      .map(withEligibilityDefaults)
+      .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
+    return merged.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
+  } catch {
+    const db = await openSpmsDb()
+    const all = await db.getAll('students')
+
+    // Only clear IndexedDB cache if we have the specific Kristy Abernathy duplication issue
+    if (all.length > 1) {
+      const uniqueNames = new Set(all.map((s) => `${s.firstName} ${s.lastName}`))
+      if (
+        uniqueNames.size === 1 &&
+        all[0] &&
+        (all[0].firstName.includes('Kristy') || all[0].lastName.includes('Abernathy'))
+      ) {
+        // Clear cache to force fresh API call on next attempt
+        await clearStudentCache()
+        return []
+      }
+    }
+
+    return all
+      .map(withEligibilityDefaults)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }
 }
 
 export async function getStudent(id: string): Promise<Student | undefined> {
-  const cached = (studentByIdCache.get(id) ?? null) as CacheEntry<Student | undefined> | null
-  if (isFreshEntry(cached, STUDENTS_CACHE_TTL_MS)) return cached.value
-  const inflight = studentByIdInFlight.get(id)
-  if (inflight) return inflight
-
-  const task = (async () => {
-    try {
-      const res = await axios.get<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`)
-      const base = withEligibilityDefaults(fromApiRow(res.data.student))
-      const db = await openSpmsDb()
-      const local = await db.get('students', id)
-      const merged = { ...base, ...pickEligibility(local ? withEligibilityDefaults(local) : undefined) }
-      setStudentByIdCache(id, merged)
-      return merged
-    } catch {
-      const db = await openSpmsDb()
-      const s = await db.get('students', id)
-      const out = s ? withEligibilityDefaults(s) : undefined
-      setStudentByIdCache(id, out)
-      return out
-    } finally {
-      studentByIdInFlight.delete(id)
-    }
-  })()
-
-  studentByIdInFlight.set(id, task)
-  return task
+  try {
+    const res = await axios.get<{ student: ApiStudentRow }>(`/api/students/${encodeURIComponent(id)}`)
+    const base = withEligibilityDefaults(fromApiRow(res.data.student))
+    const db = await openSpmsDb()
+    const local = await db.get('students', id)
+    return { ...base, ...pickEligibility(local ? withEligibilityDefaults(local) : undefined) }
+  } catch {
+    const db = await openSpmsDb()
+    const s = await db.get('students', id)
+    return s ? withEligibilityDefaults(s) : undefined
+  }
 }
 
 export async function createStudent(input: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> {

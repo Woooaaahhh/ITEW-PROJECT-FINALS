@@ -1,8 +1,15 @@
 /** Powerful Student Dashboard with Charts and Analytics */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import avatarUrl from '../../assets/react.svg'
+import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { useAuth } from '../auth/AuthContext'
+
+function fullName(s: Student) {
+  const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
+  return parts.replace(/\s+/g, ' ').trim()
+}
 
 export function StudentDashboard() {
   const { user } = useAuth()
@@ -53,6 +60,8 @@ export function StudentDashboard() {
     { skill: 'Leadership', A: 70, fullMark: 100 },
     { skill: 'Creativity', A: 82, fullMark: 100 },
   ]
+
+  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
 
   useEffect(() => {
     if (searchParams.get('medical') === '1' && myStudentId) {

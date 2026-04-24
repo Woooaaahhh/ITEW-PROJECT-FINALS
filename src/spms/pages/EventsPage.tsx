@@ -24,6 +24,7 @@ export function EventsPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [editModal, setEditModal] = useState<null | EventRow>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Form states
   const [title, setTitle] = useState('')
@@ -62,6 +63,7 @@ export function EventsPage() {
     setEndDate('')
     setDescription('')
     setImageUrl('')
+    setShowCreateModal(false)
   }
 
   const createEvent = async (e: React.FormEvent) => {
@@ -199,9 +201,7 @@ export function EventsPage() {
             {isAdmin && (
               <button
                 className="btn btn-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#createEventModal"
-                onClick={resetForm}
+                onClick={() => setShowCreateModal(true)}
               >
                 <i className="bi bi-plus-circle me-2"></i>
                 Create Event
@@ -249,8 +249,6 @@ export function EventsPage() {
                               <button
                                 className="dropdown-item"
                                 onClick={() => openEditModal(event)}
-                                data-bs-toggle="modal"
-                                data-bs-target="#editEventModal"
                               >
                                 <i className="bi bi-pencil me-2"></i>
                                 Edit
@@ -303,13 +301,13 @@ export function EventsPage() {
       </div>
 
       {/* Create Event Modal */}
-      {isAdmin && (
-        <div className="modal fade" id="createEventModal" tabIndex={-1}>
+      {isAdmin && showCreateModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Create Event</h5>
-                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)}></button>
               </div>
               <form onSubmit={createEvent}>
                 <div className="modal-body">
@@ -415,7 +413,7 @@ export function EventsPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
@@ -430,12 +428,12 @@ export function EventsPage() {
 
       {/* Edit Event Modal */}
       {isAdmin && editModal && (
-        <div className="modal fade" id="editEventModal" tabIndex={-1}>
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Edit Event</h5>
-                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" className="btn-close" onClick={() => setEditModal(null)}></button>
               </div>
               <form onSubmit={updateEvent}>
                 <div className="modal-body">
@@ -541,7 +539,7 @@ export function EventsPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditModal(null)}>
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={submitting}>

@@ -5,6 +5,8 @@ import avatarUrl from '../../assets/react.svg'
 import axios from 'axios'
 
 const apiPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/
+const nameRegex = /^[A-Za-z][A-Za-z .'-]{0,79}$/
+const phoneRegex = /^(09\d{9}|\+639\d{9})$/
 
 type FormState = {
   firstName: string
@@ -46,6 +48,7 @@ const initial: FormState = {
 export function AddStudentPage() {
   const [form, setForm] = useState<FormState>(initial)
   const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [sections, setSections] = useState<Array<{ section_id: number; year_level: '1st' | '2nd' | '3rd' | '4th'; section: string }>>([])
   const [sectionsLoading, setSectionsLoading] = useState(true)
@@ -121,9 +124,22 @@ export function AddStudentPage() {
                   setSubmitError('First name and last name are required.')
                   return
                 }
+                if (!nameRegex.test(fn) || !nameRegex.test(ln)) {
+                  setSubmitError("Names may only contain letters, spaces, apostrophes, hyphens, and periods.")
+                  return
+                }
                 const emailVal = form.email.trim().toLowerCase()
                 if (!emailVal) {
                   setSubmitError('School email is required to create a MongoDB student account.')
+                  return
+                }
+                if (!emailVal.includes('@')) {
+                  setSubmitError('School email format is invalid.')
+                  return
+                }
+                const contactVal = form.contactNumber.trim()
+                if (contactVal && !phoneRegex.test(contactVal)) {
+                  setSubmitError('Contact number must be 11 digits (09xxxxxxxxx) or +639xxxxxxxxx.')
                   return
                 }
                 // Validate Gmail for account creation
@@ -220,6 +236,7 @@ export function AddStudentPage() {
               onReset={() => {
                 setForm(initial)
                 setFileUrl(null)
+                setFileDataUrl(null)
                 setSubmitError(null)
               }}
             >
@@ -245,6 +262,11 @@ export function AddStudentPage() {
                               if (prev) URL.revokeObjectURL(prev)
                               return url
                             })
+                            const reader = new FileReader()
+                            reader.onload = () => {
+                              setFileDataUrl(typeof reader.result === 'string' ? reader.result : null)
+                            }
+                            reader.readAsDataURL(file)
                           }}
                         />
                       </div>
@@ -264,6 +286,7 @@ export function AddStudentPage() {
                       value={form.firstName}
                       onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
                       placeholder="First name"
+                      maxLength={80}
                       required
                     />
                   </div>
@@ -279,6 +302,7 @@ export function AddStudentPage() {
                       value={form.middleName}
                       onChange={(e) => setForm((f) => ({ ...f, middleName: e.target.value }))}
                       placeholder="Middle name"
+                      maxLength={80}
                     />
                   </div>
                 </div>
@@ -293,6 +317,7 @@ export function AddStudentPage() {
                       value={form.lastName}
                       onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
                       placeholder="Last name"
+                      maxLength={80}
                       required
                     />
                   </div>
@@ -340,7 +365,8 @@ export function AddStudentPage() {
                       className="form-control"
                       value={form.contactNumber}
                       onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
-                      placeholder="09xx xxx xxxx"
+                      placeholder="09xxxxxxxxx"
+                      maxLength={13}
                     />
                   </div>
                 </div>
@@ -357,6 +383,7 @@ export function AddStudentPage() {
                       value={form.email}
                       onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                       placeholder="name@school.edu"
+                      maxLength={120}
                     />
                   </div>
                 </div>
@@ -397,6 +424,7 @@ export function AddStudentPage() {
                       value={form.gmail}
                       onChange={(e) => setForm((f) => ({ ...f, gmail: e.target.value }))}
                       placeholder="student@gmail.com"
+                      maxLength={120}
                       required
                     />
                   </div>
