@@ -1752,21 +1752,11 @@ app.get('/api/scheduling/faculty-view', authMiddleware, requireStaff, async (req
         .filter((v) => v != null && v !== ''),
     ),
   )
-  let labs = await db
+  const labs = await db
     .collection('labs')
     .find({ faculty_user_id: { $in: possibleFacultyKeys } }, { projection: { _id: 0 } })
     .sort({ name: 1, lab_id: 1 })
     .toArray()
-
-  // Demo-safe fallback: when logged into a generic faculty account with no direct assignments,
-  // show currently assigned labs so the faculty module still reflects scheduling activity.
-  if (labs.length === 0 && authRole === 'faculty') {
-    labs = await db
-      .collection('labs')
-      .find({ faculty_user_id: { $ne: null } }, { projection: { _id: 0 } })
-      .sort({ name: 1, lab_id: 1 })
-      .toArray()
-  }
 
   if (labs.length === 0) {
     return res.json({ faculty, schedules: [] })
