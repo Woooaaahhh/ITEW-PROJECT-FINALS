@@ -999,6 +999,30 @@ const labUpdateSchema = z.object({
   faculty_user_id: z.number().int().positive().nullable().optional(),
 })
 
+const eventCategorySchema = z.enum(['curricular', 'extra-curricular'])
+
+const createEventSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  subtitle: z.string().trim().max(200).optional(),
+  category: eventCategorySchema,
+  location: z.string().trim().min(1).max(200),
+  start_date: z.string().trim().min(1),
+  end_date: z.string().trim().min(1),
+  description: z.string().trim().min(1).max(4000),
+  image_url: z.string().trim().url().max(2000).optional(),
+})
+
+const updateEventSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  subtitle: z.string().trim().max(200).optional(),
+  category: eventCategorySchema.optional(),
+  location: z.string().trim().min(1).max(200).optional(),
+  start_date: z.string().trim().min(1).optional(),
+  end_date: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).max(4000).optional(),
+  image_url: z.string().trim().url().max(2000).optional(),
+})
+
 app.get('/api/instruction/syllabi', authMiddleware, async (req, res) => {
   const db = await getDb()
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true'
@@ -1414,6 +1438,327 @@ app.get('/api/scheduling/faculty', authMiddleware, requireAdmin, async (_req, re
   return res.json({ faculty })
 })
 
+<<<<<<< HEAD
+=======
+app.get('/api/scheduling/student-view', authMiddleware, requireStaffOrStudent, async (req, res) => {
+  const db = await getDb()
+  const authRole = req.auth?.role
+  const authUserId = Number(req.auth?.sub)
+  const requestedStudentId = Number(req.query.student_id)
+
+  let student
+  if (authRole === 'student') {
+    student = await db.collection('students').findOne({ user_id: authUserId }, { projection: { _id: 0 } })
+  } else if (requestedStudentId) {
+    student = await db.collection('students').findOne({ student_id: requestedStudentId }, { projection: { _id: 0 } })
+  } else {
+    student = await db.collection('students').findOne({}, { projection: { _id: 0 }, sort: { student_id: 1 } })
+  }
+
+  if (!student) return res.status(404).json({ message: 'Student not found' })
+
+  const sectionName = String(student.section || '').trim()
+  if (!sectionName) {
+    return res.json({
+      student: {
+        student_id: student.student_id,
+        first_name: student.first_name ?? '',
+        last_name: student.last_name ?? '',
+        section: student.section ?? null,
+      },
+      schedules: [],
+    })
+  }
+
+  const sections = await db
+    .collection('schedule_sections')
+    .find({ name: sectionName }, { projection: { _id: 0 } })
+    .sort({ section_id: 1 })
+    .toArray()
+
+  if (sections.length === 0) {
+    return res.json({
+      student: {
+        student_id: student.student_id,
+        first_name: student.first_name ?? '',
+        last_name: student.last_name ?? '',
+        section: student.section ?? null,
+      },
+      schedules: [],
+    })
+  }
+
+  const courseIds = Array.from(new Set(sections.map((s) => s.course_id)))
+  const courses = await db
+    .collection('schedule_courses')
+    .find({ course_id: { $in: courseIds } }, { projection: { _id: 0 } })
+    .toArray()
+  const courseMap = new Map(courses.map((c) => [c.course_id, c]))
+
+  const sectionIds = sections.map((s) => s.section_id)
+  const rooms = await db
+    .collection('rooms')
+    .find({ section_id: { $in: sectionIds } }, { projection: { _id: 0 } })
+    .sort({ name: 1, room_id: 1 })
+    .toArray()
+  const roomsBySection = new Map()
+  for (const room of rooms) {
+    const key = room.section_id
+    if (!roomsBySection.has(key)) roomsBySection.set(key, [])
+    roomsBySection.get(key).push(room)
+  }
+
+  const roomIds = rooms.map((r) => r.room_id)
+  const labs = roomIds.length
+    ? await db
+        .collection('labs')
+        .find({ room_id: { $in: roomIds } }, { projection: { _id: 0 } })
+        .sort({ name: 1, lab_id: 1 })
+        .toArray()
+    : []
+  const labsByRoom = new Map()
+  for (const lab of labs) {
+    const key = lab.room_id
+    if (!labsByRoom.has(key)) labsByRoom.set(key, [])
+    labsByRoom.get(key).push(lab)
+  }
+
+  const facultyIds = Array.from(
+    new Set(
+      labs
+        .map((l) => l.faculty_user_id)
+        .filter((id) => id != null),
+    ),
+  )
+  const facultyUsers = facultyIds.length
+    ? await db
+        .collection('users')
+        .find({ user_id: { $in: facultyIds } }, { projection: { _id: 0, user_id: 1, username: 1 } })
+        .toArray()
+    : []
+  const facultyMap = new Map(facultyUsers.map((f) => [f.user_id, f.username]))
+
+  const schedules = sections.map((section) => {
+    const sectionRooms = roomsBySection.get(section.section_id) ?? []
+    const mappedRooms = sectionRooms.map((room) => {
+      const roomLabs = labsByRoom.get(room.room_id) ?? []
+      return {
+        ...room,
+        labs: roomLabs.map((lab) => ({
+          ...lab,
+          faculty_name: lab.faculty_user_id ? facultyMap.get(lab.faculty_user_id) ?? null : null,
+        })),
+      }
+    })
+
+    return {
+      section_id: section.section_id,
+      section_name: section.name,
+      course: courseMap.get(section.course_id) ?? null,
+      rooms: mappedRooms,
+    }
+  })
+
+  return res.json({
+    student: {
+      student_id: student.student_id,
+      first_name: student.first_name ?? '',
+      last_name: student.last_name ?? '',
+      section: student.section ?? null,
+    },
+    schedules,
+  })
+})
+
+app.get('/api/scheduling/faculty-view', authMiddleware, requireStaff, async (req, res) => {
+  const db = await getDb()
+  const authRole = req.auth?.role
+  const authUserId = Number(req.auth?.sub)
+  const requestedFacultyId = Number(req.query.faculty_user_id)
+
+  const facultyUserId = authRole === 'faculty' ? authUserId : requestedFacultyId || authUserId
+  if (!facultyUserId) return res.status(400).json({ message: 'Invalid faculty user id' })
+
+  const faculty = await db
+    .collection('users')
+    .findOne({ user_id: facultyUserId, role: 'faculty' }, { projection: { _id: 0, user_id: 1, username: 1, email: 1, faculty_type: 1 } })
+  if (!faculty) return res.status(404).json({ message: 'Faculty not found' })
+
+  // Legacy-safe lookup: some old records may store faculty_user_id as string (or username).
+  const possibleFacultyKeys = Array.from(
+    new Set(
+      [facultyUserId, String(facultyUserId), faculty.username, faculty.email]
+        .map((v) => (typeof v === 'string' ? v.trim() : v))
+        .filter((v) => v != null && v !== ''),
+    ),
+  )
+  const labs = await db
+    .collection('labs')
+    .find({ faculty_user_id: { $in: possibleFacultyKeys } }, { projection: { _id: 0 } })
+    .sort({ name: 1, lab_id: 1 })
+    .toArray()
+
+  if (labs.length === 0) {
+    return res.json({ faculty, schedules: [] })
+  }
+
+  const labFacultyIds = Array.from(new Set(labs.map((l) => Number(l.faculty_user_id)).filter((id) => Number.isFinite(id) && id > 0)))
+  const labFacultyUsers = labFacultyIds.length
+    ? await db
+        .collection('users')
+        .find({ user_id: { $in: labFacultyIds } }, { projection: { _id: 0, user_id: 1, username: 1 } })
+        .toArray()
+    : []
+  const labFacultyMap = new Map(labFacultyUsers.map((u) => [u.user_id, u.username]))
+
+  const roomIds = Array.from(new Set(labs.map((l) => l.room_id)))
+  const rooms = await db
+    .collection('rooms')
+    .find({ room_id: { $in: roomIds } }, { projection: { _id: 0 } })
+    .toArray()
+  const roomMap = new Map(rooms.map((r) => [r.room_id, r]))
+
+  const sectionIds = Array.from(new Set(rooms.map((r) => r.section_id).filter((id) => id != null)))
+  const sections = sectionIds.length
+    ? await db
+        .collection('schedule_sections')
+        .find({ section_id: { $in: sectionIds } }, { projection: { _id: 0 } })
+        .toArray()
+    : []
+  const sectionMap = new Map(sections.map((s) => [s.section_id, s]))
+
+  const courseIds = Array.from(new Set(sections.map((s) => s.course_id)))
+  const courses = courseIds.length
+    ? await db
+        .collection('schedule_courses')
+        .find({ course_id: { $in: courseIds } }, { projection: { _id: 0 } })
+        .toArray()
+    : []
+  const courseMap = new Map(courses.map((c) => [c.course_id, c]))
+
+  const schedules = labs.map((lab) => {
+    const room = roomMap.get(lab.room_id) ?? null
+    const section = room?.section_id ? sectionMap.get(room.section_id) ?? null : null
+    const course = section?.course_id ? courseMap.get(section.course_id) ?? null : null
+    return {
+      course,
+      section,
+      room,
+      lab: {
+        ...lab,
+        faculty_name: Number(lab.faculty_user_id) ? labFacultyMap.get(Number(lab.faculty_user_id)) ?? null : null,
+      },
+    }
+  })
+
+  return res.json({ faculty, schedules })
+})
+
+app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
+app.get('/api/events', async (_req, res) => {
+  console.log('Events route called')
+  const db = await getDb()
+  const events = await db
+    .collection('events')
+    .find({}, { projection: { _id: 0 } })
+    .sort({ start_date: 1 })
+    .toArray()
+  return res.json({ events })
+})
+
+app.post('/api/events', authMiddleware, requireAdmin, async (req, res) => {
+  const parsed = createEventSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const { title, subtitle, category, location, start_date, end_date, description, image_url } = parsed.data
+
+  // Validate dates
+  const startDate = new Date(start_date)
+  const endDate = new Date(end_date)
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' })
+  }
+  if (endDate <= startDate) {
+    return res.status(400).json({ message: 'End date must be after start date' })
+  }
+
+  const db = await getDb()
+  const created = {
+    event_id: await nextSequence(db, 'events'),
+    title,
+    subtitle: subtitle || null,
+    category,
+    location,
+    start_date: startDate,
+    end_date: endDate,
+    description,
+    image_url: image_url || null,
+    created_at: new Date(),
+  }
+
+  await db.collection('events').insertOne(created)
+  return res.status(201).json({ event: created })
+})
+
+app.put('/api/events/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid event id' })
+
+  const parsed = updateEventSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const db = await getDb()
+  const existing = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0, event_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Event not found' })
+
+  const fields = {}
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title
+  if (parsed.data.subtitle !== undefined) fields.subtitle = parsed.data.subtitle
+  if (parsed.data.category !== undefined) fields.category = parsed.data.category
+  if (parsed.data.location !== undefined) fields.location = parsed.data.location
+  if (parsed.data.description !== undefined) fields.description = parsed.data.description
+  if (parsed.data.image_url !== undefined) fields.image_url = parsed.data.image_url
+
+  // Handle date updates
+  if (parsed.data.start_date !== undefined || parsed.data.end_date !== undefined) {
+    const current = await db.collection('events').findOne({ event_id: id })
+    const startDateStr = parsed.data.start_date || current.start_date
+    const endDateStr = parsed.data.end_date || current.end_date
+
+    const startDate = new Date(startDateStr)
+    const endDate = new Date(endDateStr)
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' })
+    }
+    if (endDate <= startDate) {
+      return res.status(400).json({ message: 'End date must be after start date' })
+    }
+
+    fields.start_date = startDate
+    fields.end_date = endDate
+  }
+
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
+
+  await db.collection('events').updateOne({ event_id: id }, { $set: fields })
+  const updated = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0 } })
+  return res.json({ event: updated })
+})
+
+app.delete('/api/events/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid event id' })
+
+  const db = await getDb()
+  const existing = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0, event_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Event not found' })
+
+  await db.collection('events').deleteOne({ event_id: id })
+  return res.json({ ok: true })
+})
+
+>>>>>>> 1ce7fb3fd25a2d1069bb2170dd6f97c1193ba854
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
 async function startServer() {
