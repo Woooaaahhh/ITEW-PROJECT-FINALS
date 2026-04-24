@@ -1752,7 +1752,7 @@ app.get('/api/scheduling/faculty-view', authMiddleware, requireStaff, async (req
         .filter((v) => v != null && v !== ''),
     ),
   )
-  let labs = await db
+  const labs = await db
     .collection('labs')
     .find({ faculty_user_id: { $in: possibleFacultyKeys } }, { projection: { _id: 0 } })
     .sort({ name: 1, lab_id: 1 })
