@@ -1378,6 +1378,110 @@ app.get('/api/scheduling/faculty', authMiddleware, requireAdmin, async (_req, re
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
+app.get('/api/events', async (_req, res) => {
+  console.log('Events route called')
+  const db = await getDb()
+  const events = await db
+    .collection('events')
+    .find({}, { projection: { _id: 0 } })
+    .sort({ start_date: 1 })
+    .toArray()
+  return res.json({ events })
+})
+
+app.post('/api/events', authMiddleware, requireAdmin, async (req, res) => {
+  const parsed = createEventSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const { title, subtitle, category, location, start_date, end_date, description, image_url } = parsed.data
+
+  // Validate dates
+  const startDate = new Date(start_date)
+  const endDate = new Date(end_date)
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' })
+  }
+  if (endDate <= startDate) {
+    return res.status(400).json({ message: 'End date must be after start date' })
+  }
+
+  const db = await getDb()
+  const created = {
+    event_id: await nextSequence(db, 'events'),
+    title,
+    subtitle: subtitle || null,
+    category,
+    location,
+    start_date: startDate,
+    end_date: endDate,
+    description,
+    image_url: image_url || null,
+    created_at: new Date(),
+  }
+
+  await db.collection('events').insertOne(created)
+  return res.status(201).json({ event: created })
+})
+
+app.put('/api/events/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid event id' })
+
+  const parsed = updateEventSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
+
+  const db = await getDb()
+  const existing = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0, event_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Event not found' })
+
+  const fields = {}
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title
+  if (parsed.data.subtitle !== undefined) fields.subtitle = parsed.data.subtitle
+  if (parsed.data.category !== undefined) fields.category = parsed.data.category
+  if (parsed.data.location !== undefined) fields.location = parsed.data.location
+  if (parsed.data.description !== undefined) fields.description = parsed.data.description
+  if (parsed.data.image_url !== undefined) fields.image_url = parsed.data.image_url
+
+  // Handle date updates
+  if (parsed.data.start_date !== undefined || parsed.data.end_date !== undefined) {
+    const current = await db.collection('events').findOne({ event_id: id })
+    const startDateStr = parsed.data.start_date || current.start_date
+    const endDateStr = parsed.data.end_date || current.end_date
+
+    const startDate = new Date(startDateStr)
+    const endDate = new Date(endDateStr)
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' })
+    }
+    if (endDate <= startDate) {
+      return res.status(400).json({ message: 'End date must be after start date' })
+    }
+
+    fields.start_date = startDate
+    fields.end_date = endDate
+  }
+
+  if (Object.keys(fields).length === 0) return res.status(400).json({ message: 'No fields to update' })
+
+  await db.collection('events').updateOne({ event_id: id }, { $set: fields })
+  const updated = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0 } })
+  return res.json({ event: updated })
+})
+
+app.delete('/api/events/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ message: 'Invalid event id' })
+
+  const db = await getDb()
+  const existing = await db.collection('events').findOne({ event_id: id }, { projection: { _id: 0, event_id: 1 } })
+  if (!existing) return res.status(404).json({ message: 'Event not found' })
+
+  await db.collection('events').deleteOne({ event_id: id })
+  return res.json({ ok: true })
+})
+
+app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
 async function startServer() {
   try {
     await getDb()
