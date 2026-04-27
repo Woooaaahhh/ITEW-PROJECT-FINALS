@@ -1,15 +1,8 @@
 /** Powerful Student Dashboard with Charts and Analytics */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
-import avatarUrl from '../../assets/react.svg'
-import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { useAuth } from '../auth/AuthContext'
-
-function fullName(s: Student) {
-  const parts = [s.firstName, s.middleName ?? '', s.lastName].filter(Boolean).join(' ')
-  return parts.replace(/\s+/g, ' ').trim()
-}
 
 export function StudentDashboard() {
   const { user } = useAuth()
@@ -60,8 +53,6 @@ export function StudentDashboard() {
     { skill: 'Leadership', A: 70, fullMark: 100 },
     { skill: 'Creativity', A: 82, fullMark: 100 },
   ]
-
-  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
 
   useEffect(() => {
     if (searchParams.get('medical') === '1' && myStudentId) {
@@ -190,7 +181,7 @@ export function StudentDashboard() {
               <div className="spms-muted small">GPA, Attendance & Assignment Completion</div>
             </div>
             <div className="card-body">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={undefined}>
                 <LineChart data={academicPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" stroke="#6b7280" />
@@ -215,7 +206,7 @@ export function StudentDashboard() {
               <div className="spms-muted small">Your skill categories</div>
             </div>
             <div className="card-body">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={undefined}>
                 <PieChart>
                   <Pie
                     data={skillsDistribution}
@@ -248,7 +239,7 @@ export function StudentDashboard() {
               <div className="spms-muted small">Your scores vs class average</div>
             </div>
             <div className="card-body">
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={250} minWidth={0} minHeight={undefined}>
                 <BarChart data={subjectPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="subject" stroke="#6b7280" angle={-45} textAnchor="end" height={80} />
@@ -272,7 +263,7 @@ export function StudentDashboard() {
               <div className="spms-muted small">Study hours & tasks completed</div>
             </div>
             <div className="card-body">
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={250} minWidth={0} minHeight={undefined}>
                 <AreaChart data={weeklyActivity}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="day" stroke="#6b7280" />
@@ -300,7 +291,7 @@ export function StudentDashboard() {
               <div className="spms-muted small">Comprehensive skill evaluation</div>
             </div>
             <div className="card-body">
-              <ResponsiveContainer width="100%" height={400}>
+              <ResponsiveContainer width="100%" height={400} minWidth={0} minHeight={undefined}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="#e5e7eb" />
                   <PolarAngleAxis dataKey="skill" stroke="#6b7280" />

@@ -43,7 +43,7 @@ export function InstructionModulePage() {
   const [selectedFacultyUserId, setSelectedFacultyUserId] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const [newSyllabus, setNewSyllabus] = useState({ title: '', course_code: '', description: '', faculty_user_id: '' })
+  const [newSyllabus, setNewSyllabus] = useState({ title: '', faculty_user_id: '' })
   const [newLesson, setNewLesson] = useState({ title: '', curriculum_unit: '', week_number: '', content: '' })
 
   const selectedSyllabus = useMemo(
@@ -130,13 +130,13 @@ export function InstructionModulePage() {
     try {
       await axios.post('/api/instruction/syllabi', {
         title: newSyllabus.title.trim(),
-        course_code: newSyllabus.course_code.trim(),
-        description: newSyllabus.description.trim(),
+        course_code: '',
+        description: '',
         faculty_user_id: canAssignCourseFaculty
           ? (newSyllabus.faculty_user_id ? Number(newSyllabus.faculty_user_id) : null)
           : undefined,
       })
-      setNewSyllabus({ title: '', course_code: '', description: '', faculty_user_id: '' })
+      setNewSyllabus({ title: '', faculty_user_id: '' })
       await fetchSyllabi()
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
@@ -229,16 +229,12 @@ export function InstructionModulePage() {
     if (!canEdit || !selectedSyllabus) return
     const title = window.prompt('Syllabus title', selectedSyllabus.title)
     if (title === null) return
-    const course = window.prompt('Course code', selectedSyllabus.course_code ?? '')
-    if (course === null) return
-    const description = window.prompt('Description', selectedSyllabus.description ?? '')
-    if (description === null) return
     setSubmitting(true)
     try {
       await axios.put(`/api/instruction/syllabi/${selectedSyllabus.syllabus_id}`, {
         title: title.trim(),
-        course_code: course.trim(),
-        description: description.trim(),
+        course_code: '',
+        description: '',
       })
       await fetchSyllabi()
     } catch (e: unknown) {
@@ -319,8 +315,6 @@ export function InstructionModulePage() {
             {canEdit ? (
               <form onSubmit={createSyllabus} className="d-flex flex-column gap-2 mb-3">
                 <input className="form-control" placeholder="Syllabus title" value={newSyllabus.title} onChange={(e) => setNewSyllabus((v) => ({ ...v, title: e.target.value }))} disabled={submitting} />
-                <input className="form-control" placeholder="Course code (optional)" value={newSyllabus.course_code} onChange={(e) => setNewSyllabus((v) => ({ ...v, course_code: e.target.value }))} disabled={submitting} />
-                <textarea className="form-control" rows={3} placeholder="Description (optional)" value={newSyllabus.description} onChange={(e) => setNewSyllabus((v) => ({ ...v, description: e.target.value }))} disabled={submitting} />
                 {canAssignCourseFaculty ? (
                   <select className="form-select" value={newSyllabus.faculty_user_id} onChange={(e) => setNewSyllabus((v) => ({ ...v, faculty_user_id: e.target.value }))} disabled={submitting || loadingFaculty}>
                     <option value="">Assigned faculty (optional)</option>
@@ -346,7 +340,6 @@ export function InstructionModulePage() {
                   onClick={() => setSelectedId(row.syllabus_id)}
                 >
                   <div className="fw-semibold">{row.title}</div>
-                  <div className="small opacity-75">{row.course_code || 'No course code'}</div>
                   <div className="small opacity-75">Faculty: {row.faculty_name || (row.faculty_user_id ? (facultyNameById.get(row.faculty_user_id) ?? `#${row.faculty_user_id}`) : 'Unassigned')}</div>
                 </button>
               ))}

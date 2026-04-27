@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ThreeDLoader } from './ThreeDLoader'
 
 type LoginFormProps = {
   onSubmit: (identifier: string, password: string) => Promise<void>
@@ -10,6 +11,7 @@ export function LoginForm({ onSubmit, onError, showInlineError = true }: LoginFo
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,6 +91,25 @@ export function LoginForm({ onSubmit, onError, showInlineError = true }: LoginFo
         </div>
       ) : null}
 
+      <div className="d-flex align-items-center justify-content-between gap-2 spms-login-meta-row">
+        <div className="form-check mb-0">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="spms-remember-me"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            disabled={loading}
+          />
+          <label className="form-check-label small" htmlFor="spms-remember-me">
+            Remember me
+          </label>
+        </div>
+        <button type="button" className="btn btn-link btn-sm text-decoration-none p-0">
+          Forgot password?
+        </button>
+      </div>
+
       <button
         type="submit"
         className="btn btn-primary rounded-4 py-2 fw-semibold"
@@ -96,7 +117,7 @@ export function LoginForm({ onSubmit, onError, showInlineError = true }: LoginFo
       >
         {loading ? (
           <>
-            <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+            <ThreeDLoader size={18} label="Signing in" className="me-2" />
             Signing in...
           </>
         ) : (

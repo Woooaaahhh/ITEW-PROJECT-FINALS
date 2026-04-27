@@ -33,6 +33,8 @@ function exportTableToCsv(
   filename: string,
   reportType: ReportType,
   selectedSportId: string,
+  selectedSportName: string,
+  sportNameById: Map<string, string>,
 ) {
   const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`
   const headers =
@@ -42,7 +44,16 @@ function exportTableToCsv(
   const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) => {
     if (reportType === 'sports_tryout') {
       const medicallyOk = isMedicalApprovedForTryouts(student)
-      const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
+      const target = normalize(selectedSportName)
+      const inSport = selectedSportId
+        ? (student.sportsAffiliations ?? []).some((token) => {
+            if (!token) return false
+            if (token === selectedSportId) return true
+            const maybeName = sportNameById.get(token)
+            if (maybeName && normalize(maybeName) === target) return true
+            return normalize(token) === target
+          })
+        : false
       const eligible = medicallyOk && inSport
       return [
         student.id,
@@ -90,6 +101,7 @@ export function ReportsPage() {
   const [filterYear, setFilterYear] = useState('')
   const [filterSection, setFilterSection] = useState('')
   const [reportType, setReportType] = useState<ReportType>('sports_tryout')
+  const [reportTypeDescription, setReportTypeDescription] = useState('')
   const [sportsOptions, setSportsOptions] = useState<{ id: string; name: string }[]>([])
   const [selectedSportId, setSelectedSportId] = useState('')
   const [skillOptions, setSkillOptions] = useState<{ id: string; name: string }[]>([])
@@ -131,6 +143,9 @@ export function ReportsPage() {
     }
   }, [])
 
+  const sportNameById = useMemo(() => new Map(sportsOptions.map((s) => [s.id, s.name])), [sportsOptions])
+  const selectedSportName = useMemo(() => sportNameById.get(selectedSportId) ?? '', [sportNameById, selectedSportId])
+
   const filtered = useMemo<EnrichedStudent[]>(() => {
     const q = normalize(search)
     const y = normalize(filterYear)
@@ -149,7 +164,16 @@ export function ReportsPage() {
         let hitReport = true
         if (reportType === 'sports_tryout') {
           const medicallyOk = isMedicalApprovedForTryouts(s)
-          const inSport = selectedSportId ? (s.sportsAffiliations ?? []).includes(selectedSportId) : false
+          const target = normalize(selectedSportName)
+          const inSport = selectedSportId
+            ? (s.sportsAffiliations ?? []).some((token) => {
+                if (!token) return false
+                if (token === selectedSportId) return true
+                const maybeName = sportNameById.get(token)
+                if (maybeName && normalize(maybeName) === target) return true
+                return normalize(token) === target
+              })
+            : false
           hitReport = Boolean(selectedSportId) && medicallyOk && inSport
         } else if (reportType === 'specific_skill') {
           const selectedSkillName = normalize(skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? '')
@@ -166,7 +190,9 @@ export function ReportsPage() {
         skillNames: studentSkillsById[student.id] ?? [],
         violationCount: violationsByStudentId[student.id] ?? 0,
       }))
-  }, [students, search, filterYear, filterSection, reportType, selectedSportId, selectedSkillId, skillOptions, studentSkillsById, violationsByStudentId])
+  }, [students, search, filterYear, filterSection, reportType, selectedSportId, selectedSportName, selectedSkillId, skillOptions, studentSkillsById, violationsByStudentId, sportNameById])
+
+  const reportLabel = reportTypeDescription.trim() || 'Report Results'
 
   return (
     <div className="row g-3">
@@ -217,6 +243,18 @@ export function ReportsPage() {
                 <option value="no_violations">Students with no violations</option>
                 <option value="specific_skill">Students with specific skills</option>
               </select>
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold">Report Type Description</label>
+              <input
+                className="form-control"
+                value={reportTypeDescription}
+                onChange={(e) => setReportTypeDescription(e.target.value)}
+                placeholder="e.g. Students qualified for basketball tryouts"
+              />
+              <div className="form-text">
+                Enter a custom report type like students qualified for a specific sport or skills qualification for contest.
+              </div>
             </div>
 
             {reportType === 'sports_tryout' ? (
@@ -287,6 +325,7 @@ export function ReportsPage() {
                   setFilterYear('')
                   setFilterSection('')
                   setReportType('sports_tryout')
+                  setReportTypeDescription('')
                   setSelectedSportId(sportsOptions[0]?.id ?? '')
                   setSelectedSkillId(skillOptions[0]?.id ?? '')
                 }}
@@ -302,9 +341,11 @@ export function ReportsPage() {
                 onClick={() =>
                   exportTableToCsv(
                     filtered,
-                    `spms-report-${new Date().toISOString().slice(0, 10)}.csv`,
+                    `spms-report-${(reportTypeDescription.trim() || reportType).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'general'}-${new Date().toISOString().slice(0, 10)}.csv`,
                     reportType,
                     selectedSportId,
+                    selectedSportName,
+                    sportNameById,
                   )
                 }
               >
@@ -320,9 +361,15 @@ export function ReportsPage() {
 
       <div className="col-12 col-xl-8">
         <div className="spms-card card">
+          <div className="d-none d-print-block px-3 pt-3">
+            <h4 className="mb-1">{reportLabel}</h4>
+            <div className="text-muted small">
+              Generated on {new Date().toLocaleString()}
+            </div>
+          </div>
           <div className="card-header d-flex align-items-center justify-content-between">
             <div className="fw-bold">
-              <i className="bi bi-table me-2" /> Report Results
+              <i className="bi bi-table me-2" /> {reportLabel}
             </div>
             <span className="spms-chip">
               <i className="bi bi-check2-square" /> {filtered.length} matched

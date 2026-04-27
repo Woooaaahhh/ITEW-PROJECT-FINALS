@@ -435,7 +435,7 @@ export function RegistrarDashboard() {
                 {loading || !d ? (
                   <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={undefined}>
                     <BarChart data={d.byYearLevel} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
@@ -453,7 +453,7 @@ export function RegistrarDashboard() {
                 {loading || !d ? (
                   <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={undefined}>
                     <PieChart>
                       <Pie
                         data={d.medicalMix}

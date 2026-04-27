@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getDefaultDashboardPath } from '../auth/authService'
 import { LoginForm } from '../components/LoginForm'
+import { ThreeDLoader } from '../components/ThreeDLoader'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -89,7 +90,7 @@ export function LoginPage() {
                       className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                       style={{ width: 40, height: 40, background: 'rgba(37, 99, 235, .12)', color: 'var(--spms-primary)' }}
                     >
-                      <span className="spinner-border spinner-border-sm" aria-hidden="true" />
+                      <ThreeDLoader size={28} label="Redirecting" />
                     </div>
                     <div className="min-w-0">
                       <div className="fw-semibold">You’re signed in.</div>
@@ -105,37 +106,48 @@ export function LoginPage() {
       )}
 
       <div className="spms-login-page">
-        <div className="spms-login-card card">
-          <div className="card-body">
-            <div className="text-center mb-4">
-              <div
-                className="d-inline-flex align-items-center justify-content-center rounded-4 mb-3"
-                style={{
-                  width: 56,
-                  height: 56,
-                  background: 'rgba(37, 99, 235, .15)',
-                  border: '1px solid rgba(37, 99, 235, .25)',
-                }}
-              >
-                <i className="bi bi-mortarboard-fill text-primary fs-4" />
+        <div className="spms-login-shell">
+          <section className="spms-login-hero">
+            <div className="spms-login-hero-inner">
+              <img src="/header.png" alt="University of Cabuyao" className="img-fluid spms-login-hero-header mb-4" />
+              <p className="spms-login-eyebrow mb-1">Welcome to</p>
+              <h1 className="spms-login-brand mb-1">SPMS</h1>
+              <h2 className="spms-login-subtitle mb-3">Student Profiling Management System</h2>
+              <div className="spms-login-divider mb-3" />
+            </div>
+          </section>
+
+          <section className="spms-login-auth-pane">
+            <div className="spms-login-card card">
+              <div className="card-body">
+              <div className="text-center mb-4">
+                <div className="spms-login-lock-icon mx-auto mb-3"><i className="bi bi-lock-fill" /></div>
+                <p className="spms-muted mb-0">Please sign in to continue</p>
               </div>
-              <h4 className="fw-bold mb-1">Student Profiling</h4>
-              <p className="spms-muted small mb-0">Management System</p>
-            </div>
 
-            <h5 className="fw-bold mb-3">Sign in</h5>
-            <LoginForm
-              onSubmit={handleSubmit}
-              showInlineError={false}
-              onError={(message) => setErrorModal({ open: true, message })}
-            />
+              <LoginForm
+                onSubmit={handleSubmit}
+                showInlineError={false}
+                onError={(message) => setErrorModal({ open: true, message })}
+              />
 
-            <div className="mt-4 pt-3 border-top text-center">
-              <p className="spms-muted small mb-0">
-                Demo Admin: admin@spms.edu / admin123 · faculty@spms.edu / faculty123
-              </p>
+                <div className="spms-login-or my-3"><span>or</span></div>
+
+                <div className="spms-login-help text-center">
+                  <i className="bi bi-shield-lock me-2" />
+                  Need help? Contact <span className="fw-semibold">System Administrator</span>
+                </div>
+
+                <div className="mt-4 pt-3 border-top text-center">
+                  <p className="spms-muted small mb-0">
+                    Demo Admin: admin@spms.edu / admin123
+                    <br />
+                    Faculty Account: faculty@spms.edu / faculty123
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </>

@@ -48,7 +48,6 @@ const initial: FormState = {
 export function AddStudentPage() {
   const [form, setForm] = useState<FormState>(initial)
   const [fileUrl, setFileUrl] = useState<string | null>(null)
-  const [fileDataUrl, setFileDataUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [sections, setSections] = useState<Array<{ section_id: number; year_level: '1st' | '2nd' | '3rd' | '4th'; section: string }>>([])
   const [sectionsLoading, setSectionsLoading] = useState(true)
@@ -236,7 +235,6 @@ export function AddStudentPage() {
               onReset={() => {
                 setForm(initial)
                 setFileUrl(null)
-                setFileDataUrl(null)
                 setSubmitError(null)
               }}
             >
@@ -262,15 +260,10 @@ export function AddStudentPage() {
                               if (prev) URL.revokeObjectURL(prev)
                               return url
                             })
-                            const reader = new FileReader()
-                            reader.onload = () => {
-                              setFileDataUrl(typeof reader.result === 'string' ? reader.result : null)
-                            }
-                            reader.readAsDataURL(file)
                           }}
                         />
                       </div>
-                      <div className="spms-muted small mt-1">Accepted: JPG, PNG. Saved in IndexedDB.</div>
+                      <div className="spms-muted small mt-1">Accepted: JPG, PNG.</div>
                     </div>
                   </div>
                 </div>

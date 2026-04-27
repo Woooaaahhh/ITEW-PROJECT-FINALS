@@ -25,6 +25,7 @@ export function EventsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [editModal, setEditModal] = useState<null | EventRow>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   // Form states
   const [title, setTitle] = useState('')
@@ -96,6 +97,8 @@ export function EventsPage() {
       })
       resetForm()
       await fetchEvents()
+      setShowCreateModal(false)
+      setShowSuccessModal(true)
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setError(msg || 'Failed to create event.')
@@ -390,16 +393,6 @@ export function EventsPage() {
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">Image URL</label>
-                    <input
-                      type="url"
-                      className="form-control"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-                  <div className="mb-3">
                     <label className="form-label">
                       Description <span className="text-danger">*</span>
                     </label>
@@ -516,16 +509,6 @@ export function EventsPage() {
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">Image URL</label>
-                    <input
-                      type="url"
-                      className="form-control"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-                  <div className="mb-3">
                     <label className="form-label">
                       Description <span className="text-danger">*</span>
                     </label>
@@ -547,6 +530,72 @@ export function EventsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header border-0">
+                <h5 className="modal-title">Event Created Successfully! 🎉</h5>
+                <button type="button" className="btn-close" onClick={() => setShowSuccessModal(false)}></button>
+              </div>
+              <div className="modal-body text-center">
+                <div className="mb-4">
+                  <div className="display-1 mb-3">🎊</div>
+                  <h6 className="fw-bold text-success mb-2">Event Successfully Created!</h6>
+                  <p className="text-muted">Your event has been created and is now available in the events list.</p>
+                </div>
+                
+                <div className="card bg-light border-0 rounded-3">
+                  <div className="card-body">
+                    <h6 className="fw-semibold mb-3">Event Details</h6>
+                    <div className="row g-2 text-start">
+                      <div className="col-12">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Title:</span>
+                          <span className="fw-semibold">{title}</span>
+                        </div>
+                      </div>
+                      <div className="col-12">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Category:</span>
+                          <span className="fw-semibold">{category === 'curricular' ? 'Curricular' : 'Extra-curricular'}</span>
+                        </div>
+                      </div>
+                      <div className="col-12">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Location:</span>
+                          <span className="fw-semibold">{location}</span>
+                        </div>
+                      </div>
+                      <div className="col-12">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Date:</span>
+                          <span className="fw-semibold">{new Date(startDate).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-0">
+                <div className="d-flex gap-2 w-100">
+                  <button type="button" className="btn btn-outline-secondary rounded-3 flex-fill" onClick={() => setShowSuccessModal(false)}>
+                    Close
+                  </button>
+                  <button type="button" className="btn btn-primary rounded-3 flex-fill" onClick={() => {
+                    setShowSuccessModal(false)
+                    setShowCreateModal(true)
+                  }}>
+                    Create Another Event
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -555,18 +555,433 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-}
-.spms-login-card {
-  width: 100%;
-  max-width: 420px;
-  background: var(--spms-surface);
-  border: 1px solid var(--spms-border);
-  border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(2, 6, 23, .12);
-  backdrop-filter: blur(12px);
-}
-.spms-login-card .card-body {
-  padding: 28px 24px;
+  padding: 0;
+  background: #0b0f16;
 }
 
+.spms-login-shell {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 70% 30%;
+  box-shadow: none;
+}
+
+.spms-login-hero {
+  background:
+    linear-gradient(180deg, rgba(4, 10, 22, .44), rgba(10, 18, 34, .62)),
+    url('/pnc-bg.jpg') center/cover no-repeat,
+    radial-gradient(78% 84% at 97% 52%, rgba(255, 129, 12, .32) 0%, rgba(255, 129, 12, 0) 65%),
+    linear-gradient(145deg, #081021 0%, #0d1830 48%, #1f150f 100%);
+  color: #fff;
+  position: relative;
+  min-height: 100vh;
+}
+
+.spms-login-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 460px at 92% 45%, rgba(255, 123, 8, .16), rgba(255, 123, 8, 0)),
+    linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.28));
+}
+
+.spms-login-hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: clamp(28px, 4vw, 64px);
+}
+
+.spms-login-hero-header {
+  width: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.spms-login-eyebrow {
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: .02em;
+  color: rgba(255,255,255,.86);
+}
+
+.spms-login-brand {
+  font-size: clamp(4.2rem, 7vw, 5.9rem);
+  line-height: .95;
+  font-weight: 900;
+  letter-spacing: -.03em;
+  color: #ff8a1e;
+}
+
+.spms-login-subtitle {
+  font-size: clamp(1rem, 1.45vw, 1.2rem);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.86);
+}
+
+.spms-login-divider {
+  width: 74px;
+  height: 2px;
+  background: #ff8a1e;
+  opacity: .9;
+}
+
+.spms-login-description {
+  max-width: 500px;
+  font-size: 1.02rem;
+  color: rgba(255, 255, 255, .82);
+}
+
+.spms-login-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.spms-login-feature-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  background: rgba(255, 138, 30, .18);
+  border: 1px solid rgba(255, 138, 30, .32);
+  color: #ff8a1e;
+  flex-shrink: 0;
+}
+
+.spms-login-feature .fw-semibold {
+  font-size: 1.52rem;
+  line-height: 1.15;
+}
+
+.spms-login-feature .small {
+  font-size: 1rem !important;
+}
+
+.spms-login-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 138, 30, .34);
+  background: rgba(255, 138, 30, .12);
+  padding: 12px 14px;
+  color: #ffad60;
+  max-width: 470px;
+}
+
+.spms-login-auth-pane {
+  background: radial-gradient(900px 520px at 30% -10%, rgba(255, 146, 31, .10), transparent 60%), #f2f3f5;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 3vw, 48px);
+}
+
+.spms-login-card {
+  width: 100%;
+  max-width: 430px;
+  margin: auto;
+  background: #f7f7f8;
+  border: 1px solid #eceef2;
+  border-radius: 22px;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, .10);
+}
+.spms-login-card .card-body {
+  padding: 32px 28px;
+}
+
+.spms-login-lock-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 138, 30, .12);
+  color: #ff8a1e;
+}
+
+.spms-login-card .form-label {
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.spms-login-card .input-group-text {
+  background: #f2f3f5;
+}
+
+.spms-login-card .btn-primary {
+  border-radius: 12px !important;
+  padding-top: .62rem;
+  padding-bottom: .62rem;
+  font-weight: 700;
+  background: linear-gradient(180deg, #ff921f 0%, #e77d23 100%);
+  border-color: #e77d23;
+}
+
+.spms-login-card .btn-primary:hover {
+  background: linear-gradient(180deg, #ef8211 0%, #d96f14 100%);
+  border-color: #d96f14;
+}
+
+.spms-login-meta-row .form-check-label {
+  color: #6b7280;
+}
+
+.spms-login-card .btn-link {
+  color: #d78235;
+}
+
+.spms-login-card .btn-link:hover {
+  color: #be6a1f;
+}
+
+.spms-login-help {
+  border-radius: 10px;
+  background: #f1f2f5;
+  border: 1px solid #eaecf0;
+  font-size: .95rem;
+  color: #6b7280;
+  padding: .7rem .75rem;
+}
+
+.spms-login-or {
+  display: flex;
+  align-items: center;
+  color: #9aa0aa;
+  font-size: .95rem;
+}
+
+.spms-login-or::before,
+.spms-login-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e4e9;
+}
+
+.spms-login-or span {
+  padding: 0 12px;
+}
+
+@media (max-width: 991.98px) {
+  .spms-login-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .spms-login-hero {
+    min-height: auto;
+  }
+
+  .spms-login-hero-inner {
+    padding: 24px 20px;
+  }
+}
+
+/* 3D loader (used on auth success/loading states) */
+.spms-3d-loader {
+  --spms-3d-size: 36px;
+  --spms-3d-color: var(--spms-primary);
+  display: inline-grid;
+  place-items: center;
+  width: var(--spms-3d-size);
+  height: var(--spms-3d-size);
+}
+
+.spms-3d-loader__scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  perspective: 700px;
+  filter:
+    drop-shadow(0 10px 16px rgba(2, 6, 23, .14))
+    drop-shadow(0 0 18px rgba(37, 99, 235, .18));
+}
+
+.spms-3d-loader__ring {
+  position: absolute;
+  inset: 10%;
+  border-radius: 999px;
+  border: 2px solid rgba(37, 99, 235, .55);
+  box-shadow:
+    inset 0 0 18px rgba(37, 99, 235, .14),
+    0 0 22px rgba(37, 99, 235, .12);
+  transform-style: preserve-3d;
+  animation: spms-3d-spin 1.25s linear infinite;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.30), rgba(255,255,255,0) 55%);
+}
+
+.spms-3d-loader__ring--a { --rx: 66deg; --ry: 0deg; opacity: .95; }
+.spms-3d-loader__ring--b { --rx: 0deg; --ry: 66deg; opacity: .75; animation-duration: 1.5s; }
+.spms-3d-loader__ring--c { --rx: 12deg; --ry: 66deg; opacity: .6; animation-duration: 1.75s; }
+
+.spms-3d-loader__core {
+  position: absolute;
+  inset: 28%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.92), rgba(255,255,255,.18) 38%, rgba(37, 99, 235, .18) 72%, rgba(37, 99, 235, .06));
+  box-shadow:
+    0 10px 26px rgba(2, 6, 23, .12),
+    0 0 22px rgba(37, 99, 235, .20);
+  transform: translateZ(26px);
+  animation: spms-3d-breathe 1.25s ease-in-out infinite;
+}
+
+@keyframes spms-3d-spin {
+  from { transform: rotateX(var(--rx, 66deg)) rotateY(var(--ry, 0deg)) rotateZ(0deg); }
+  to { transform: rotateX(var(--rx, 66deg)) rotateY(var(--ry, 0deg)) rotateZ(360deg); }
+}
+
+@keyframes spms-3d-breathe {
+  0%, 100% { transform: translateZ(26px) scale(1); filter: saturate(1); }
+  50% { transform: translateZ(34px) scale(1.04); filter: saturate(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spms-3d-loader__ring,
+  .spms-3d-loader__core {
+    animation: none !important;
+  }
+}
+
+/* Scheduling workspace */
+.spms-sched-layout{
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 991.98px){
+  .spms-sched-layout{
+    grid-template-columns: 1fr;
+  }
+}
+
+.spms-sched-left-card{
+  position: sticky;
+  top: 86px; /* below topbar */
+  box-shadow: 0 4px 20px rgba(15, 23, 42, .06);
+  border-radius: 16px;
+}
+
+.spms-sched-main .spms-card{
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, .06);
+}
+
+.spms-sched-context{
+  display: grid;
+  gap: 8px;
+}
+
+.spms-sched-chip{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(15, 23, 42, .08);
+  background: rgba(248, 250, 252, .9);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.spms-sched-chip__k{
+  font-size: .75rem;
+  color: rgba(15, 23, 42, .52);
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.spms-sched-chip__v{
+  font-size: .86rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, .88);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.spms-sched-steps{
+  display: grid;
+  gap: 8px;
+}
+
+.spms-sched-step{
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, .10);
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 10px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 16px;
+  gap: 10px;
+  align-items: center;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease, box-shadow .12s ease;
+}
+
+.spms-sched-step:hover{
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, .30);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+}
+
+.spms-sched-step:disabled{
+  opacity: .55;
+  transform: none;
+  box-shadow: none;
+}
+
+.spms-sched-step.is-active{
+  background: rgba(37, 99, 235, .10);
+  border-color: rgba(37, 99, 235, .35);
+}
+
+.spms-sched-step__icon{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 99, 235, .10);
+  border: 1px solid rgba(37, 99, 235, .18);
+  color: var(--spms-primary);
+}
+
+.spms-sched-step__text{
+  display: grid;
+  min-width: 0;
+}
+
+.spms-sched-step__title{
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: rgba(15, 23, 42, .92);
+}
+
+.spms-sched-step__subtitle{
+  font-size: .82rem;
+  color: rgba(15, 23, 42, .56);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spms-sched-step__chev{
+  color: rgba(15, 23, 42, .35);
+}

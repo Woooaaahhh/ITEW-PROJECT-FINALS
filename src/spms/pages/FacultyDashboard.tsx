@@ -204,7 +204,7 @@ export function FacultyDashboard() {
               {loading || !d ? (
                 <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading chart…</div>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={undefined}>
                   <BarChart data={d.gwaDistribution} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="band" tick={{ fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={70} />
