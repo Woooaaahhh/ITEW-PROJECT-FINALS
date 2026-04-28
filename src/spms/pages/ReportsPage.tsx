@@ -44,16 +44,7 @@ function exportTableToCsv(
   const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) => {
     if (reportType === 'sports_tryout') {
       const medicallyOk = isMedicalApprovedForTryouts(student)
-      const target = normalize(selectedSportName)
-      const inSport = selectedSportId
-        ? (student.sportsAffiliations ?? []).some((token) => {
-            if (!token) return false
-            if (token === selectedSportId) return true
-            const maybeName = sportNameById.get(token)
-            if (maybeName && normalize(maybeName) === target) return true
-            return normalize(token) === target
-          })
-        : false
+      const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
       const eligible = medicallyOk && inSport
       return [
         student.id,
@@ -107,36 +98,39 @@ export function ReportsPage() {
   const [skillOptions, setSkillOptions] = useState<{ id: string; name: string }[]>([])
   const [selectedSkillId, setSelectedSkillId] = useState('')
 
+  async function refreshData() {
+    setLoading(true)
+    await Promise.all([seedIfEmpty(), seedSkillsIfEmpty(), seedSportsIfEmpty()])
+    const [all, allSkills, allSports] = await Promise.all([listStudents(), listSkills({ activeOnly: true }), listSports({ activeOnly: true })])
+    const skillNameById = new Map(allSkills.map((sk) => [sk.id, sk.name]))
+    const skillsMap: Record<string, string[]> = {}
+    const violationsMap: Record<string, number> = {}
+
+    await Promise.all(
+      all.map(async (s) => {
+        const assigned = await listStudentSkills(s.id)
+        skillsMap[s.id] = assigned
+          .map((row) => skillNameById.get(row.skillId))
+          .filter((n): n is string => Boolean(n))
+        const records = getStudentRecords(s.id)
+        violationsMap[s.id] = records.violations.length
+      }),
+    )
+
+    setStudents(all)
+    setStudentSkillsById(skillsMap)
+    setViolationsByStudentId(violationsMap)
+    setSkillOptions(allSkills.map((sk) => ({ id: sk.id, name: sk.name })))
+    setSportsOptions(allSports.map((sp) => ({ id: sp.id, name: sp.name })))
+    setSelectedSportId((prev) => prev || allSports[0]?.id || '')
+    setSelectedSkillId((prev) => prev || allSkills[0]?.id || '')
+    setLoading(false)
+  }
+
   useEffect(() => {
     let alive = true
     ;(async () => {
-      setLoading(true)
-      await Promise.all([seedIfEmpty(), seedSkillsIfEmpty(), seedSportsIfEmpty()])
-      const [all, allSkills, allSports] = await Promise.all([listStudents(), listSkills({ activeOnly: true }), listSports({ activeOnly: true })])
-      if (!alive) return
-      const skillNameById = new Map(allSkills.map((sk) => [sk.id, sk.name]))
-      const skillsMap: Record<string, string[]> = {}
-      const violationsMap: Record<string, number> = {}
-
-      await Promise.all(
-        all.map(async (s) => {
-          const assigned = await listStudentSkills(s.id)
-          skillsMap[s.id] = assigned
-            .map((row) => skillNameById.get(row.skillId))
-            .filter((n): n is string => Boolean(n))
-          const records = getStudentRecords(s.id)
-          violationsMap[s.id] = records.violations.length
-        }),
-      )
-
-      setStudents(all)
-      setStudentSkillsById(skillsMap)
-      setViolationsByStudentId(violationsMap)
-      setSkillOptions(allSkills.map((sk) => ({ id: sk.id, name: sk.name })))
-      setSportsOptions(allSports.map((sp) => ({ id: sp.id, name: sp.name })))
-      setSelectedSkillId((prev) => prev || allSkills[0]?.id || '')
-      setSelectedSportId((prev) => prev || allSports[0]?.id || '')
-      setLoading(false)
+      await refreshData()
     })()
     return () => {
       alive = false
@@ -145,6 +139,18 @@ export function ReportsPage() {
 
   const sportNameById = useMemo(() => new Map(sportsOptions.map((s) => [s.id, s.name])), [sportsOptions])
   const selectedSportName = useMemo(() => sportNameById.get(selectedSportId) ?? '', [sportNameById, selectedSportId])
+
+  // Dynamic year level options based on actual student data
+  const yearLevelOptions = useMemo(() => {
+    const years = new Set(students.map(s => s.yearLevel).filter((year): year is string => Boolean(year)))
+    return Array.from(years).sort()
+  }, [students])
+
+  // Dynamic section options based on actual student data
+  const sectionOptions = useMemo(() => {
+    const sections = new Set(students.map(s => s.section).filter((section): section is string => Boolean(section)))
+    return Array.from(sections).sort()
+  }, [students])
 
   const filtered = useMemo<EnrichedStudent[]>(() => {
     const q = normalize(search)
@@ -156,28 +162,19 @@ export function ReportsPage() {
         const violations = violationsByStudentId[s.id] ?? 0
       const hitSearch =
         !q ||
-        fullName(s).toLowerCase().includes(q) ||
-        (s.email ?? '').toLowerCase().includes(q) ||
-        s.id.toLowerCase().includes(q)
+        normalize(fullName(s)).includes(q) ||
+        normalize(s.email ?? '').includes(q) ||
+        normalize(s.id).includes(q)
       const hitYear = !y || normalize(s.yearLevel ?? '') === y
       const hitSection = !sec || normalize(s.section ?? '') === sec
         let hitReport = true
         if (reportType === 'sports_tryout') {
           const medicallyOk = isMedicalApprovedForTryouts(s)
-          const target = normalize(selectedSportName)
-          const inSport = selectedSportId
-            ? (s.sportsAffiliations ?? []).some((token) => {
-                if (!token) return false
-                if (token === selectedSportId) return true
-                const maybeName = sportNameById.get(token)
-                if (maybeName && normalize(maybeName) === target) return true
-                return normalize(token) === target
-              })
-            : false
+          const inSport = selectedSportId ? (s.sportsAffiliations ?? []).includes(selectedSportId) : false
           hitReport = Boolean(selectedSportId) && medicallyOk && inSport
         } else if (reportType === 'specific_skill') {
-          const selectedSkillName = normalize(skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? '')
-          hitReport = !selectedSkillName || skillNames.some((name) => normalize(name) === selectedSkillName)
+          const selectedSkillName = skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? ''
+          hitReport = !!selectedSkillId && skillNames.includes(selectedSkillName)
         } else if (reportType === 'programming_contest') {
           hitReport = skillNames.some((name) => normalize(name).includes('programming'))
         } else if (reportType === 'no_violations') {
@@ -225,10 +222,11 @@ export function ReportsPage() {
                 onChange={(e) => setFilterYear(e.target.value)}
               >
                 <option value="">All</option>
-                <option value="1st">1st</option>
-                <option value="2nd">2nd</option>
-                <option value="3rd">3rd</option>
-                <option value="4th">4th</option>
+                {yearLevelOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="mb-3">
@@ -310,10 +308,11 @@ export function ReportsPage() {
                 onChange={(e) => setFilterSection(e.target.value)}
               >
                 <option value="">All</option>
-                <option value="BSIT-2A">BSIT-2A</option>
-                <option value="BSBA-1B">BSBA-1B</option>
-                <option value="BSED-3C">BSED-3C</option>
-                <option value="BSIT-4A">BSIT-4A</option>
+                {sectionOptions.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="d-flex gap-2">
@@ -331,6 +330,14 @@ export function ReportsPage() {
                 }}
               >
                 Reset
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-info rounded-4 px-4"
+                onClick={() => refreshData()}
+                disabled={loading}
+              >
+                <i className="bi bi-arrow-clockwise me-1" /> {loading ? 'Refreshing...' : 'Refresh Data'}
               </button>
             </div>
             <hr className="my-3" />
@@ -429,7 +436,16 @@ export function ReportsPage() {
                         <td>{student.email ?? '—'}</td>
                         <td>{medicalClearanceLabel(student)}</td>
                         <td className="text-end pe-3">
-                          <span className="badge text-bg-success rounded-pill">Yes</span>
+                          {(() => {
+                            const medicallyOk = isMedicalApprovedForTryouts(student)
+                            const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
+                            const eligible = medicallyOk && inSport
+                            return (
+                              <span className={`badge rounded-pill ${eligible ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                {eligible ? 'Yes' : 'No'}
+                              </span>
+                            )
+                          })()}
                         </td>
                       </tr>
                     ) : (

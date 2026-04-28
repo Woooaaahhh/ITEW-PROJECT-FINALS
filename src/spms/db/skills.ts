@@ -70,30 +70,31 @@ export async function setStudentSkills(studentId: string, skillIds: string[]): P
   const db = await openSpmsDb()
   const unique = Array.from(new Set(skillIds.filter(Boolean)))
 
-  const tx = db.transaction('studentSkills', 'readwrite')
-  const existing = await tx.store.index('by-studentId').getAll(studentId)
-  const existingSet = new Set(existing.map((r: StudentSkill) => r.skillId))
-  const nextSet = new Set(unique)
-
+  // Clear all existing skills for this student first
+  const clearTx = db.transaction('studentSkills', 'readwrite')
+  const existingSkills = await clearTx.store.index('by-studentId').getAll(studentId)
   await Promise.all(
-    existing
-      .filter((r: StudentSkill) => !nextSet.has(r.skillId))
-      .map((r: StudentSkill) => tx.store.delete([r.studentId, r.skillId])),
+    existingSkills.map((skill: StudentSkill) => 
+      clearTx.store.delete([skill.studentId, skill.skillId])
+    )
   )
+  await clearTx.done
 
-  const ts = nowIso()
-  await Promise.all(
-    unique
-      .filter((skillId) => !existingSet.has(skillId))
-      .map((skillId) =>
-        tx.store.put({
+  // Add the new skills
+  if (unique.length > 0) {
+    const addTx = db.transaction('studentSkills', 'readwrite')
+    const ts = nowIso()
+    await Promise.all(
+      unique.map((skillId) =>
+        addTx.store.put({
           studentId,
           skillId,
           createdAt: ts,
         }),
       ),
-  )
-  await tx.done
+    )
+    await addTx.done
+  }
 }
 
 export async function seedSkillsIfEmpty(): Promise<void> {

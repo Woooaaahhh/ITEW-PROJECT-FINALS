@@ -22,6 +22,22 @@ function studentNameOnly(st: Student | null) {
   return parts.replace(/\s+/g, ' ').trim()
 }
 
+const yearOptions = ['1st', '2nd', '3rd', '4th'] as const
+const sectionOptions = ['BSIT-2A', 'BSBA-1B', 'BSED-3C', 'BSIT-4A']
+
+function matchesStudentFilter(st: Student, q: string, year: string, section: string) {
+  const parts = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ')
+  const full = parts.replace(/\s+/g, ' ').trim()
+  const hitQ =
+    !q ||
+    normalize(full).includes(q) ||
+    normalize(st.email ?? '').includes(q) ||
+    normalize(st.id).includes(q)
+  const hitYear = !year || normalize(st.yearLevel ?? '') === year
+  const hitSection = !section || normalize(st.section ?? '') === section
+  return hitQ && hitYear && hitSection
+}
+
 const OTHER_SPORT_VALUE = '__other__'
 
 export function FacultySportsPage() {
@@ -39,6 +55,12 @@ export function FacultySportsPage() {
   const [savingAssign, setSavingAssign] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   const [savedModalOpen, setSavedModalOpen] = useState(false)
+  const [savedModalStudent, setSavedModalStudent] = useState<Student | null>(null)
+
+  // Student filtering states
+  const [studentQuery, setStudentQuery] = useState('')
+  const [studentYear, setStudentYear] = useState('')
+  const [studentSection, setStudentSection] = useState('')
 
   /** Qualification-by-sport report (same pattern as Skills “Qualification by Category”) */
   const [qualSportId, setQualSportId] = useState<string>('')
@@ -110,6 +132,16 @@ export function FacultySportsPage() {
   const assignedActiveCount = useMemo(
     () => assignedSportIds.filter((id) => activeSportsById.has(id)).length,
     [assignedSportIds, activeSportsById],
+  )
+
+  // Filtered students for assignment
+  const sq = useMemo(() => normalize(studentQuery), [studentQuery])
+  const sy = useMemo(() => normalize(studentYear), [studentYear])
+  const ssec = useMemo(() => normalize(studentSection), [studentSection])
+
+  const filteredStudents = useMemo(
+    () => students.filter((st) => matchesStudentFilter(st, sq, sy, ssec)),
+    [students, sq, sy, ssec],
   )
 
   useEffect(() => {
@@ -187,7 +219,7 @@ export function FacultySportsPage() {
                     <div className="min-w-0">
                       <div className="fw-semibold">Sports assignments updated successfully.</div>
                       <div className="spms-muted small">
-                        Student: <span className="fw-semibold text-body">{studentNameOnly(selectedStudent)}</span> · Assigned:{' '}
+                        Student: <span className="fw-semibold text-body">{studentNameOnly(savedModalStudent)}</span> · Assigned:{' '}
                         <span className="fw-semibold text-body">{assignedSportIds.length}</span> sport
                         {assignedSportIds.length === 1 ? '' : 's'}
                       </div>
@@ -499,53 +531,132 @@ export function FacultySportsPage() {
               </div>
 
               <div className="row g-3">
-                <div className="col-12 col-lg-6">
-                  <label className="form-label small fw-semibold mb-1">Student</label>
-                  <select
-                    className="form-select rounded-3"
-                    value={selectedStudentId}
-                    onChange={(e) => setSelectedStudentId(e.target.value)}
-                    disabled={studentsLoading || students.length === 0}
-                  >
-                    {students.length === 0 ? <option value="">No students</option> : null}
-                    {students.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {studentLabel(st)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-2">
-                    <Link to="/students" className="btn btn-sm btn-outline-primary rounded-3">
-                      <i className="bi bi-people me-1" /> Student List
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="col-12 col-lg-6">
-                  <div className="spms-chip">
-                    <i className="bi bi-check2-square" /> Assigned: {assignedActiveCount}/{activeSports.length} active sports
-                  </div>
-                  <div className="spms-muted small mt-2">
-                    Student: <span className="fw-semibold">{studentNameOnly(selectedStudent)}</span>
-                  </div>
-                </div>
-
-                <div className="col-12">
-                  {assignError ? (
-                    <div className="alert alert-danger py-2 mb-3">
-                      <i className="bi bi-exclamation-circle me-2" />
-                      {assignError}
+              <div className="col-12">
+                <div className="spms-muted small fw-semibold mb-2">Filter students</div>
+                <div className="row g-2 align-items-end">
+                  <div className="col-12 col-md-5">
+                    <label className="form-label small fw-semibold mb-1">Search</label>
+                    <div className="input-group input-group-sm">
+                      <span className="input-group-text">
+                        <i className="bi bi-search" />
+                      </span>
+                      <input
+                        className="form-control"
+                        value={studentQuery}
+                        onChange={(e) => setStudentQuery(e.target.value)}
+                        placeholder="Name, email, or ID..."
+                      />
                     </div>
+                  </div>
+                  <div className="col-6 col-md-3">
+                    <label className="form-label small fw-semibold mb-1">Year level</label>
+                    <select
+                      className="form-select form-select-sm rounded-3"
+                      value={studentYear}
+                      onChange={(e) => setStudentYear(e.target.value)}
+                    >
+                      <option value="">All years</option>
+                      {yearOptions.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-6 col-md-3">
+                    <label className="form-label small fw-semibold mb-1">Section</label>
+                    <select
+                      className="form-select form-select-sm rounded-3"
+                      value={studentSection}
+                      onChange={(e) => setStudentSection(e.target.value)}
+                    >
+                      <option value="">All sections</option>
+                      {sectionOptions.map((sec) => (
+                        <option key={sec} value={sec}>
+                          {sec}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-12 col-md-1 text-md-end">
+                    <span className="spms-chip small">
+                      <i className="bi bi-funnel" /> {filteredStudents.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-12 col-lg-6">
+                <label className="form-label small fw-semibold mb-1">Student</label>
+                <select
+                  className="form-select"
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  disabled={studentsLoading || filteredStudents.length === 0}
+                >
+                  {filteredStudents.length === 0 ? (
+                    <option value="">No students match filters</option>
                   ) : null}
+                  {filteredStudents.map((st) => {
+                    const parts = [st.firstName, st.middleName ?? '', st.lastName].filter(Boolean).join(' ')
+                    const nm = parts.replace(/\s+/g, ' ').trim()
+                    return (
+                      <option key={st.id} value={st.id}>
+                        {nm} · {st.section ?? '—'}
+                      </option>
+                    )
+                  })}
+                </select>
+                <div className="d-flex gap-2 mt-2">
+                  <Link to="/students" className="btn btn-sm btn-outline-primary rounded-3">
+                    <i className="bi bi-people me-1" /> Student List
+                  </Link>
+                  <Link to="/faculty" className="btn btn-sm btn-outline-secondary rounded-3">
+                    Back to Dashboard
+                  </Link>
+                </div>
+              </div>
 
-                  {activeSports.length === 0 ? (
-                    <div className="alert alert-warning mb-0">
-                      <i className="bi bi-info-circle me-2" />
-                      No active sports available. Add and activate sports in the left panel first.
+              <div className="col-12 col-lg-6">
+                <div className="spms-chip">
+                  <i className="bi bi-check2-square" /> Assigned: {assignedActiveCount}/{activeSports.length} active sports
+                </div>
+                <div className="spms-muted small mt-2">
+                  Student: <span className="fw-semibold">{studentNameOnly(selectedStudent)}</span>
+                </div>
+              </div>
+
+              <div className="col-12">
+                {assignError ? (
+                  <div className="alert alert-danger py-2 mb-3">
+                    <i className="bi bi-exclamation-circle me-2" />
+                    {assignError}
+                  </div>
+                ) : null}
+
+                {activeSports.length === 0 ? (
+                  <div className="alert alert-warning mb-0">
+                    <i className="bi bi-info-circle me-2" />
+                    No active sports available. Add and activate sports in the left panel first.
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-2">
+                      <label className="form-label small fw-semibold mb-1">Filter sports to assign</label>
+                      <div className="input-group input-group-sm">
+                        <span className="input-group-text">
+                          <i className="bi bi-search" />
+                        </span>
+                        <input
+                          className="form-control"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Search sports..."
+                        />
+                      </div>
                     </div>
-                  ) : (
                     <div className="d-flex flex-wrap gap-2">
-                      {activeSports.map((sp) => {
+                      {filtered.map((sp) => {
                         const checked = assignedSportIds.includes(sp.id)
                         return (
                           <label
@@ -573,9 +684,10 @@ export function FacultySportsPage() {
                         )
                       })}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
+            </div>
 
               <div className="d-flex flex-wrap gap-2 mt-3">
                 <button
@@ -589,6 +701,8 @@ export function FacultySportsPage() {
                     try {
                       const updated = await updateStudent(selectedStudentId, { sportsAffiliations: assignedSportIds })
                       setStudents((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)))
+                      // Store the updated student for the success message
+                      setSavedModalStudent(updated)
                       setSavedModalOpen(true)
                     } catch (e) {
                       setAssignError(e instanceof Error ? e.message : 'Failed to save sports assignments.')
