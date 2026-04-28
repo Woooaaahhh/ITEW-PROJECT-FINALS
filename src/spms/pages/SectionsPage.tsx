@@ -32,6 +32,9 @@ function SectionsManager() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [editModal, setEditModal] = useState<null | SectionRow>(null)
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const sectionsPerPage = 20
   const [editYearLevel, setEditYearLevel] = useState<'1st' | '2nd' | '3rd' | '4th'>('1st')
   const [editSection, setEditSection] = useState('')
   const [editFacultyUserId, setEditFacultyUserId] = useState('')
@@ -45,6 +48,15 @@ function SectionsManager() {
     for (const f of faculty) map.set(f.user_id, f.username)
     return map
   }, [faculty])
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.ceil(sections.length / sectionsPerPage), [sections.length, sectionsPerPage])
+  
+  const paginatedSections = useMemo(() => {
+    const startIndex = (currentPage - 1) * sectionsPerPage
+    const endIndex = startIndex + sectionsPerPage
+    return sections.slice(startIndex, endIndex)
+  }, [sections, currentPage, sectionsPerPage])
 
   const fetchSections = async () => {
     setLoading(true)
@@ -317,7 +329,7 @@ function SectionsManager() {
                         </td>
                       </tr>
                     ) : (
-                      sections.map((s) => (
+                      paginatedSections.map((s) => (
                         <tr key={s.section_id}>
                           <td className="ps-4 py-3 fw-semibold">{s.year_level}</td>
                           <td className="py-3 fw-semibold">{s.section}</td>
@@ -338,6 +350,60 @@ function SectionsManager() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="card-footer border-0 bg-transparent py-3">
+                <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                  <div className="spms-muted small">
+                    Showing {((currentPage - 1) * sectionsPerPage) + 1} to {Math.min(currentPage * sectionsPerPage, sections.length)} of {sections.length} sections
+                  </div>
+                  <div className="btn-group" role="group">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                    >
+                      <i className="bi bi-chevron-left" /> Previous
+                    </button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPage - 2 + i
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`btn ${currentPage === pageNum ? 'btn-primary' : 'btn-outline-primary'}`}
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                    >
+                      Next <i className="bi bi-chevron-right" />
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

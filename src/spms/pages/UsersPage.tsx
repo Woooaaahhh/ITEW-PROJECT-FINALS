@@ -22,6 +22,9 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   // Controlled search input for Part 6 (UsersPage filter).
   const [search, setSearch] = useState('')
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const facultyPerPage = 20
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -51,6 +54,20 @@ export function UsersPage() {
       )
     })
   }, [users, search])
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.ceil(filteredUsers.length / facultyPerPage), [filteredUsers.length, facultyPerPage])
+  
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * facultyPerPage
+    const endIndex = startIndex + facultyPerPage
+    return filteredUsers.slice(startIndex, endIndex)
+  }, [filteredUsers, currentPage, facultyPerPage])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -239,7 +256,7 @@ export function UsersPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((u) => (
+                      paginatedUsers.map((u) => (
                         <tr key={u.user_id}>
                           <td className="ps-4 py-3 fw-semibold">{u.username}</td>
                           <td className="py-3">{u.email}</td>
@@ -268,6 +285,60 @@ export function UsersPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="card-footer border-0 bg-transparent py-3">
+                <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                  <div className="spms-muted small">
+                    Showing {((currentPage - 1) * facultyPerPage) + 1} to {Math.min(currentPage * facultyPerPage, filteredUsers.length)} of {filteredUsers.length} faculty members
+                  </div>
+                  <div className="btn-group" role="group">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                    >
+                      <i className="bi bi-chevron-left" /> Previous
+                    </button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPage - 2 + i
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`btn ${currentPage === pageNum ? 'btn-primary' : 'btn-outline-primary'}`}
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                    >
+                      Next <i className="bi bi-chevron-right" />
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

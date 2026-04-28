@@ -347,7 +347,7 @@ export function FacultySportsPage() {
               </div>
 
               <div className="border rounded-3 overflow-hidden" style={{ borderColor: 'rgba(15, 23, 42, .08)' }}>
-                <div className="table-responsive">
+                <div className="table-responsive" style={{ maxHeight: '450px', overflowY: 'auto' }}>
                   <table className="table spms-table table-hover align-middle mb-0">
                     <thead className="border-bottom bg-light bg-opacity-50">
                       <tr>

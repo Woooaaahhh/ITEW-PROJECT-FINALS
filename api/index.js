@@ -119,10 +119,15 @@ async function requireStaffOrOwnStudentProfile(req, res, next) {
 }
 
 function requireInstructionEditor(req, res, next) {
-  if (req.auth?.role !== 'admin' && req.auth?.role !== 'faculty') {
-    return res.status(403).json({ message: 'Forbidden' })
+  // Allow students to read (GET), but not write (POST, PUT, DELETE)
+  if (req.method === 'GET' && req.auth?.role === 'student') {
+    return next()
   }
-  return next()
+  // Admin and faculty have full access
+  if (req.auth?.role === 'admin' || req.auth?.role === 'faculty') {
+    return next()
+  }
+  return res.status(403).json({ message: 'Forbidden' })
 }
 
 app.post('/api/login', async (req, res) => {

@@ -19,6 +19,9 @@ export function RegistrarRecordsPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [recordsRev, setRecordsRev] = useState(0)
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const studentsPerPage = 50
 
   useEffect(() => {
     let alive = true
@@ -68,6 +71,20 @@ export function RegistrarRecordsPage() {
         normalize(s.section ?? '').includes(q),
     )
   }, [rows, q])
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.ceil(filtered.length / studentsPerPage), [filtered.length, studentsPerPage])
+  
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * studentsPerPage
+    const endIndex = startIndex + studentsPerPage
+    return filtered.slice(startIndex, endIndex)
+  }, [filtered, currentPage, studentsPerPage])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [q])
 
   const totalWithAny = filtered.filter((r) => r.violations > 0 || r.achievements > 0).length
 
@@ -130,7 +147,7 @@ export function RegistrarRecordsPage() {
                   </tr>
                 ) : null}
                 {!loading &&
-                  filtered.map(({ student: s, violations, achievements, pendingViolations }) => (
+                  paginatedRows.map(({ student: s, violations, achievements, pendingViolations }) => (
                     <tr key={s.id}>
                       <td className="ps-3">
                         <div className="fw-semibold">{fullName(s)}</div>
@@ -169,6 +186,60 @@ export function RegistrarRecordsPage() {
             </table>
           </div>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="card-footer border-0 bg-transparent py-3">
+            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+              <div className="spms-muted small">
+                Showing {((currentPage - 1) * studentsPerPage) + 1} to {Math.min(currentPage * studentsPerPage, filtered.length)} of {filtered.length} students
+              </div>
+              <div className="btn-group" role="group">
+                <button
+                  type="button"
+                  className="btn btn-outline-primary"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  <i className="bi bi-chevron-left" /> Previous
+                </button>
+                
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      className={`btn ${currentPage === pageNum ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+                
+                <button
+                  type="button"
+                  className="btn btn-outline-primary"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next <i className="bi bi-chevron-right" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
