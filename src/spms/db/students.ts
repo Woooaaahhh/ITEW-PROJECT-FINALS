@@ -1,5 +1,15 @@
 import { nowIso, openSpmsDb, type Student } from './spmsDb'
 import axios from 'axios'
+import { DEFAULT_DEMO_SPORTS } from './sports'
+import { ensureSeededForDemo } from './studentRecordsSeed'
+import { ensureSeededDemoAcademicRecords } from './academicRecords'
+import { ensureSeededDemoStudentSkills } from './skills'
+import {
+  BULK_DEMO_STUDENT_COUNT,
+  CORE_DEMO_STUDENT_IDS,
+  bulkDemoStudentId,
+  buildAllSeedDemoStudentIds,
+} from './demoSeedUtils'
 
 export type { Student } from './spmsDb'
 
@@ -149,13 +159,6 @@ function makeId() {
   return `S-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-/** Fixed keys so concurrent seed runs upsert the same rows instead of creating duplicates. */
-const SEED_STUDENT_IDS = {
-  alyssa: 'S-seed-alyssa-santos',
-  jerome: 'S-seed-jerome-reyes',
-  demo: 'S-seed-student-demo',
-} as const
-
 const DEMO_SEED_EMAILS = [
   'alyssa.santos@school.edu',
   'jerome.reyes@school.edu',
@@ -163,13 +166,178 @@ const DEMO_SEED_EMAILS = [
 ] as const
 
 const STABLE_ID_BY_DEMO_EMAIL: Record<(typeof DEMO_SEED_EMAILS)[number], string> = {
-  'alyssa.santos@school.edu': SEED_STUDENT_IDS.alyssa,
-  'jerome.reyes@school.edu': SEED_STUDENT_IDS.jerome,
-  'student@spms.edu': SEED_STUDENT_IDS.demo,
+  'alyssa.santos@school.edu': CORE_DEMO_STUDENT_IDS.alyssa,
+  'jerome.reyes@school.edu': CORE_DEMO_STUDENT_IDS.jerome,
+  'student@spms.edu': CORE_DEMO_STUDENT_IDS.demo,
 }
 
 function normEmail(e: string) {
   return e.toLowerCase().trim()
+}
+
+const demoFirstNames = [
+  'Alex', 'Bianca', 'Carlo', 'Diana', 'Ethan', 'Faith', 'Gabriel', 'Hannah', 'Ivan', 'Jasmine',
+  'Kyle', 'Lara', 'Marco', 'Nina', 'Owen', 'Paula', 'Quinn', 'Rafael', 'Sabrina', 'Tristan',
+]
+
+const demoLastNames = [
+  'Alvarez', 'Bautista', 'Castillo', 'Dela Cruz', 'Evangelista', 'Fernandez', 'Garcia', 'Hernandez',
+  'Ignacio', 'Jimenez', 'Lopez', 'Mendoza', 'Navarro', 'Ortega', 'Perez', 'Ramos', 'Santiago',
+  'Torres', 'Valdez', 'Zamora',
+]
+
+const demoSections = ['BSIT-1A', 'BSIT-2A', 'BSIT-3A', 'BSIT-4A', 'BSBA-1B', 'BSED-3C']
+
+function createBulkDemoStudent(index: number, ts: string): Student {
+  const firstName = demoFirstNames[index % demoFirstNames.length]
+  const lastName = demoLastNames[Math.floor(index / demoFirstNames.length) % demoLastNames.length]
+  const yearLevel = `${(index % 4) + 1}${(index % 4) === 0 ? 'st' : (index % 4) === 1 ? 'nd' : (index % 4) === 2 ? 'rd' : 'th'}`
+  const section = demoSections[index % demoSections.length]
+  const submitted = index % 5 !== 0
+  const approved = index % 4 !== 0
+  const medicalStatus = submitted ? (approved ? 'approved' : 'pending') : 'pending'
+  const demoSportIds = DEFAULT_DEMO_SPORTS.map((sport) => sport.id)
+  return {
+    id: bulkDemoStudentId(index + 1),
+    firstName,
+    middleName: '',
+    lastName: `${lastName} ${String.fromCharCode(65 + (index % 26))}.`,
+    birthdate: `200${index % 8}-0${(index % 9) + 1}-${String(((index * 3) % 27) + 1).padStart(2, '0')}`,
+    gender: index % 2 === 0 ? 'Male' : 'Female',
+    address: `Barangay ${((index % 20) + 1).toString().padStart(2, '0')}, Demo City`,
+    email: `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}.${index + 1}@demo.spms.edu`,
+    contactNumber: `0917${String(1000000 + index).slice(-7)}`,
+    yearLevel,
+    section,
+    profilePictureDataUrl: null,
+    sportsAffiliations: [demoSportIds[index % demoSportIds.length], demoSportIds[(index + 2) % demoSportIds.length]],
+    createdAt: ts,
+    updatedAt: ts,
+    medicalClearanceStatus: medicalStatus,
+    medicalClearanceUpdatedAt: ts,
+    medicalClearanceNotes: approved ? 'Approved for seeded demonstration data.' : 'Pending faculty review.',
+    medicalHeight: `${150 + (index % 30)} cm`,
+    medicalWeight: `${45 + (index % 35)} kg`,
+    medicalBloodPressure: `${110 + (index % 15)}/${70 + (index % 10)}`,
+    medicalCondition: index % 6 === 0 ? 'Seasonal allergies' : 'Fit to participate',
+    medicalPhysicianName: `Dr. Demo ${(index % 12) + 1}`,
+    medicalExamDate: `2026-0${(index % 9) + 1}-${String((index % 20) + 1).padStart(2, '0')}`,
+    medicalFormDetails: 'Auto-generated medical record for system capacity testing.',
+    medicalDocumentDataUrl: null,
+    medicalSubmittedAt: submitted ? ts : null,
+  }
+}
+
+function buildSeedStudents(ts: string): Student[] {
+  const core: Student[] = [
+    {
+      id: CORE_DEMO_STUDENT_IDS.alyssa,
+      firstName: 'Alyssa',
+      middleName: 'M.',
+      lastName: 'Santos',
+      birthdate: '2006-07-15',
+      gender: 'Female',
+      address: 'Brgy. Example, City, Province',
+      email: 'alyssa.santos@school.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '2nd',
+      section: 'BSIT-2A',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [DEFAULT_DEMO_SPORTS[0].id],
+      createdAt: ts,
+      updatedAt: ts,
+      medicalClearanceStatus: 'approved',
+      medicalClearanceUpdatedAt: ts,
+      medicalClearanceNotes: 'Approved for tryouts.',
+      medicalHeight: '162 cm',
+      medicalWeight: '53 kg',
+      medicalBloodPressure: '112/74',
+      medicalCondition: 'Fit to participate',
+      medicalPhysicianName: 'Dr. Elena Cruz',
+      medicalExamDate: '2026-02-14',
+      medicalFormDetails: 'Routine physical exam completed.',
+      medicalDocumentDataUrl: null,
+      medicalSubmittedAt: ts,
+    },
+    {
+      id: CORE_DEMO_STUDENT_IDS.jerome,
+      firstName: 'Jerome',
+      middleName: 'D.',
+      lastName: 'Reyes',
+      birthdate: '2007-02-10',
+      gender: 'Male',
+      address: 'City, Province',
+      email: 'jerome.reyes@school.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '1st',
+      section: 'BSBA-1B',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [DEFAULT_DEMO_SPORTS[1].id],
+      createdAt: ts,
+      updatedAt: ts,
+      medicalClearanceStatus: 'pending',
+      medicalClearanceUpdatedAt: ts,
+      medicalClearanceNotes: 'Awaiting faculty review.',
+      medicalHeight: '170 cm',
+      medicalWeight: '60 kg',
+      medicalBloodPressure: '118/76',
+      medicalCondition: 'Fit to participate',
+      medicalPhysicianName: 'Dr. Marco Sy',
+      medicalExamDate: '2026-02-16',
+      medicalFormDetails: 'Submitted medical requirements.',
+      medicalDocumentDataUrl: null,
+      medicalSubmittedAt: ts,
+    },
+    {
+      id: CORE_DEMO_STUDENT_IDS.demo,
+      firstName: 'Student',
+      middleName: 'Demo',
+      lastName: 'User',
+      birthdate: '2006-01-01',
+      gender: 'Male',
+      address: 'Campus Address',
+      email: 'student@spms.edu',
+      contactNumber: '09xx xxx xxxx',
+      yearLevel: '2nd',
+      section: 'BSIT-2A',
+      profilePictureDataUrl: null,
+      sportsAffiliations: [DEFAULT_DEMO_SPORTS[2].id],
+      createdAt: ts,
+      updatedAt: ts,
+      medicalClearanceStatus: 'approved',
+      medicalClearanceUpdatedAt: ts,
+      medicalClearanceNotes: 'Demo student cleared for activities.',
+      medicalHeight: '168 cm',
+      medicalWeight: '58 kg',
+      medicalBloodPressure: '116/75',
+      medicalCondition: 'Fit to participate',
+      medicalPhysicianName: 'Dr. Mira Tan',
+      medicalExamDate: '2026-02-18',
+      medicalFormDetails: 'Demo medical form complete.',
+      medicalDocumentDataUrl: null,
+      medicalSubmittedAt: ts,
+    },
+  ]
+
+  const bulk = Array.from({ length: BULK_DEMO_STUDENT_COUNT }, (_, index) => createBulkDemoStudent(index, ts))
+  return [...core, ...bulk]
+}
+
+function mergeApiAndLocalStudents(apiStudents: Student[], localStudents: Student[]) {
+  const localById = new Map(localStudents.map((student) => [student.id, withEligibilityDefaults(student)]))
+  const merged = apiStudents.map(withEligibilityDefaults).map((student) => {
+    const local = localById.get(student.id)
+    return local ? { ...student, ...pickEligibility(local) } : student
+  })
+
+  for (const local of localStudents.map(withEligibilityDefaults)) {
+    if (!localById.has(local.id)) continue
+    if (!merged.some((student) => student.id === local.id)) {
+      merged.push(local)
+    }
+  }
+
+  return merged.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
 }
 
 /** Removes extra rows for built-in demo emails (e.g. after a race double-seeded the DB). */
@@ -196,73 +364,26 @@ async function runSeededWork(): Promise<void> {
   await dedupeDemoStudentsByEmail(db)
 
   const seeded = await db.get('meta', 'seeded')
-  if (seeded?.value === 'true') return
+  const expectedDemoIds = new Set<string>(buildAllSeedDemoStudentIds())
+  const existingStudents = await db.getAll('students')
+  const existingById = new Map(existingStudents.map((student) => [student.id, student]))
+  const allDemoStudents = buildSeedStudents(nowIso())
 
-  const existing = await db.count('students')
-  if (existing > 0) {
-    await db.put('meta', { key: 'seeded', value: 'true' })
-    return
-  }
-
-  const ts = nowIso()
-  const demo: Student[] = [
-    {
-      id: SEED_STUDENT_IDS.alyssa,
-      firstName: 'Alyssa',
-      middleName: 'M.',
-      lastName: 'Santos',
-      birthdate: '2006-07-15',
-      gender: 'Female',
-      address: 'Brgy. Example, City, Province',
-      email: 'alyssa.santos@school.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '2nd',
-      section: 'BSIT-2A',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-    {
-      id: SEED_STUDENT_IDS.jerome,
-      firstName: 'Jerome',
-      middleName: 'D.',
-      lastName: 'Reyes',
-      birthdate: '2007-02-10',
-      gender: 'Male',
-      address: 'City, Province',
-      email: 'jerome.reyes@school.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '1st',
-      section: 'BSBA-1B',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-    {
-      id: SEED_STUDENT_IDS.demo,
-      firstName: 'Student',
-      middleName: 'Demo',
-      lastName: 'User',
-      birthdate: '2006-01-01',
-      gender: 'Male',
-      address: 'Campus Address',
-      email: 'student@spms.edu',
-      contactNumber: '09xx xxx xxxx',
-      yearLevel: '2nd',
-      section: 'BSIT-2A',
-      profilePictureDataUrl: null,
-      sportsAffiliations: [],
-      createdAt: ts,
-      updatedAt: ts,
-    },
-  ]
+  const missingDemoStudents = allDemoStudents.filter((student) => !existingById.has(student.id))
+  if (seeded?.value === 'true' && missingDemoStudents.length === 0) return
 
   const tx = db.transaction(['students', 'meta'], 'readwrite')
-  await Promise.all(demo.map((s) => tx.objectStore('students').put(s)))
+  await Promise.all(missingDemoStudents.map((student) => tx.objectStore('students').put(student)))
   await tx.objectStore('meta').put({ key: 'seeded', value: 'true' })
   await tx.done
+
+  const demoStudentIds = existingStudents
+    .map((student) => student.id)
+    .filter((studentId) => expectedDemoIds.has(studentId))
+    .concat(missingDemoStudents.map((student) => student.id))
+  ensureSeededForDemo(demoStudentIds)
+  ensureSeededDemoAcademicRecords(demoStudentIds)
+  await ensureSeededDemoStudentSkills(demoStudentIds)
   notifyStudentsChanged()
 }
 
@@ -288,23 +409,13 @@ export async function listStudents(): Promise<Student[]> {
         const retryAll = (retryRes.data.students ?? []).map(fromApiRow)
         const db = await openSpmsDb()
         const local = await db.getAll('students')
-        const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
-        const mergedRetry = retryAll
-          .map(withEligibilityDefaults)
-          .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
-        return mergedRetry.sort(
-          (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
-        )
+        return mergeApiAndLocalStudents(retryAll, local)
       }
     }
 
     const db = await openSpmsDb()
     const local = await db.getAll('students')
-    const localById = new Map(local.map((s) => [s.id, withEligibilityDefaults(s)]))
-    const merged = all
-      .map(withEligibilityDefaults)
-      .map((st) => ({ ...st, ...pickEligibility(localById.get(st.id)) }))
-    return merged.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName))
+    return mergeApiAndLocalStudents(all, local)
   } catch {
     const db = await openSpmsDb()
     const all = await db.getAll('students')

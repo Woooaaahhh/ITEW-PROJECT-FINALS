@@ -18,7 +18,15 @@ type AchievementPayload = {
 }
 
 export function FacultyAchievementsPage() {
-  const { students, loadingStudents, selectedStudentId, setSelectedStudentId } = useFacultyTargetStudent()
+  const {
+    students,
+    filteredStudents,
+    loadingStudents,
+    selectedStudentId,
+    setSelectedStudentId,
+    studentSearch,
+    setStudentSearch,
+  } = useFacultyTargetStudent()
   const [rows, setRows] = useState<AchievementRecord[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -91,6 +99,20 @@ export function FacultyAchievementsPage() {
 
           <div className="row g-2 mb-3">
             <div className="col-12 col-lg-7">
+              <label className="form-label small fw-semibold">Search Student</label>
+              <div className="input-group input-group-sm mb-2">
+                <span className="input-group-text rounded-start-3">
+                  <i className="bi bi-search" />
+                </span>
+                <input
+                  type="search"
+                  className="form-control rounded-end-3"
+                  placeholder="Search by name, ID, section, or email"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  disabled={loadingStudents}
+                />
+              </div>
               <label className="form-label small fw-semibold">Target Student</label>
               <select
                 className="form-select form-select-sm rounded-3"
@@ -102,8 +124,10 @@ export function FacultyAchievementsPage() {
                   <option value="">Loading students...</option>
                 ) : students.length === 0 ? (
                   <option value="">No students available</option>
+                ) : filteredStudents.length === 0 ? (
+                  <option value="">No matching students found</option>
                 ) : (
-                  students.map((st) => (
+                  filteredStudents.map((st) => (
                     <option key={st.id} value={st.id}>
                       {fullName(st)} (ID: {st.id})
                     </option>

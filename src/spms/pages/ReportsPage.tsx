@@ -24,8 +24,44 @@ type EnrichedStudent = {
   violationCount: number
 }
 
+const REPORTS_PAGE_SIZE = 20
+
 function medicalClearanceLabel(s: Student) {
   return medicalStatusLabel(normalizeMedicalStatus(s.medicalClearanceStatus))
+}
+
+function getReportStatus(
+  row: EnrichedStudent,
+  reportType: ReportType,
+  selectedSportId: string,
+  selectedSkillId: string,
+  skillOptions: { id: string; name: string }[],
+) {
+  const { student, skillNames, violationCount } = row
+  if (reportType === 'sports_tryout') {
+    const medicallyOk = isMedicalApprovedForTryouts(student)
+    const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
+    if (!selectedSportId) return { label: 'No sport selected', badgeClass: 'text-bg-secondary' }
+    return medicallyOk && inSport
+      ? { label: 'Eligible', badgeClass: 'text-bg-success' }
+      : { label: 'Not Eligible', badgeClass: 'text-bg-danger' }
+  }
+  if (reportType === 'specific_skill') {
+    const selectedSkillName = skillOptions.find((sk) => sk.id === selectedSkillId)?.name ?? ''
+    if (!selectedSkillId) return { label: 'No skill selected', badgeClass: 'text-bg-secondary' }
+    return skillNames.includes(selectedSkillName)
+      ? { label: 'Matched', badgeClass: 'text-bg-success' }
+      : { label: 'Not Matched', badgeClass: 'text-bg-danger' }
+  }
+  if (reportType === 'programming_contest') {
+    const matched = skillNames.some((name) => normalize(name).includes('programming'))
+    return matched
+      ? { label: 'Qualified', badgeClass: 'text-bg-success' }
+      : { label: 'Not Qualified', badgeClass: 'text-bg-danger' }
+  }
+  return violationCount === 0
+    ? { label: 'Cleared', badgeClass: 'text-bg-success' }
+    : { label: 'Has Violations', badgeClass: 'text-bg-danger' }
 }
 
 function exportTableToCsv(
@@ -33,19 +69,23 @@ function exportTableToCsv(
   filename: string,
   reportType: ReportType,
   selectedSportId: string,
-  selectedSportName: string,
-  sportNameById: Map<string, string>,
+  selectedSkillId: string,
+  skillOptions: { id: string; name: string }[],
 ) {
   const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`
   const headers =
     reportType === 'sports_tryout'
-      ? ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Medical clearance', 'Try-out eligible']
-      : ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills']
+      ? ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Medical clearance', 'Report status']
+      : ['ID', 'Full Name', 'Year Level', 'Section', 'Email', 'Contact', 'Violations', 'Skills', 'Report status']
   const rowToCsv = ({ student, skillNames, violationCount }: EnrichedStudent) => {
+    const status = getReportStatus(
+      { student, skillNames, violationCount },
+      reportType,
+      selectedSportId,
+      selectedSkillId,
+      skillOptions,
+    )
     if (reportType === 'sports_tryout') {
-      const medicallyOk = isMedicalApprovedForTryouts(student)
-      const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
-      const eligible = medicallyOk && inSport
       return [
         student.id,
         fullName(student),
@@ -53,7 +93,7 @@ function exportTableToCsv(
         student.section ?? '',
         student.email ?? '',
         medicalClearanceLabel(student),
-        eligible ? 'Yes' : 'No',
+        status.label,
       ]
         .map(escape)
         .join(',')
@@ -67,6 +107,7 @@ function exportTableToCsv(
       student.contactNumber ?? '',
       String(violationCount),
       skillNames.join('; '),
+      status.label,
     ]
       .map(escape)
       .join(',')
@@ -97,6 +138,7 @@ export function ReportsPage() {
   const [selectedSportId, setSelectedSportId] = useState('')
   const [skillOptions, setSkillOptions] = useState<{ id: string; name: string }[]>([])
   const [selectedSkillId, setSelectedSkillId] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   async function refreshData() {
     setLoading(true)
@@ -128,17 +170,10 @@ export function ReportsPage() {
   }
 
   useEffect(() => {
-    let alive = true
     ;(async () => {
       await refreshData()
     })()
-    return () => {
-      alive = false
-    }
   }, [])
-
-  const sportNameById = useMemo(() => new Map(sportsOptions.map((s) => [s.id, s.name])), [sportsOptions])
-  const selectedSportName = useMemo(() => sportNameById.get(selectedSportId) ?? '', [sportNameById, selectedSportId])
 
   // Dynamic year level options based on actual student data
   const yearLevelOptions = useMemo(() => {
@@ -160,13 +195,13 @@ export function ReportsPage() {
       .filter((s) => {
         const skillNames = studentSkillsById[s.id] ?? []
         const violations = violationsByStudentId[s.id] ?? 0
-      const hitSearch =
-        !q ||
-        normalize(fullName(s)).includes(q) ||
-        normalize(s.email ?? '').includes(q) ||
-        normalize(s.id).includes(q)
-      const hitYear = !y || normalize(s.yearLevel ?? '') === y
-      const hitSection = !sec || normalize(s.section ?? '') === sec
+        const hitSearch =
+          !q ||
+          normalize(fullName(s)).includes(q) ||
+          normalize(s.email ?? '').includes(q) ||
+          normalize(s.id).includes(q)
+        const hitYear = !y || normalize(s.yearLevel ?? '') === y
+        const hitSection = !sec || normalize(s.section ?? '') === sec
         let hitReport = true
         if (reportType === 'sports_tryout') {
           const medicallyOk = isMedicalApprovedForTryouts(s)
@@ -187,7 +222,24 @@ export function ReportsPage() {
         skillNames: studentSkillsById[student.id] ?? [],
         violationCount: violationsByStudentId[student.id] ?? 0,
       }))
-  }, [students, search, filterYear, filterSection, reportType, selectedSportId, selectedSportName, selectedSkillId, skillOptions, studentSkillsById, violationsByStudentId, sportNameById])
+  }, [students, search, filterYear, filterSection, reportType, selectedSportId, selectedSkillId, skillOptions, studentSkillsById, violationsByStudentId])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterYear, filterSection, reportType, selectedSportId, selectedSkillId])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / REPORTS_PAGE_SIZE))
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * REPORTS_PAGE_SIZE
+    return filtered.slice(start, start + REPORTS_PAGE_SIZE)
+  }, [filtered, currentPage])
 
   const reportLabel = reportTypeDescription.trim() || 'Report Results'
 
@@ -351,8 +403,8 @@ export function ReportsPage() {
                     `spms-report-${(reportTypeDescription.trim() || reportType).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'general'}-${new Date().toISOString().slice(0, 10)}.csv`,
                     reportType,
                     selectedSportId,
-                    selectedSportName,
-                    sportNameById,
+                    selectedSkillId,
+                    skillOptions,
                   )
                 }
               >
@@ -394,12 +446,13 @@ export function ReportsPage() {
                     {reportType === 'sports_tryout' ? (
                       <>
                         <th>Medical clearance</th>
-                        <th className="text-end pe-3">Try-out eligible</th>
+                        <th className="text-end pe-3">Report Status</th>
                       </>
                     ) : (
                       <>
                         <th>Violations</th>
-                        <th className="text-end pe-3">Skills</th>
+                        <th>Skills</th>
+                        <th className="text-end pe-3">Report Status</th>
                       </>
                     )}
                   </tr>
@@ -419,8 +472,15 @@ export function ReportsPage() {
                       </td>
                     </tr>
                   ) : null}
-                  {filtered.map(({ student, skillNames, violationCount }) =>
-                    reportType === 'sports_tryout' ? (
+                  {paginatedRows.map(({ student, skillNames, violationCount }) => {
+                    const reportStatus = getReportStatus(
+                      { student, skillNames, violationCount },
+                      reportType,
+                      selectedSportId,
+                      selectedSkillId,
+                      skillOptions,
+                    )
+                    return reportType === 'sports_tryout' ? (
                       <tr key={student.id}>
                         <td className="ps-3">
                           <div className="d-flex align-items-center gap-2">
@@ -436,16 +496,7 @@ export function ReportsPage() {
                         <td>{student.email ?? '—'}</td>
                         <td>{medicalClearanceLabel(student)}</td>
                         <td className="text-end pe-3">
-                          {(() => {
-                            const medicallyOk = isMedicalApprovedForTryouts(student)
-                            const inSport = selectedSportId ? (student.sportsAffiliations ?? []).includes(selectedSportId) : false
-                            const eligible = medicallyOk && inSport
-                            return (
-                              <span className={`badge rounded-pill ${eligible ? 'text-bg-success' : 'text-bg-danger'}`}>
-                                {eligible ? 'Yes' : 'No'}
-                              </span>
-                            )
-                          })()}
+                          <span className={`badge rounded-pill ${reportStatus.badgeClass}`}>{reportStatus.label}</span>
                         </td>
                       </tr>
                     ) : (
@@ -463,7 +514,7 @@ export function ReportsPage() {
                         <td>{student.section ?? '—'}</td>
                         <td>{student.email ?? '—'}</td>
                         <td>{violationCount}</td>
-                        <td className="text-end pe-3">
+                        <td>
                           {skillNames.length > 0 ? (
                             <span className="spms-muted small">
                               {skillNames.slice(0, 2).join(', ')}
@@ -473,12 +524,44 @@ export function ReportsPage() {
                             '—'
                           )}
                         </td>
+                        <td className="text-end pe-3">
+                          <span className={`badge rounded-pill ${reportStatus.badgeClass}`}>{reportStatus.label}</span>
+                        </td>
                       </tr>
-                    ),
-                  )}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
+            {!loading && filtered.length > 0 ? (
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-top spms-no-print">
+                <div className="spms-muted small">
+                  Showing {(currentPage - 1) * REPORTS_PAGE_SIZE + 1}-
+                  {Math.min(currentPage * REPORTS_PAGE_SIZE, filtered.length)} of {filtered.length} students
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-3"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </button>
+                  <span className="spms-muted small">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary rounded-3"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

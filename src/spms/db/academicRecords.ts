@@ -1,3 +1,5 @@
+import { isSeedDemoStudentId } from './demoSeedUtils'
+
 export type AcademicSemesterLabel = '1st Semester' | '2nd Semester' | 'Summer'
 
 export type AcademicRecord = {
@@ -224,4 +226,47 @@ export function updateAcademicRecord(
   all[studentId] = list
   writeAll(all)
   return { ok: true, record: updated }
+}
+
+export function ensureSeededDemoAcademicRecords(studentIds: string[]) {
+  try {
+    const all = readAll()
+    let changed = false
+    for (const studentId of studentIds) {
+      if (!isSeedDemoStudentId(studentId)) continue
+      if ((all[studentId] ?? []).length > 0) continue
+
+      const ts = nowIso()
+      const base = studentId.length
+      all[studentId] = [
+        {
+          id: makeId(),
+          studentId,
+          schoolYear: '2024-2025',
+          semester: '1st Semester',
+          gwa: 1.25 + (base % 15) * 0.1,
+          honors: base % 2 === 0 ? "Dean's List" : '',
+          createdAt: ts,
+          updatedAt: ts,
+        },
+        {
+          id: makeId(),
+          studentId,
+          schoolYear: '2024-2025',
+          semester: '2nd Semester',
+          gwa: 1.35 + (base % 12) * 0.1,
+          honors: base % 4 === 0 ? 'Academic Distinction' : '',
+          createdAt: ts,
+          updatedAt: ts,
+        },
+      ]
+      changed = true
+    }
+    if (changed) {
+      writeAll(all)
+      localStorage.setItem(SEEDED_KEY, 'true')
+    }
+  } catch {
+    // ignore demo seed issues
+  }
 }

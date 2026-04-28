@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { listStudents, seedIfEmpty, type Student } from '../db/students'
 import { ensureSeededForDemo } from '../db/studentRecordsSeed'
+
+function fullName(student: Student) {
+  const parts = [student.firstName, student.middleName ?? '', student.lastName].filter(Boolean).join(' ')
+  return parts.replace(/\s+/g, ' ').trim()
+}
 
 export function useFacultyTargetStudent() {
   const [students, setStudents] = useState<Student[]>([])
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [studentSearch, setStudentSearch] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -24,5 +30,42 @@ export function useFacultyTargetStudent() {
     }
   }, [])
 
-  return { students, loadingStudents, selectedStudentId, setSelectedStudentId }
+  const normalizedSearch = studentSearch.trim().toLowerCase()
+  const filteredStudents = useMemo(() => {
+    if (!normalizedSearch) return students
+    return students.filter((student) => {
+      const searchable = [
+        fullName(student),
+        student.id,
+        student.yearLevel ?? '',
+        student.section ?? '',
+        student.email ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return searchable.includes(normalizedSearch)
+    })
+  }, [normalizedSearch, students])
+
+  useEffect(() => {
+    if (loadingStudents) return
+    if (filteredStudents.length === 0) {
+      setSelectedStudentId('')
+      return
+    }
+    const selectedStillVisible = filteredStudents.some((student) => student.id === selectedStudentId)
+    if (!selectedStillVisible) {
+      setSelectedStudentId(filteredStudents[0]?.id ?? '')
+    }
+  }, [filteredStudents, loadingStudents, selectedStudentId])
+
+  return {
+    students,
+    filteredStudents,
+    loadingStudents,
+    selectedStudentId,
+    setSelectedStudentId,
+    studentSearch,
+    setStudentSearch,
+  }
 }

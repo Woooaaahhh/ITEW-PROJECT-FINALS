@@ -4,6 +4,14 @@ function makeId() {
   return `SP-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+export const DEFAULT_DEMO_SPORTS: Array<Pick<Sport, 'id' | 'name'>> = [
+  { id: 'SP-seed-basketball', name: 'Basketball' },
+  { id: 'SP-seed-volleyball', name: 'Volleyball' },
+  { id: 'SP-seed-badminton', name: 'Badminton' },
+  { id: 'SP-seed-table-tennis', name: 'Table Tennis' },
+  { id: 'SP-seed-track-field', name: 'Track & Field' },
+]
+
 export async function listSports(options?: { activeOnly?: boolean }): Promise<Sport[]> {
   const db = await openSpmsDb()
   const all = await db.getAll('sports')
@@ -52,26 +60,24 @@ export async function deleteSport(id: string): Promise<void> {
 export async function seedSportsIfEmpty(): Promise<void> {
   const db = await openSpmsDb()
   const seeded = await db.get('meta', 'sports_seeded')
-  if (seeded?.value === 'true') return
-
-  const existing = await db.count('sports')
-  if (existing > 0) {
-    await db.put('meta', { key: 'sports_seeded', value: 'true' })
-    return
-  }
-
   const ts = nowIso()
-  const demoNames = ['Basketball', 'Volleyball', 'Badminton', 'Table Tennis', 'Track & Field']
-  const demo: Sport[] = demoNames.map((name) => ({
-    id: makeId(),
-    name,
-    isActive: true,
-    createdAt: ts,
-    updatedAt: ts,
-  }))
+  const existing = await db.getAll('sports')
+  const existingById = new Map(existing.map((sport) => [sport.id, sport]))
+  const missingDefaults = DEFAULT_DEMO_SPORTS.filter((sport) => !existingById.has(sport.id))
+  if (seeded?.value === 'true' && missingDefaults.length === 0) return
 
   const tx = db.transaction(['sports', 'meta'], 'readwrite')
-  await Promise.all(demo.map((s) => tx.objectStore('sports').put(s)))
+  await Promise.all(
+    missingDefaults.map((sport) =>
+      tx.objectStore('sports').put({
+        id: sport.id,
+        name: sport.name,
+        isActive: true,
+        createdAt: ts,
+        updatedAt: ts,
+      }),
+    ),
+  )
   await tx.objectStore('meta').put({ key: 'sports_seeded', value: 'true' })
   await tx.done
 }

@@ -1,8 +1,9 @@
 /** Client-side routing (React Router): uses <Link> for in-app navigation (no full page reload). */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listStudents, seedIfEmpty, type Student } from '../db/students'
-import { addViolation, ensureSeededForDemo, getStudentRecords } from '../db/studentRecords'
+import type { Student } from '../db/students'
+import { addViolation, getStudentRecords } from '../db/studentRecords'
+import { useFacultyTargetStudent } from '../hooks/useFacultyTargetStudent'
 
 type ViolationPayload = {
   violation_type: string
@@ -25,9 +26,15 @@ function fullName(s: Student) {
 }
 
 export function FacultyViolationsPage() {
-  const [students, setStudents] = useState<Student[]>([])
-  const [loadingStudents, setLoadingStudents] = useState(true)
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('')
+  const {
+    students,
+    filteredStudents,
+    loadingStudents,
+    selectedStudentId,
+    setSelectedStudentId,
+    studentSearch,
+    setStudentSearch,
+  } = useFacultyTargetStudent()
 
   const [violations, setViolations] = useState<ApiViolation[]>([])
   const [submitting, setSubmitting] = useState<boolean>(false)
@@ -40,23 +47,6 @@ export function FacultyViolationsPage() {
     date: '',
     status: 'Pending',
   })
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setLoadingStudents(true)
-      await seedIfEmpty()
-      const all = await listStudents()
-      if (!alive) return
-      setStudents(all)
-      ensureSeededForDemo(all.map((s) => s.id))
-      setSelectedStudentId(all[0]?.id ?? '')
-      setLoadingStudents(false)
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!selectedStudentId) {
@@ -139,6 +129,20 @@ export function FacultyViolationsPage() {
 
           <div className="row g-2 mb-3">
             <div className="col-12 col-lg-7">
+              <label className="form-label small fw-semibold">Search Student</label>
+              <div className="input-group input-group-sm mb-2">
+                <span className="input-group-text rounded-start-3">
+                  <i className="bi bi-search" />
+                </span>
+                <input
+                  type="search"
+                  className="form-control rounded-end-3"
+                  placeholder="Search by name, ID, section, or email"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  disabled={loadingStudents}
+                />
+              </div>
               <label className="form-label small fw-semibold">Target Student</label>
               <select
                 className="form-select form-select-sm rounded-3"
@@ -150,8 +154,10 @@ export function FacultyViolationsPage() {
                   <option value="">Loading students...</option>
                 ) : students.length === 0 ? (
                   <option value="">No students available</option>
+                ) : filteredStudents.length === 0 ? (
+                  <option value="">No matching students found</option>
                 ) : (
-                  students.map((st) => (
+                  filteredStudents.map((st) => (
                     <option key={st.id} value={st.id}>
                       {fullName(st)} (ID: {st.id})
                     </option>
