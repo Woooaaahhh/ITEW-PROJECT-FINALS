@@ -154,15 +154,26 @@ export function ProfileAcademicHistoryCard({
     }
   }
 
+  // Check if we're in Academic Module
+  const isAcademicModule = window.location.pathname.includes('/faculty/academic') || window.location.pathname.includes('/academic')
+
   return (
     <div className={`${cardClassName} card`}>
       <div className="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div className="fw-bold">
           <i className="bi bi-mortarboard me-2 text-primary" /> Academic history
         </div>
-        <span className="spms-chip">
-          <i className="bi bi-graph-up" /> Performance
-        </span>
+        <div className="d-flex align-items-center gap-2">
+          {!isAcademicModule && (
+            <span className="badge rounded-pill bg-light text-secondary border">
+              <i className="bi bi-lock-fill me-1" style={{ fontSize: '.65rem' }} />
+              Read-only
+            </span>
+          )}
+          <span className="spms-chip">
+            <i className="bi bi-graph-up" /> Performance
+          </span>
+        </div>
       </div>
       <div className="card-body p-0">
         <div className="table-responsive">
@@ -295,6 +306,20 @@ export function ProfileAcademicHistoryCard({
           </form>
         </div>
       ) : null}
+
+      {!isAcademicModule && (
+        <div className="card-body border-top bg-light">
+          <div className="d-flex align-items-center gap-2">
+            <i className="bi bi-info-circle text-primary"></i>
+            <div className="small">
+              <strong>Academic records management:</strong> To add or edit academic records, please use the{' '}
+              <a href="/faculty/academic" className="text-decoration-none fw-semibold">
+                Academic Module
+              </a>. This ensures data integrity and follows the correct workflow.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

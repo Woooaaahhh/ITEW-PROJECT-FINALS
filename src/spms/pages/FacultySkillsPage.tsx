@@ -277,7 +277,8 @@ export function FacultySkillsPage() {
 
       setStudents(all)
 
-      setSelectedStudentId((prev) => prev || all[0]?.id || '')
+      // Don't auto-select any student - wait for user selection
+      setSelectedStudentId('')
 
     } finally {
 

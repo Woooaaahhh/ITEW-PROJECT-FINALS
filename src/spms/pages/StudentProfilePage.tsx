@@ -48,7 +48,6 @@ export function StudentProfilePage() {
   const [recordsTick, setRecordsTick] = useState(0)
 
   const canEditProfile = user?.role === 'admin'
-  const canEditAcademic = user?.role === 'faculty'
   const isFaculty = user?.role === 'faculty'
   const isStudentViewer = user?.role === 'student'
   const isOwnStudentProfile = Boolean(user?.role === 'student' && user?.studentId && user.studentId === id)
@@ -488,7 +487,7 @@ export function StudentProfilePage() {
         <div className="col-12 col-lg-8 order-1 order-lg-2 d-flex flex-column gap-4">
           <ProfileAcademicHistoryCard
             studentId={student.id}
-            showFacultyForm={canEditAcademic}
+            showFacultyForm={false}
             cardClassName="spms-profile-section-card"
           />
 

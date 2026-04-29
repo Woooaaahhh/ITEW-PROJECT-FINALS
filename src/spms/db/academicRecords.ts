@@ -149,6 +149,15 @@ export function addAcademicRecord(
   studentId: string,
   input: Omit<AcademicRecord, 'id' | 'studentId' | 'createdAt' | 'updatedAt'>,
 ): { ok: true; record: AcademicRecord } | { ok: false; error: string } {
+  // Route validation - only allow from Academic Module
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+  if (!currentPath.includes('/faculty/academic') && !currentPath.includes('/academic')) {
+    return { 
+      ok: false, 
+      error: 'Academic records can only be created from the Academic Module. Please use Faculty → Academic to manage academic records.' 
+    }
+  }
+
   const sem = normalizeSemester(input.semester)
   if (!sem) return { ok: false, error: 'Invalid semester' }
   const sy = String(input.schoolYear).trim()
@@ -187,6 +196,15 @@ export function updateAcademicRecord(
   recordId: string,
   input: Partial<Pick<AcademicRecord, 'schoolYear' | 'semester' | 'gwa' | 'honors'>>,
 ): { ok: true; record: AcademicRecord } | { ok: false; error: string } {
+  // Route validation - only allow from Academic Module
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+  if (!currentPath.includes('/faculty/academic') && !currentPath.includes('/academic')) {
+    return { 
+      ok: false, 
+      error: 'Academic records can only be updated from the Academic Module. Please use Faculty → Academic to manage academic records.' 
+    }
+  }
+
   const all = readAll()
   const list = [...(all[studentId] ?? [])]
   const idx = list.findIndex((r) => r.id === recordId)
