@@ -1,7 +1,8 @@
 /** Client-side routing: this screen is a React Router <Route> target; shown without a full page reload. */
 import { useEffect, useMemo, useState } from 'react'
 import avatarUrl from '../../assets/react.svg'
-import { listSkills, listSports, seedSkillsIfEmpty, seedSportsIfEmpty } from '../db'
+import { listSkills, seedSkillsIfEmpty } from '../db/skills'
+import { listSports, seedSportsIfEmpty } from '../db/sports'
 import { medicalStatusLabel, normalizeMedicalStatus } from '../db/medicalClearance'
 import { useOptimizedReports, exportUtils, reportCacheUtils, type ReportType, type ReportFilters, type EnrichedStudent } from '../hooks/useOptimizedReports'
 
@@ -39,7 +40,7 @@ function FilterSkeleton() {
   )
 }
 
-function StatCardSkeleton() {
+function _StatCardSkeleton() {
   return (
     <div className="spms-card card border-0 h-100">
       <div className="card-body">
@@ -102,8 +103,8 @@ export function OptimizedReportsPage() {
           listSports({ activeOnly: true })
         ])
         
-        setSkillOptions(skills.map(sk => ({ id: sk.id, name: sk.name })))
-        setSportsOptions(sports.map(sp => ({ id: sp.id, name: sp.name })))
+        setSkillOptions(skills.map((sk: any) => ({ id: sk.id, name: sk.name })))
+        setSportsOptions(sports.map((sp: any) => ({ id: sp.id, name: sp.name })))
         setSelectedSportId(prev => prev || sports[0]?.id || '')
         setSelectedSkillId(prev => prev || skills[0]?.id || '')
       } catch (error) {
@@ -422,7 +423,7 @@ export function OptimizedReportsPage() {
                     </tr>
                   ) : (
                     students.map(({ student, skillNames, violationCount }) => {
-                      const reportStatus = getReportStatus({ student, skillNames, violationCount })
+                      const reportStatus = getReportStatus({ student, skillNames, violationCount, medicalStatus: normalizeMedicalStatus(student.medicalClearanceStatus || 'pending') })
                       return reportType === 'sports_tryout' ? (
                         <tr key={student.id}>
                           <td className="ps-3">

@@ -46,7 +46,7 @@ export function FacultyDashboard() {
   const [analyticsData, setAnalyticsData] = useState<Omit<FacultyDashboardData, 'totalStudents' | 'approvedMedical' | 'studentsWithViolations' | 'pendingMedicalCount'> | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
 
   // Load basic stats immediately
   useEffect(() => {

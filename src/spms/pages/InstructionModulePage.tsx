@@ -82,7 +82,7 @@ export function InstructionModulePage() {
   
     
   // Faculty-specific access control
-  const canManageSyllabus = (syllabus: SyllabusRow) => {
+  const _canManageSyllabus = (syllabus: SyllabusRow) => {
     if (isAdmin) return true
     if (isFaculty) return syllabus.faculty_user_id === currentFacultyId
     if (isStudent) return false // Students can't manage syllabi
@@ -106,7 +106,7 @@ export function InstructionModulePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [lessons, setLessons] = useState<LessonRow[]>([])
   const [faculty, setFaculty] = useState<FacultyRow[]>([])
-  const [loadingFaculty, setLoadingFaculty] = useState(false)
+  const [, setLoadingFaculty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
   // Search and filter states
@@ -135,7 +135,7 @@ export function InstructionModulePage() {
   const [selectedFacultyUserId, setSelectedFacultyUserId] = useState('')
   
   // Drag and drop state
-  const [draggedLesson, setDraggedLesson] = useState<number | null>(null)
+  const [, setDraggedLesson] = useState<number | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
   // Refs for accessibility
@@ -864,7 +864,7 @@ export function InstructionModulePage() {
                       className="form-select form-select-sm"
                       value={selectedFacultyUserId}
                       onChange={(e) => setSelectedFacultyUserId(e.target.value)}
-                      disabled={submitting || loadingFaculty}
+                      disabled={submitting}
                     >
                       <option value="">Unassigned</option>
                       {faculty.map((f) => (
@@ -876,7 +876,7 @@ export function InstructionModulePage() {
                     <button 
                       className="btn btn-primary btn-sm rounded-3"
                       onClick={saveAssignedFaculty}
-                      disabled={submitting || loadingFaculty}
+                      disabled={submitting}
                     >
                       {submitting ? <LoadingSpinner /> : null}
                       Save
@@ -970,7 +970,7 @@ export function InstructionModulePage() {
                           lessons.map((lesson, index) => (
                             <tr 
                               key={lesson.lesson_id}
-                              className={draggedLesson === lesson.lesson_id ? 'table-active' : ''}
+                              className={''}
                               onKeyDown={(e) => handleKeyDown(e, lesson.lesson_id, index)}
                               tabIndex={0}
                               role="button"
@@ -1117,7 +1117,7 @@ export function InstructionModulePage() {
                         className="form-select"
                         value={newSyllabus.faculty_user_id}
                         onChange={(e) => setNewSyllabus(prev => ({ ...prev, faculty_user_id: e.target.value }))}
-                        disabled={submitting || loadingFaculty}
+                        disabled={submitting}
                       >
                         <option value="">Unassigned</option>
                         {faculty.map((f) => (
