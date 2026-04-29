@@ -81,14 +81,7 @@ export function InstructionModulePage() {
   const canAssignCourseFaculty = isAdmin && !isStudent // Only admin can assign faculty to syllabus
   
     
-  // Faculty-specific access control
-  const canManageSyllabus = (syllabus: SyllabusRow) => {
-    if (isAdmin) return true
-    if (isFaculty) return syllabus.faculty_user_id === currentFacultyId
-    if (isStudent) return false // Students can't manage syllabi
-    return false
-  }
-  
+    
   const canManageLessons = (syllabus: SyllabusRow) => {
     if (isAdmin) return true
     if (isFaculty) return syllabus.faculty_user_id === currentFacultyId
@@ -106,7 +99,7 @@ export function InstructionModulePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [lessons, setLessons] = useState<LessonRow[]>([])
   const [faculty, setFaculty] = useState<FacultyRow[]>([])
-  const [loadingFaculty, setLoadingFaculty] = useState(false)
+  const [loadingFaculty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
   // Search and filter states
@@ -135,7 +128,7 @@ export function InstructionModulePage() {
   const [selectedFacultyUserId, setSelectedFacultyUserId] = useState('')
   
   // Drag and drop state
-  const [draggedLesson, setDraggedLesson] = useState<number | null>(null)
+  const [draggedLesson] = useState<number | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
   // Refs for accessibility

@@ -2,7 +2,6 @@ import { listStudents, type Student } from '../db/students'
 import { getCurrentAcademicRecord } from '../db/academicRecords'
 import { getBehaviorCountIndex } from '../db/studentRecordsQueries'
 import {
-  hasMedicalRecordData,
   hasPendingMedicalSubmission,
   isMedicalApprovedForTryouts,
   normalizeMedicalStatus,
@@ -95,7 +94,7 @@ export async function loadFacultyDashboardAnalytics(): Promise<Omit<FacultyDashb
     ensureSeededForDemo(students.map((s) => s.id))
 
     // Load skills data in parallel
-    const [skills, behavior] = await Promise.all([
+    const [skills] = await Promise.all([
       listSkills({ activeOnly: false }),
       Promise.resolve(getBehaviorCountIndex())
     ])
