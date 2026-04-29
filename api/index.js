@@ -1985,7 +1985,8 @@ async function startServer() {
 
 // Load optimized student endpoints
 try {
-  await import('./optimized-students.js')
+  const { registerOptimizedStudentEndpoints } = await import('./optimized-students.js')
+  registerOptimizedStudentEndpoints(app, authMiddleware, requireStaff, requireAdmin)
 } catch (error) {
   console.warn('Failed to load optimized student endpoints:', error.message)
 }
