@@ -1,0 +1,21 @@
+services:
+  # Backend API Service
+  - type: web
+    name: spms-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node api/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: spms
+    healthCheckPath: /api/health
+    autoDeploy: true
