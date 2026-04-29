@@ -46,12 +46,14 @@ export function FacultyDashboard() {
   const [analyticsData, setAnalyticsData] = useState<Omit<FacultyDashboardData, 'totalStudents' | 'approvedMedical' | 'studentsWithViolations' | 'pendingMedicalCount'> | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
-  
+  const [error, setError] = useState<string | null>(null)
+
   // Load basic stats immediately
   useEffect(() => {
     let alive = true
     ;(async () => {
       setStatsLoading(true)
+      setError(null)
       try {
         const stats = await loadFacultyDashboardStatsFast()
         if (alive) {
@@ -60,7 +62,7 @@ export function FacultyDashboard() {
         }
       } catch (err) {
         if (alive) {
-          console.error('Failed to load dashboard data:', err)
+          setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
           setStatsLoading(false)
         }
       }

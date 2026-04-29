@@ -1991,14 +1991,4 @@ try {
   console.warn('Failed to load optimized student endpoints:', error.message)
 }
 
-// Health check endpoint for Render
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
-  })
-})
-
 startServer()

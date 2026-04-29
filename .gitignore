@@ -16,11 +16,12 @@ dist-ssr
 build
 *.local
 
-# Environment files (keep .env.production for deployment reference)
+# Environment files
 .env
 .env.local
 .env.development.local
 .env.test.local
+.env.production.local
 
 # Database files
 *.sqlite
@@ -93,8 +94,3 @@ pids
 
 # DynamoDB Local files
 .dynamodb/
-
-# Deployment files (keep these for deployment)
-# vercel.json
-# render.yaml
-# .env.production

@@ -13,11 +13,7 @@
     "set:admin": "node set-admin-credentials.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "start": "node api/index.js",
-    "build:prod": "npm run build",
-    "deploy:vercel": "npm run build && vercel --prod",
-    "deploy:render": "git add . && git commit -m 'Deploy to Render' && git push origin main"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
