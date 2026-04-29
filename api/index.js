@@ -1915,5 +1915,11 @@ async function startServer() {
   }
 }
 
-startServer()
+// Load optimized student endpoints
+try {
+  await import('./optimized-students.js')
+} catch (error) {
+  console.warn('Failed to load optimized student endpoints:', error.message)
+}
 
+startServer()

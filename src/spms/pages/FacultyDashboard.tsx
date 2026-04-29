@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatCard } from '../components/StatCard'
-import { loadFacultyDashboardData, type FacultyDashboardData } from '../dashboards/dashboardAnalytics'
+import { loadFacultyDashboardStatsFast, loadFacultyDashboardAnalytics, type FacultyDashboardData } from '../dashboards/fastDashboardAnalytics'
 import { formatStudentRecordDate } from './studentRecordViewUtils'
 
 const FACULTY = {
@@ -42,20 +42,29 @@ function ChartCard({
 }
 
 export function FacultyDashboard() {
-  const [data, setData] = useState<FacultyDashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [statsData, setStatsData] = useState<Partial<FacultyDashboardData> | null>(null)
+  const [analyticsData, setAnalyticsData] = useState<Omit<FacultyDashboardData, 'totalStudents' | 'approvedMedical' | 'studentsWithViolations' | 'pendingMedicalCount'> | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // Load basic stats immediately
   useEffect(() => {
     let alive = true
     ;(async () => {
-      setLoading(true)
+      setStatsLoading(true)
+      setError(null)
       try {
-        const d = await loadFacultyDashboardData()
-        if (alive) setData(d)
-      } catch {
-        if (alive) setData(null)
-      } finally {
-        if (alive) setLoading(false)
+        const stats = await loadFacultyDashboardStatsFast()
+        if (alive) {
+          setStatsData(stats)
+          setStatsLoading(false)
+        }
+      } catch (err) {
+        if (alive) {
+          setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+          setStatsLoading(false)
+        }
       }
     })()
     return () => {
@@ -63,7 +72,38 @@ export function FacultyDashboard() {
     }
   }, [])
 
-  const d = data
+  // Load detailed analytics after stats are loaded
+  useEffect(() => {
+    if (!statsLoading && statsData) {
+      let alive = true
+      ;(async () => {
+        setAnalyticsLoading(true)
+        try {
+          const analytics = await loadFacultyDashboardAnalytics()
+          if (alive) {
+            setAnalyticsData(analytics)
+            setAnalyticsLoading(false)
+          }
+        } catch (err) {
+          if (alive) {
+            console.error('Failed to load analytics:', err)
+            setAnalyticsLoading(false)
+          }
+        }
+      })()
+      return () => {
+        alive = false
+      }
+    }
+  }, [statsLoading, statsData])
+
+  // Combine data for display
+  const d: FacultyDashboardData | null = statsData && analyticsData ? {
+    ...statsData,
+    ...analyticsData,
+  } as FacultyDashboardData : null
+
+  const isLoading = statsLoading || analyticsLoading
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -111,7 +151,7 @@ export function FacultyDashboard() {
           <div className="col-6 col-xl-3">
             <StatCard
               icon="bi-people-fill"
-              value={loading ? '—' : (d?.totalStudents ?? 0)}
+              value={statsLoading ? '—' : (statsData?.totalStudents ?? 0)}
               description="Total students"
               iconBg={FACULTY.accentSoft}
               iconColor={FACULTY.accent}
@@ -120,7 +160,7 @@ export function FacultyDashboard() {
           <div className="col-6 col-xl-3">
             <StatCard
               icon="bi-heart-pulse-fill"
-              value={loading ? '—' : (d?.approvedMedical ?? 0)}
+              value={statsLoading ? '—' : (statsData?.approvedMedical ?? 0)}
               description="Approved medical"
               iconBg="rgba(16, 185, 129, 0.15)"
               iconColor="#059669"
@@ -129,7 +169,7 @@ export function FacultyDashboard() {
           <div className="col-6 col-xl-3">
             <StatCard
               icon="bi-exclamation-triangle-fill"
-              value={loading ? '—' : (d?.studentsWithViolations ?? 0)}
+              value={statsLoading ? '—' : (statsData?.studentsWithViolations ?? 0)}
               description="Students with violations"
               iconBg="rgba(245, 158, 11, 0.18)"
               iconColor="#d97706"
@@ -138,7 +178,7 @@ export function FacultyDashboard() {
           <div className="col-6 col-xl-3">
             <StatCard
               icon="bi-hourglass-split"
-              value={loading ? '—' : (d?.pendingMedicalCount ?? 0)}
+              value={statsLoading ? '—' : (statsData?.pendingMedicalCount ?? 0)}
               description="Medical pending review"
               iconBg="rgba(234, 179, 8, 0.2)"
               iconColor="#ca8a04"
@@ -185,7 +225,7 @@ export function FacultyDashboard() {
                     </div>
                     <div className="min-w-0">
                       <div className="spms-muted small">{q.label}</div>
-                      <div className="fs-3 fw-bold">{loading ? '—' : q.value}</div>
+                      <div className="fs-3 fw-bold">{analyticsLoading ? '—' : q.value}</div>
                       <div className="spms-muted small text-truncate">{q.hint}</div>
                     </div>
                   </div>
@@ -201,7 +241,7 @@ export function FacultyDashboard() {
         <div className="row g-4">
           <div className="col-12 col-lg-6">
             <ChartCard title="Academic performance overview" subtitle="Latest-term GWA distribution (Philippine scale).">
-              {loading || !d ? (
+              {analyticsLoading || !d ? (
                 <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading chart…</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={undefined}>
@@ -219,7 +259,7 @@ export function FacultyDashboard() {
 
           <div className="col-12 col-lg-6">
             <ChartCard title="Top students by latest GWA" subtitle="Lower GWA is stronger. Includes skill assignment count.">
-              {loading || !d ? (
+              {analyticsLoading || !d ? (
                 <div className="spms-muted small d-flex align-items-center justify-content-center h-100">Loading…</div>
               ) : d.topByGwa.length === 0 ? (
                 <p className="spms-muted small mb-0">No academic records yet — add terms under Faculty → Academic.</p>
@@ -261,7 +301,7 @@ export function FacultyDashboard() {
           style={{ borderRadius: 16, boxShadow: '0 4px 24px rgba(15, 23, 42, .07)' }}
         >
           <div className="card-body p-0">
-            {loading || !d ? (
+            {isLoading || !d ? (
               <div className="p-4 spms-muted small">Loading…</div>
             ) : d.pendingMedicalRows.length === 0 ? (
               <div className="p-4 spms-muted small mb-0">No submissions waiting for review. Great job staying on top of the queue.</div>
