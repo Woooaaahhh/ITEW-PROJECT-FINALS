@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { getDb } from './db.js'
 import { signToken, verifyToken } from './jwt.js'
+import { optimizedStudentsEndpoint, studentCountEndpoint, batchStudentsEndpoint, studentSuggestionsEndpoint, cacheClearEndpoint } from './optimized-students.js'
 
 // Set Google DNS servers to resolve SRV records
 dns.setServers(['8.8.8.8', '8.8.4.4'])
@@ -2097,6 +2098,13 @@ app.get('/api/students/count', authMiddleware, requireStaff, async (req, res) =>
     res.status(500).json({ message: 'Failed to get student count' })
   }
 })
+
+// Register optimized student endpoints
+optimizedStudentsEndpoint(app, authMiddleware, requireStaff)
+studentCountEndpoint(app, authMiddleware, requireStaff)
+batchStudentsEndpoint(app, authMiddleware, requireStaff)
+studentSuggestionsEndpoint(app, authMiddleware, requireStaff)
+cacheClearEndpoint(app, authMiddleware, requireAdmin)
 
 console.log('✅ Optimized student API endpoints loaded')
 

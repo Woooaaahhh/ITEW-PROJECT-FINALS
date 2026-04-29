@@ -2,6 +2,7 @@
 // This file exports route functions to be registered in the main API
 
 import { getDb } from './db.js'
+import { requireAdmin } from './index.js'
 
 // Enhanced student field selection
 function getStudentProjection(fields = []) {
