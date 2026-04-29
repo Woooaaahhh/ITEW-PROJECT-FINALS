@@ -80,8 +80,6 @@ export function InstructionModulePage() {
   const canEditLessons = isFaculty && !isStudent     // Faculty only can create/edit lessons
   const canAssignCourseFaculty = isAdmin && !isStudent // Only admin can assign faculty to syllabus
   
-    
-  
   const canManageLessons = (syllabus: SyllabusRow) => {
     if (isAdmin) return true
     if (isFaculty) return syllabus.faculty_user_id === currentFacultyId
