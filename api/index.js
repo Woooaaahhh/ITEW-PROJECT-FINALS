@@ -1540,55 +1540,123 @@ app.post('/api/scheduling/courses/:courseId/sections', authMiddleware, requireAd
 
 // Get rooms for a specific section
 app.get('/api/scheduling/sections/:sectionId/rooms', authMiddleware, async (req, res) => {
-  const sectionId = Number(req.params.sectionId)
-  if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
-  
-  const db = await getDb()
-  // Verify section exists in regular sections collection
-  const section = await db.collection('sections').findOne({ section_id: sectionId })
-  if (!section) {
-    // Debug: log available sections
-    const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
-    console.log('Available sections:', availableSections)
-    console.log('Looking for section_id:', sectionId)
-    return res.status(404).json({ message: 'Section not found' })
+  try {
+    const sectionId = Number(req.params.sectionId)
+    if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
+    
+    const db = await getDb()
+    
+    // Verify section exists in regular sections collection
+    const section = await db.collection('sections').findOne({ section_id: sectionId })
+    if (!section) {
+      // Debug: log available sections for troubleshooting
+      try {
+        const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
+        console.log('Available sections:', availableSections)
+        console.log('Looking for section_id:', sectionId)
+      } catch (debugError) {
+        console.error('Debug query failed:', debugError)
+      }
+      return res.status(404).json({ message: 'Section not found', sectionId })
+    }
+    
+    const rooms = await db
+      .collection('rooms')
+      .find({ section_id: sectionId }, { projection: { _id: 0 } })
+      .sort({ name: 1, room_id: 1 })
+      .toArray()
+    
+    console.log('Retrieved rooms for section:', { sectionId, roomCount: rooms.length })
+    return res.json({ rooms })
+    
+  } catch (error) {
+    console.error('Error retrieving rooms:', error)
+    
+    if (error.name === 'MongoServerError') {
+      return res.status(500).json({ message: 'Database error occurred while retrieving rooms' })
+    }
+    
+    return res.status(500).json({ 
+      message: 'Internal server error while retrieving rooms',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
-  
-  const rooms = await db
-    .collection('rooms')
-    .find({ section_id: sectionId }, { projection: { _id: 0 } })
-    .sort({ name: 1, room_id: 1 })
-    .toArray()
-  return res.json({ rooms })
 })
 
 // Create room for a specific section
 app.post('/api/scheduling/sections/:sectionId/rooms', authMiddleware, requireAdmin, async (req, res) => {
-  const sectionId = Number(req.params.sectionId)
-  if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
-  
-  const parsed = roomSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
-  
-  const db = await getDb()
-  // Verify section exists in regular sections collection
-  const section = await db.collection('sections').findOne({ section_id: sectionId })
-  if (!section) {
-    return res.status(404).json({ message: 'Section not found' })
+  try {
+    const sectionId = Number(req.params.sectionId)
+    if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
+    
+    const parsed = roomSchema.safeParse(req.body)
+    if (!parsed.success) {
+      console.error('Room validation error:', parsed.error)
+      return res.status(400).json({ message: 'Invalid input', errors: parsed.error.errors })
+    }
+    
+    const db = await getDb()
+    
+    // Verify section exists in regular sections collection
+    const section = await db.collection('sections').findOne({ section_id: sectionId })
+    if (!section) {
+      // Debug: log available sections for troubleshooting
+      try {
+        const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
+        console.log('Available sections:', availableSections)
+        console.log('Looking for section_id:', sectionId)
+      } catch (debugError) {
+        console.error('Debug query failed:', debugError)
+      }
+      return res.status(404).json({ message: 'Section not found', sectionId })
+    }
+    
+    // Check for duplicate room name within the same section
+    const existingRoom = await db.collection('rooms').findOne({ 
+      section_id: sectionId, 
+      name: parsed.data.name.trim() 
+    })
+    if (existingRoom) {
+      return res.status(409).json({ message: 'Room with this name already exists in this section' })
+    }
+    
+    const room_id = await nextSequence(db, 'rooms')
+    const created = {
+      room_id,
+      section_id: sectionId,
+      name: parsed.data.name.trim(),
+      building: parsed.data.building?.trim() || null,
+      capacity: parsed.data.capacity ?? null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    
+    const result = await db.collection('rooms').insertOne(created)
+    if (!result.acknowledged) {
+      throw new Error('Failed to insert room into database')
+    }
+    
+    console.log('Room created successfully:', { room_id, section_id, name: created.name })
+    return res.status(201).json({ room: created })
+    
+  } catch (error) {
+    console.error('Error creating room:', error)
+    
+    // Handle specific database errors
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Room already exists' })
+    }
+    
+    if (error.name === 'MongoServerError') {
+      return res.status(500).json({ message: 'Database error occurred' })
+    }
+    
+    // Generic error
+    return res.status(500).json({ 
+      message: 'Internal server error while creating room',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
-  
-  const room_id = await nextSequence(db, 'rooms')
-  const created = {
-    room_id,
-    section_id: sectionId,
-    name: parsed.data.name,
-    building: parsed.data.building ?? null,
-    capacity: parsed.data.capacity ?? null,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }
-  await db.collection('rooms').insertOne(created)
-  return res.status(201).json({ room: created })
 })
 
 app.get('/api/scheduling/student-view', authMiddleware, requireStaffOrStudent, async (req, res) => {
