@@ -1,5 +1,7 @@
 // Optimized student API endpoints with field selection and pagination support
-// This file extends the existing API with performance improvements
+// This file exports route functions to be registered in the main API
+
+import { getDb } from './db.js'
 
 // Enhanced student field selection
 function getStudentProjection(fields = []) {
@@ -54,7 +56,8 @@ function parseFieldsQuery(fieldsQuery = '') {
 }
 
 // Optimized students endpoint with pagination and field selection
-app.get('/api/students/optimized', authMiddleware, requireStaff, async (req, res) => {
+export function optimizedStudentsEndpoint(app, authMiddleware, requireStaff) {
+  app.get('/api/students/optimized', authMiddleware, requireStaff, async (req, res) => {
   try {
     const db = await getDb()
     
@@ -142,7 +145,8 @@ app.get('/api/students/optimized', authMiddleware, requireStaff, async (req, res
 })
 
 // Optimized student count endpoint (for dashboard stats)
-app.get('/api/students/count', authMiddleware, requireStaff, async (req, res) => {
+export function studentCountEndpoint(app, authMiddleware, requireStaff) {
+  app.get('/api/students/count', authMiddleware, requireStaff, async (req, res) => {
   try {
     const db = await getDb()
     
@@ -179,7 +183,8 @@ app.get('/api/students/count', authMiddleware, requireStaff, async (req, res) =>
 })
 
 // Batch student details endpoint (for loading multiple students efficiently)
-app.post('/api/students/batch', authMiddleware, requireStaff, async (req, res) => {
+export function batchStudentsEndpoint(app, authMiddleware, requireStaff) {
+  app.post('/api/students/batch', authMiddleware, requireStaff, async (req, res) => {
   try {
     const { studentIds, fields = ['basic'] } = req.body
     
@@ -212,7 +217,8 @@ app.post('/api/students/batch', authMiddleware, requireStaff, async (req, res) =
 })
 
 // Student search suggestions endpoint (for autocomplete)
-app.get('/api/students/suggestions', authMiddleware, requireStaff, async (req, res) => {
+export function studentSuggestionsEndpoint(app, authMiddleware, requireStaff) {
+  app.get('/api/students/suggestions', authMiddleware, requireStaff, async (req, res) => {
   try {
     const db = await getDb()
     const query = req.query.q?.trim() || ''
@@ -262,15 +268,18 @@ app.get('/api/students/suggestions', authMiddleware, requireStaff, async (req, r
 })
 
 // Cache invalidation endpoint (for admin use)
-app.post('/api/students/cache/clear', authMiddleware, requireAdmin, async (req, res) => {
-  try {
-    // This would integrate with a caching system like Redis
-    // For now, we'll just return success
-    res.json({ message: 'Student cache cleared successfully' })
-  } catch (error) {
-    console.error('Error clearing cache:', error)
-    res.status(500).json({ message: 'Failed to clear cache' })
-  }
-})
+export function cacheClearEndpoint(app, authMiddleware, requireAdmin) {
+  app.post('/api/students/cache/clear', authMiddleware, requireAdmin, async (req, res) => {
+    try {
+      // This would integrate with a caching system like Redis
+      // For now, we'll just return success
+      res.json({ message: 'Student cache cleared successfully' })
+    } catch (error) {
+      console.error('Error clearing cache:', error)
+      res.status(500).json({ message: 'Failed to clear cache' })
+    }
+  })
+}
+
 
 console.log('✅ Optimized student API endpoints loaded')
