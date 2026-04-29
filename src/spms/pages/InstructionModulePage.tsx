@@ -813,12 +813,34 @@ export function InstructionModulePage() {
                           </div>
                         </div>
                         <div className="d-flex flex-column align-items-end">
-                          {syllabus.faculty_user_id && (
-                            <StatusBadge status="success">
-                              <i className="bi bi-check-circle me-1" />
-                              Assigned
-                            </StatusBadge>
-                          )}
+                          {(() => {
+                            const hasFacultyId = Boolean(syllabus.faculty_user_id);
+                            const facultyName = syllabus.faculty_name || 
+                              (syllabus.faculty_user_id ? (facultyNameById.get(syllabus.faculty_user_id) ?? `#${syllabus.faculty_user_id}`) : null);
+                            
+                            // Debug logging to identify the issue
+                            if (syllabus.title.includes('Kerwin') || syllabus.title.includes('Khen')) {
+                              console.log('Faculty Assignment Debug:', {
+                                syllabusTitle: syllabus.title,
+                                faculty_user_id: syllabus.faculty_user_id,
+                                faculty_name: syllabus.faculty_name,
+                                hasFacultyId,
+                                facultyName
+                              });
+                            }
+                            
+                            return hasFacultyId ? (
+                              <StatusBadge status="success">
+                                <i className="bi bi-check-circle me-1" />
+                                Assigned
+                              </StatusBadge>
+                            ) : (
+                              <StatusBadge status="warning">
+                                <i className="bi bi-exclamation-circle me-1" />
+                                Unassigned
+                              </StatusBadge>
+                            );
+                          })()}
                           {syllabus.syllabus_id === selectedId && (
                             <div className="small text-primary mt-1">
                               <i className="bi bi-check-circle-fill" /> Selected
