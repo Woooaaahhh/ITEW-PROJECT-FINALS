@@ -13,7 +13,9 @@
     "set:admin": "node set-admin-credentials.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "vercel-build": "npm run build",
+    "vercel-dev": "vercel dev"
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
