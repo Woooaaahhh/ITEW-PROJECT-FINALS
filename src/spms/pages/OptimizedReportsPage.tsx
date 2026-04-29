@@ -40,18 +40,6 @@ function FilterSkeleton() {
   )
 }
 
-function _StatCardSkeleton() {
-  return (
-    <div className="spms-card card border-0 h-100">
-      <div className="card-body">
-        <div className="placeholder-glow">
-          <div className="placeholder col-4 mb-2"></div>
-          <div className="placeholder col-8"></div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function OptimizedReportsPage() {
   // Form state
