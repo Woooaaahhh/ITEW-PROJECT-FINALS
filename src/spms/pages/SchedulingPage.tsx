@@ -167,6 +167,10 @@ export function SchedulingPage() {
   const [roomQuery, setRoomQuery] = useState('')
   const [labQuery, setLabQuery] = useState('')
 
+  // Pagination for sections
+  const [currentSectionPage, setCurrentSectionPage] = useState(1)
+  const sectionsPerPage = 10
+
   const fetchSections = async () => {
     setLoadingSections(true)
     setError(null)
@@ -462,6 +466,20 @@ export function SchedulingPage() {
     if (!q) return sections
     return sections.filter((s) => `${s.year_level} ${s.section} ${s.faculty_name ?? ''}`.toLowerCase().includes(q))
   }, [sections, sectionQuery])
+
+  // Pagination calculations for sections
+  const totalSectionPages = useMemo(() => Math.ceil(filteredSections.length / sectionsPerPage), [filteredSections.length, sectionsPerPage])
+  
+  const paginatedSections = useMemo(() => {
+    const startIndex = (currentSectionPage - 1) * sectionsPerPage
+    const endIndex = startIndex + sectionsPerPage
+    return filteredSections.slice(startIndex, endIndex)
+  }, [filteredSections, currentSectionPage, sectionsPerPage])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentSectionPage(1)
+  }, [sectionQuery])
 
   const filteredRooms = useMemo(() => {
     const q = roomQuery.trim().toLowerCase()
@@ -770,26 +788,80 @@ export function SchedulingPage() {
                   ) : filteredSections.length === 0 ? (
                     <div className="spms-muted small py-2">No sections available. Please create sections in the Sections page first.</div>
                   ) : (
-                    <div className="list-group">
-                      {filteredSections.map((s) => (
-                        <button
-                          type="button"
-                          key={s.section_id}
-                          className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
-                            selectedSectionId === s.section_id ? 'active' : ''
-                          }`}
-                          onClick={() => setSelectedSectionId(s.section_id)}
-                          disabled={submitting}
-                        >
-                          <div className="me-2 text-start">
-                            <div className="fw-semibold">{s.year_level} - {s.section}</div>
-                            <div className={`small ${selectedSectionId === s.section_id ? 'text-white-50' : 'text-muted'}`}>
-                              {s.faculty_name ? `Faculty: ${s.faculty_name}` : 'No faculty assigned'}
+                    <>
+                      <div className="list-group">
+                        {paginatedSections.map((s) => (
+                          <button
+                            type="button"
+                            key={s.section_id}
+                            className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
+                              selectedSectionId === s.section_id ? 'active' : ''
+                            }`}
+                            onClick={() => setSelectedSectionId(s.section_id)}
+                            disabled={submitting}
+                          >
+                            <div className="me-2 text-start">
+                              <div className="fw-semibold">{s.year_level} - {s.section}</div>
+                              <div className={`small ${selectedSectionId === s.section_id ? 'text-white-50' : 'text-muted'}`}>
+                                {s.faculty_name ? `Faculty: ${s.faculty_name}` : 'No faculty assigned'}
+                              </div>
                             </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Pagination Controls */}
+                      {totalSectionPages > 1 && (
+                        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3 mt-3">
+                          <div className="spms-muted small">
+                            Showing {((currentSectionPage - 1) * sectionsPerPage) + 1} to {Math.min(currentSectionPage * sectionsPerPage, filteredSections.length)} of {filteredSections.length} sections
                           </div>
-                        </button>
-                      ))}
-                    </div>
+                          <div className="btn-group" role="group">
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              disabled={currentSectionPage === 1}
+                              onClick={() => setCurrentSectionPage(currentSectionPage - 1)}
+                            >
+                              <i className="bi bi-chevron-left" /> Previous
+                            </button>
+                            
+                            {/* Page numbers */}
+                            {Array.from({ length: Math.min(5, totalSectionPages) }, (_, i) => {
+                              let pageNum
+                              if (totalSectionPages <= 5) {
+                                pageNum = i + 1
+                              } else if (currentSectionPage <= 3) {
+                                pageNum = i + 1
+                              } else if (currentSectionPage >= totalSectionPages - 2) {
+                                pageNum = totalSectionPages - 4 + i
+                              } else {
+                                pageNum = currentSectionPage - 2 + i
+                              }
+                              return (
+                                <button
+                                  key={pageNum}
+                                  type="button"
+                                  className={`btn btn-sm ${currentSectionPage === pageNum ? 'btn-primary' : 'btn-outline-primary'}`}
+                                  onClick={() => setCurrentSectionPage(pageNum)}
+                                >
+                                  {pageNum}
+                                </button>
+                              )
+                            })}
+                            
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              disabled={currentSectionPage === totalSectionPages}
+                              onClick={() => setCurrentSectionPage(currentSectionPage + 1)}
+                            >
+                              Next <i className="bi bi-chevron-right" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 

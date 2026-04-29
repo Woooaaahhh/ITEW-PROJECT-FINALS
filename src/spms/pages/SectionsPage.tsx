@@ -34,7 +34,7 @@ function SectionsManager() {
   const [editModal, setEditModal] = useState<null | SectionRow>(null)
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const sectionsPerPage = 20
+  const sectionsPerPage = 10
   const [editYearLevel, setEditYearLevel] = useState<'1st' | '2nd' | '3rd' | '4th'>('1st')
   const [editSection, setEditSection] = useState('')
   const [editFacultyUserId, setEditFacultyUserId] = useState('')
