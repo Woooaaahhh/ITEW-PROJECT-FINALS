@@ -3,7 +3,7 @@ import axios from 'axios'
 // API Client Configuration for Production Deployment
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
                     (import.meta.env.NODE_ENV === 'production' 
-                      ? 'https://spms-api.onrender.com' 
+                      ? 'https://spms-api-ezb4.onrender.com' 
                       : 'http://localhost:3001')
 
 export const apiClient = axios.create({

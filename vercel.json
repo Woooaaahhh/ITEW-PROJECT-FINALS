@@ -12,7 +12,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://spms-api.onrender.com/api/$1"
+      "destination": "https://spms-api-ezb4.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
@@ -20,6 +20,6 @@
     }
   ],
   "env": {
-    "VITE_API_URL": "https://spms-api.onrender.com"
+    "VITE_API_URL": "https://spms-api-ezb4.onrender.com"
   }
 }
