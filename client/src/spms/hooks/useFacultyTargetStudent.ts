@@ -22,7 +22,8 @@ export function useFacultyTargetStudent() {
       if (!alive) return
       setStudents(all)
       ensureSeededForDemo(all.map((s) => s.id))
-      setSelectedStudentId(all[0]?.id ?? '')
+      // Don't auto-select any student - wait for user selection
+      setSelectedStudentId('')
       setLoadingStudents(false)
     })()
     return () => {
@@ -55,7 +56,8 @@ export function useFacultyTargetStudent() {
     }
     const selectedStillVisible = filteredStudents.some((student) => student.id === selectedStudentId)
     if (!selectedStillVisible) {
-      setSelectedStudentId(filteredStudents[0]?.id ?? '')
+      // Don't auto-select when filtering - require explicit user selection
+      setSelectedStudentId('')
     }
   }, [filteredStudents, loadingStudents, selectedStudentId])
 

@@ -1545,55 +1545,123 @@ app.post('/api/scheduling/courses/:courseId/sections', authMiddleware, requireAd
 
 // Get rooms for a specific section
 app.get('/api/scheduling/sections/:sectionId/rooms', authMiddleware, async (req, res) => {
-  const sectionId = Number(req.params.sectionId)
-  if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
-  
-  const db = await getDb()
-  // Verify section exists in regular sections collection
-  const section = await db.collection('sections').findOne({ section_id: sectionId })
-  if (!section) {
-    // Debug: log available sections
-    const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
-    console.log('Available sections:', availableSections)
-    console.log('Looking for section_id:', sectionId)
-    return res.status(404).json({ message: 'Section not found' })
+  try {
+    const sectionId = Number(req.params.sectionId)
+    if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
+    
+    const db = await getDb()
+    
+    // Verify section exists in regular sections collection
+    const section = await db.collection('sections').findOne({ section_id: sectionId })
+    if (!section) {
+      // Debug: log available sections for troubleshooting
+      try {
+        const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
+        console.log('Available sections:', availableSections)
+        console.log('Looking for section_id:', sectionId)
+      } catch (debugError) {
+        console.error('Debug query failed:', debugError)
+      }
+      return res.status(404).json({ message: 'Section not found', sectionId })
+    }
+    
+    const rooms = await db
+      .collection('rooms')
+      .find({ section_id: sectionId }, { projection: { _id: 0 } })
+      .sort({ name: 1, room_id: 1 })
+      .toArray()
+    
+    console.log('Retrieved rooms for section:', { sectionId, roomCount: rooms.length })
+    return res.json({ rooms })
+    
+  } catch (error) {
+    console.error('Error retrieving rooms:', error)
+    
+    if (error.name === 'MongoServerError') {
+      return res.status(500).json({ message: 'Database error occurred while retrieving rooms' })
+    }
+    
+    return res.status(500).json({ 
+      message: 'Internal server error while retrieving rooms',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
-  
-  const rooms = await db
-    .collection('rooms')
-    .find({ section_id: sectionId }, { projection: { _id: 0 } })
-    .sort({ name: 1, room_id: 1 })
-    .toArray()
-  return res.json({ rooms })
 })
 
 // Create room for a specific section
 app.post('/api/scheduling/sections/:sectionId/rooms', authMiddleware, requireAdmin, async (req, res) => {
-  const sectionId = Number(req.params.sectionId)
-  if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
-  
-  const parsed = roomSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ message: 'Invalid input' })
-  
-  const db = await getDb()
-  // Verify section exists in regular sections collection
-  const section = await db.collection('sections').findOne({ section_id: sectionId })
-  if (!section) {
-    return res.status(404).json({ message: 'Section not found' })
+  try {
+    const sectionId = Number(req.params.sectionId)
+    if (!sectionId || isNaN(sectionId)) return res.status(400).json({ message: 'Invalid section id' })
+    
+    const parsed = roomSchema.safeParse(req.body)
+    if (!parsed.success) {
+      console.error('Room validation error:', parsed.error)
+      return res.status(400).json({ message: 'Invalid input', errors: parsed.error.errors })
+    }
+    
+    const db = await getDb()
+    
+    // Verify section exists in regular sections collection
+    const section = await db.collection('sections').findOne({ section_id: sectionId })
+    if (!section) {
+      // Debug: log available sections for troubleshooting
+      try {
+        const availableSections = await db.collection('sections').find({}, { projection: { section_id: 1, year_level: 1, section: 1 } }).limit(5).toArray()
+        console.log('Available sections:', availableSections)
+        console.log('Looking for section_id:', sectionId)
+      } catch (debugError) {
+        console.error('Debug query failed:', debugError)
+      }
+      return res.status(404).json({ message: 'Section not found', sectionId })
+    }
+    
+    // Check for duplicate room name within the same section
+    const existingRoom = await db.collection('rooms').findOne({ 
+      section_id: sectionId, 
+      name: parsed.data.name.trim() 
+    })
+    if (existingRoom) {
+      return res.status(409).json({ message: 'Room with this name already exists in this section' })
+    }
+    
+    const room_id = await nextSequence(db, 'rooms')
+    const created = {
+      room_id,
+      section_id: sectionId,
+      name: parsed.data.name.trim(),
+      building: parsed.data.building?.trim() || null,
+      capacity: parsed.data.capacity ?? null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+    
+    const result = await db.collection('rooms').insertOne(created)
+    if (!result.acknowledged) {
+      throw new Error('Failed to insert room into database')
+    }
+    
+    console.log('Room created successfully:', { room_id, section_id, name: created.name })
+    return res.status(201).json({ room: created })
+    
+  } catch (error) {
+    console.error('Error creating room:', error)
+    
+    // Handle specific database errors
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Room already exists' })
+    }
+    
+    if (error.name === 'MongoServerError') {
+      return res.status(500).json({ message: 'Database error occurred' })
+    }
+    
+    // Generic error
+    return res.status(500).json({ 
+      message: 'Internal server error while creating room',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
-  
-  const room_id = await nextSequence(db, 'rooms')
-  const created = {
-    room_id,
-    section_id: sectionId,
-    name: parsed.data.name,
-    building: parsed.data.building ?? null,
-    capacity: parsed.data.capacity ?? null,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }
-  await db.collection('rooms').insertOne(created)
-  return res.status(201).json({ room: created })
 })
 
 app.get('/api/scheduling/student-view', authMiddleware, requireStaffOrStudent, async (req, res) => {
@@ -1919,185 +1987,6 @@ async function startServer() {
     process.exit(1)
   }
 }
-
-// Optimized student endpoints - moved here to avoid ES module issues
-
-// Enhanced student field selection
-function getStudentProjection(fields = []) {
-  const projection = {}
-  
-  // Always include essential fields
-  projection.student_id = 1
-  projection.first_name = 1
-  projection.last_name = 1
-  
-  // Optional fields based on request
-  if (fields.includes('middle_name')) projection.middle_name = 1
-  if (fields.includes('email')) projection.school_email = 1
-  if (fields.includes('year_level')) projection.year_level = 1
-  if (fields.includes('section')) projection.section = 1
-  if (fields.includes('contact_number')) projection.contact_number = 1
-  if (fields.includes('birthdate')) projection.birthdate = 1
-  if (fields.includes('gender')) projection.gender = 1
-  if (fields.includes('address')) projection.address = 1
-  if (fields.includes('profile_picture')) projection.profile_picture_data_url = 1
-  
-  // Medical fields (only if specifically requested)
-  if (fields.includes('medical')) {
-    projection.medical_clearance_status = 1
-    projection.medical_clearance_updated_at = 1
-    projection.medical_submitted_at = 1
-  }
-  
-  // Sports affiliations (only if specifically requested)
-  if (fields.includes('sports')) {
-    projection.sports_affiliations = 1
-  }
-  
-  // Timestamps
-  if (fields.includes('timestamps') || fields.includes('created_at')) {
-    projection.created_at = 1
-  }
-  if (fields.includes('timestamps') || fields.includes('updated_at')) {
-    projection.updated_at = 1
-  }
-  
-  return projection
-}
-
-// Parse fields from query parameter
-function parseFieldsQuery(fieldsQuery = '') {
-  if (!fieldsQuery || fieldsQuery === 'all') {
-    return ['all'] // Return all fields
-  }
-  
-  return fieldsQuery.split(',').map(f => f.trim()).filter(Boolean)
-}
-
-// Optimized students endpoint with pagination and field selection
-app.get('/api/students/optimized', authMiddleware, requireStaff, async (req, res) => {
-  try {
-    const db = await getDb()
-    
-    // Parse query parameters
-    const page = Math.max(1, parseInt(req.query.page) || 1)
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 25)) // Max 100 per request
-    const skip = (page - 1) * limit
-    
-    const search = req.query.search?.trim() || ''
-    const yearLevel = req.query.year_level?.trim() || ''
-    const section = req.query.section?.trim() || ''
-    const includeInactive = req.query.include_inactive === 'true'
-    
-    // Parse fields
-    const fields = parseFieldsQuery(req.query.fields)
-    const projection = fields.includes('all') ? {} : getStudentProjection(fields)
-    
-    // Build query
-    const query = {}
-    
-    // Active status filter
-    if (!includeInactive) {
-      query.active = { $ne: false }
-    }
-    
-    // Search filter
-    if (search) {
-      query.$or = [
-        { first_name: { $regex: search, $options: 'i' } },
-        { last_name: { $regex: search, $options: 'i' } },
-        { middle_name: { $regex: search, $options: 'i' } },
-        { school_email: { $regex: search, $options: 'i' } },
-        { student_id: { $regex: search, $options: 'i' } }
-      ]
-    }
-    
-    // Year level filter
-    if (yearLevel) {
-      query.year_level = yearLevel
-    }
-    
-    // Section filter
-    if (section) {
-      query.section = section
-    }
-    
-    // Get total count for pagination
-    const totalCount = await db.collection('students').countDocuments(query)
-    
-    // Get paginated results
-    const students = await db.collection('students')
-      .find(query)
-      .project(projection)
-      .sort({ last_name: 1, first_name: 1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray()
-    
-    // Format response
-    const totalPages = Math.ceil(totalCount / limit)
-    
-    res.json({
-      students,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalCount,
-        limit,
-        hasNext: page < totalPages,
-        hasPrev: page > 1
-      },
-      filters: {
-        search,
-        yearLevel,
-        section,
-        includeInactive,
-        fields
-      }
-    })
-    
-  } catch (error) {
-    console.error('Error in optimized students endpoint:', error)
-    res.status(500).json({ message: 'Failed to load students' })
-  }
-})
-
-// Optimized student count endpoint (for dashboard stats)
-app.get('/api/students/count', authMiddleware, requireStaff, async (req, res) => {
-  try {
-    const db = await getDb()
-    
-    const includeInactive = req.query.include_inactive === 'true'
-    const yearLevel = req.query.year_level?.trim() || ''
-    const section = req.query.section?.trim() || ''
-    
-    // Build query
-    const query = {}
-    
-    if (!includeInactive) {
-      query.active = { $ne: false }
-    }
-    
-    if (yearLevel) {
-      query.year_level = yearLevel
-    }
-    
-    if (section) {
-      query.section = section
-    }
-    
-    const totalCount = await db.collection('students').countDocuments(query)
-    
-    res.json({
-      count: totalCount,
-      filters: { includeInactive, yearLevel, section }
-    })
-    
-  } catch (error) {
-    console.error('Error in student count endpoint:', error)
-    res.status(500).json({ message: 'Failed to get student count' })
-  }
-})
 
 // Register optimized student endpoints
 optimizedStudentsEndpoint(app, authMiddleware, requireStaff)

@@ -161,11 +161,15 @@ export function SchedulingPage() {
   const [createLabModalOpen, setCreateLabModalOpen] = useState(false)
   const [viewLabsModalOpen, setViewLabsModalOpen] = useState(false)
   const [assignFacultyModalOpen, setAssignFacultyModalOpen] = useState(false)
-  const [completeSetupModalOpen, setCompleteSetupModalOpen] = useState(false)
+  const [assignmentSuccessModalOpen, setAssignmentSuccessModalOpen] = useState(false)
 
   const [sectionQuery, setSectionQuery] = useState('')
   const [roomQuery, setRoomQuery] = useState('')
   const [labQuery, setLabQuery] = useState('')
+
+  // Pagination for sections
+  const [currentSectionPage, setCurrentSectionPage] = useState(1)
+  const sectionsPerPage = 10
 
   const fetchSections = async () => {
     setLoadingSections(true)
@@ -199,7 +203,7 @@ export function SchedulingPage() {
       const res = await axios.get<{ rooms: RoomRow[] }>(url)
       const rows = res.data.rooms ?? []
       setRooms(rows)
-      setSelectedRoomId((prev) => prev ?? rows[0]?.room_id ?? null)
+      // Do not auto-select any room - require explicit user selection
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setError(msg || 'Failed to load rooms.')
@@ -215,7 +219,7 @@ export function SchedulingPage() {
       const res = await axios.get<{ labs: LabRow[] }>(`/api/scheduling/rooms/${roomId}/labs`)
       const rows = res.data.labs ?? []
       setLabs(rows)
-      setSelectedLabId((prev) => prev ?? rows[0]?.lab_id ?? null)
+      // Do not auto-select any lab - require explicit user selection
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setError(msg || 'Failed to load labs.')
@@ -245,12 +249,7 @@ export function SchedulingPage() {
     void fetchFaculty()
   }, [])
 
-  // Auto-select first section only on initial load if no section is selected
-  useEffect(() => {
-    if (sections.length > 0 && selectedSectionId === null) {
-      setSelectedSectionId(sections[0].section_id)
-    }
-  }, [sections, selectedSectionId])
+  // Do not auto-select any section - require explicit user selection
 
   useEffect(() => {
     if (!selectedSectionId) {
@@ -438,6 +437,8 @@ export function SchedulingPage() {
       await axios.put(`/api/scheduling/labs/${selectedLab.lab_id}`, { faculty_user_id: facultyId })
       setAssignFacultyModalOpen(false)
       if (selectedRoomId) await fetchLabs(selectedRoomId)
+      // Show success modal after successful assignment
+      setAssignmentSuccessModalOpen(true)
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
       setError(msg || 'Failed to assign faculty.')
@@ -462,6 +463,20 @@ export function SchedulingPage() {
     if (!q) return sections
     return sections.filter((s) => `${s.year_level} ${s.section} ${s.faculty_name ?? ''}`.toLowerCase().includes(q))
   }, [sections, sectionQuery])
+
+  // Pagination calculations for sections
+  const totalSectionPages = useMemo(() => Math.ceil(filteredSections.length / sectionsPerPage), [filteredSections.length, sectionsPerPage])
+  
+  const paginatedSections = useMemo(() => {
+    const startIndex = (currentSectionPage - 1) * sectionsPerPage
+    const endIndex = startIndex + sectionsPerPage
+    return filteredSections.slice(startIndex, endIndex)
+  }, [filteredSections, currentSectionPage, sectionsPerPage])
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentSectionPage(1)
+  }, [sectionQuery])
 
   const filteredRooms = useMemo(() => {
     const q = roomQuery.trim().toLowerCase()
@@ -673,6 +688,56 @@ export function SchedulingPage() {
         </div>
       </ModalShell>
 
+      <ModalShell title="Assignment Successful!" open={assignmentSuccessModalOpen} onClose={() => setAssignmentSuccessModalOpen(false)}>
+        <div className="text-center">
+          <div className="display-4 mb-3 text-success">✓</div>
+          <h6 className="fw-bold text-success mb-2">Faculty Assignment Saved!</h6>
+          <p className="text-muted mb-4">
+            The faculty member has been successfully assigned to the lab.
+          </p>
+          
+          <div className="card bg-light border-0 rounded-3 mb-4">
+            <div className="card-body">
+              <h6 className="fw-semibold mb-3">Assignment Details</h6>
+              <div className="row g-2 text-start">
+                <div className="col-12">
+                  <div className="d-flex justify-content-between">
+                    <span className="text-muted">Section:</span>
+                    <span className="fw-semibold">{selectedSection ? `${selectedSection.year_level} - ${selectedSection.section}` : '—'}</span>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="d-flex justify-content-between">
+                    <span className="text-muted">Room:</span>
+                    <span className="fw-semibold">{selectedRoom ? selectedRoom.name : '—'}</span>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="d-flex justify-content-between">
+                    <span className="text-muted">Lab:</span>
+                    <span className="fw-semibold">{selectedLab ? selectedLab.name : '—'}</span>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="d-flex justify-content-between">
+                    <span className="text-muted">Faculty:</span>
+                    <span className="fw-semibold">{selectedLab?.faculty_user_id ? facultyLabel(selectedLab.faculty_user_id) : 'Unassigned'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            type="button" 
+            className="btn btn-primary rounded-3 w-100"
+            onClick={() => setAssignmentSuccessModalOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+      </ModalShell>
+
       <div className="spms-sched-layout">
         <aside className="spms-sched-left">
           <div className="spms-card card border-0 spms-sched-left-card">
@@ -770,26 +835,80 @@ export function SchedulingPage() {
                   ) : filteredSections.length === 0 ? (
                     <div className="spms-muted small py-2">No sections available. Please create sections in the Sections page first.</div>
                   ) : (
-                    <div className="list-group">
-                      {filteredSections.map((s) => (
-                        <button
-                          type="button"
-                          key={s.section_id}
-                          className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
-                            selectedSectionId === s.section_id ? 'active' : ''
-                          }`}
-                          onClick={() => setSelectedSectionId(s.section_id)}
-                          disabled={submitting}
-                        >
-                          <div className="me-2 text-start">
-                            <div className="fw-semibold">{s.year_level} - {s.section}</div>
-                            <div className={`small ${selectedSectionId === s.section_id ? 'text-white-50' : 'text-muted'}`}>
-                              {s.faculty_name ? `Faculty: ${s.faculty_name}` : 'No faculty assigned'}
+                    <>
+                      <div className="list-group">
+                        {paginatedSections.map((s) => (
+                          <button
+                            type="button"
+                            key={s.section_id}
+                            className={`list-group-item list-group-item-action d-flex align-items-start justify-content-between ${
+                              selectedSectionId === s.section_id ? 'active' : ''
+                            }`}
+                            onClick={() => setSelectedSectionId(s.section_id)}
+                            disabled={submitting}
+                          >
+                            <div className="me-2 text-start">
+                              <div className="fw-semibold">{s.year_level} - {s.section}</div>
+                              <div className={`small ${selectedSectionId === s.section_id ? 'text-white-50' : 'text-muted'}`}>
+                                {s.faculty_name ? `Faculty: ${s.faculty_name}` : 'No faculty assigned'}
+                              </div>
                             </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Pagination Controls */}
+                      {totalSectionPages > 1 && (
+                        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3 mt-3">
+                          <div className="spms-muted small">
+                            Showing {((currentSectionPage - 1) * sectionsPerPage) + 1} to {Math.min(currentSectionPage * sectionsPerPage, filteredSections.length)} of {filteredSections.length} sections
                           </div>
-                        </button>
-                      ))}
-                    </div>
+                          <div className="btn-group" role="group">
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              disabled={currentSectionPage === 1}
+                              onClick={() => setCurrentSectionPage(currentSectionPage - 1)}
+                            >
+                              <i className="bi bi-chevron-left" /> Previous
+                            </button>
+                            
+                            {/* Page numbers */}
+                            {Array.from({ length: Math.min(5, totalSectionPages) }, (_, i) => {
+                              let pageNum
+                              if (totalSectionPages <= 5) {
+                                pageNum = i + 1
+                              } else if (currentSectionPage <= 3) {
+                                pageNum = i + 1
+                              } else if (currentSectionPage >= totalSectionPages - 2) {
+                                pageNum = totalSectionPages - 4 + i
+                              } else {
+                                pageNum = currentSectionPage - 2 + i
+                              }
+                              return (
+                                <button
+                                  key={pageNum}
+                                  type="button"
+                                  className={`btn btn-sm ${currentSectionPage === pageNum ? 'btn-primary' : 'btn-outline-primary'}`}
+                                  onClick={() => setCurrentSectionPage(pageNum)}
+                                >
+                                  {pageNum}
+                                </button>
+                              )
+                            })}
+                            
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              disabled={currentSectionPage === totalSectionPages}
+                              onClick={() => setCurrentSectionPage(currentSectionPage + 1)}
+                            >
+                              Next <i className="bi bi-chevron-right" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -1019,94 +1138,13 @@ export function SchedulingPage() {
                   )}
                 </div>
 
-                <div className="d-flex justify-content-between mt-4">
+                <div className="d-flex justify-content-start mt-4">
                   <button type="button" className="btn btn-outline-secondary rounded-4 px-4" onClick={() => goToStep(3)}>
                     <i className="bi bi-arrow-left me-1" /> Back to Lab
-                  </button>
-                  <button type="button" className="btn btn-success rounded-4 px-4" disabled={!selectedLab} onClick={() => setCompleteSetupModalOpen(true)}>
-                    <i className="bi bi-check-circle me-1" /> Complete Setup
                   </button>
                 </div>
               </div>
           </div>
-        )}
-
-        {completeSetupModalOpen && (
-          <>
-            <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true">
-              <div className="modal-dialog modal-dialog-centered" role="document">
-                <div className="modal-content border-0" style={{ borderRadius: 16, boxShadow: '0 20px 60px rgba(2,6,23,.25)' }}>
-                  <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title fw-bold">Setup Complete! 🎉</h5>
-                    <button type="button" className="btn-close" onClick={() => setCompleteSetupModalOpen(false)} aria-label="Close" />
-                  </div>
-                  <div className="modal-body pt-2">
-                    <div className="text-center mb-4">
-                      <div className="display-1 mb-3">🎊</div>
-                      <h6 className="fw-bold text-success mb-2">Scheduling Setup Successful!</h6>
-                      <p className="text-muted">The scheduling setup has been completed successfully.</p>
-                    </div>
-                    
-                    <div className="card bg-light border-0 rounded-3">
-                      <div className="card-body">
-                        <h6 className="fw-semibold mb-3">Setup Details</h6>
-                        <div className="row g-2">
-                          <div className="col-12">
-                            <div className="d-flex justify-content-between">
-                              <span className="text-muted">Section:</span>
-                              <span className="fw-semibold">{selectedSection?.year_level} - {selectedSection?.section}</span>
-                            </div>
-                          </div>
-                          <div className="col-12">
-                            <div className="d-flex justify-content-between">
-                              <span className="text-muted">Room:</span>
-                              <span className="fw-semibold">{selectedRoom?.name || '—'}</span>
-                            </div>
-                          </div>
-                          <div className="col-12">
-                            <div className="d-flex justify-content-between">
-                              <span className="text-muted">Lab:</span>
-                              <span className="fw-semibold">{selectedLab?.name || '—'}</span>
-                            </div>
-                          </div>
-                          <div className="col-12">
-                            <div className="d-flex justify-content-between">
-                              <span className="text-muted">Faculty:</span>
-                              <span className="fw-semibold">
-                                {selectedLab?.faculty_user_id 
-                                  ? facultyLabel(selectedLab.faculty_user_id)
-                                  : 'Unassigned'
-                                }
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="modal-footer border-0 pt-0">
-                    <div className="d-flex gap-2 w-100">
-                      <button type="button" className="btn btn-outline-secondary rounded-3 flex-fill" onClick={() => setCompleteSetupModalOpen(false)}>
-                        Close
-                      </button>
-                      <button type="button" className="btn btn-primary rounded-3 flex-fill" onClick={() => {
-                      setCompleteSetupModalOpen(false)
-                      // Reset to start for new setup
-                      setStep(1)
-                      setSelectedSectionId(null)
-                      setSelectedRoomId(null)
-                      setSelectedLabId(null)
-                      setAssignFacultyId('')
-                    }}>
-                        Create New Setup
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-backdrop fade show" onClick={() => setCompleteSetupModalOpen(false)} />
-          </>
         )}
 
         {error && (

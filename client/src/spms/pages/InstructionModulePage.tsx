@@ -231,8 +231,11 @@ export function InstructionModulePage() {
       const res = await axios.get<{ faculty: FacultyRow[] }>('/api/scheduling/faculty')
       setFaculty(res.data.faculty ?? [])
     } catch (e: unknown) {
+      // Don't throw error for faculty loading failures - just log and continue
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
-      throw new Error(msg || 'Failed to load faculty list.')
+      console.warn('Failed to load faculty list:', msg || 'Unknown error')
+      // Set empty faculty array to prevent undefined errors
+      setFaculty([])
     }
   }, [])
 
@@ -243,10 +246,12 @@ export function InstructionModulePage() {
     setSuccess(null)
     setAccessDenied(false)
     try {
-      await Promise.all([fetchSyllabi(), fetchFaculty()])
+      // Load syllabi and faculty independently
+      await fetchSyllabi()
+      await fetchFaculty() // This won't throw error anymore
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined
-      setError(msg || 'Failed to load data.')
+      setError(msg || 'Failed to load syllabi.')
     } finally {
       setLoading(false)
     }
@@ -801,12 +806,36 @@ export function InstructionModulePage() {
                           </div>
                         </div>
                         <div className="d-flex flex-column align-items-end">
-                          {syllabus.faculty_user_id && (
-                            <StatusBadge status="success">
-                              <i className="bi bi-check-circle me-1" />
-                              Assigned
-                            </StatusBadge>
-                          )}
+                          {(() => {
+                            const hasFacultyId = Boolean(syllabus.faculty_user_id);
+                            const facultyName = syllabus.faculty_name || 
+                              (syllabus.faculty_user_id ? (facultyNameById.get(syllabus.faculty_user_id) ?? `Faculty #${syllabus.faculty_user_id}`) : null);
+                            
+                            // Debug logging to identify the issue
+                            if (syllabus.title.includes('Kerwin') || syllabus.title.includes('Khen')) {
+                              console.log('Faculty Assignment Debug:', {
+                                syllabusTitle: syllabus.title,
+                                faculty_user_id: syllabus.faculty_user_id,
+                                faculty_name: syllabus.faculty_name,
+                                hasFacultyId,
+                                facultyName,
+                                facultyDataLoaded: faculty.length > 0
+                              });
+                            }
+                            
+                            // Show success badge if faculty is assigned, regardless of whether faculty data loaded
+                            return hasFacultyId ? (
+                              <StatusBadge status="success">
+                                <i className="bi bi-check-circle me-1" />
+                                Assigned
+                              </StatusBadge>
+                            ) : (
+                              <StatusBadge status="warning">
+                                <i className="bi bi-exclamation-circle me-1" />
+                                Unassigned
+                              </StatusBadge>
+                            );
+                          })()}
                           {syllabus.syllabus_id === selectedId && (
                             <div className="small text-primary mt-1">
                               <i className="bi bi-check-circle-fill" /> Selected
