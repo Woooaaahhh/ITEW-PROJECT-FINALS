@@ -2,7 +2,6 @@
 // This file exports route functions to be registered in the main API
 
 import { getDb } from './db.js'
-import { requireAdmin } from './index.js'
 
 // Enhanced student field selection
 function getStudentProjection(fields = []) {
@@ -81,7 +80,7 @@ export function optimizedStudentsEndpoint(app, authMiddleware, requireStaff) {
     
     // Active status filter
     if (!includeInactive) {
-      query.active = { $ne: false }
+      query.active = { $ne: 0 }
     }
     
     // Search filter
@@ -144,6 +143,7 @@ export function optimizedStudentsEndpoint(app, authMiddleware, requireStaff) {
     res.status(500).json({ message: 'Failed to load students' })
   }
 })
+}
 
 // Optimized student count endpoint (for dashboard stats)
 export function studentCountEndpoint(app, authMiddleware, requireStaff) {
@@ -159,7 +159,7 @@ export function studentCountEndpoint(app, authMiddleware, requireStaff) {
     const query = {}
     
     if (!includeInactive) {
-      query.active = { $ne: false }
+      query.active = { $ne: 0 }
     }
     
     if (yearLevel) {
@@ -182,6 +182,7 @@ export function studentCountEndpoint(app, authMiddleware, requireStaff) {
     res.status(500).json({ message: 'Failed to get student count' })
   }
 })
+}
 
 // Batch student details endpoint (for loading multiple students efficiently)
 export function batchStudentsEndpoint(app, authMiddleware, requireStaff) {
@@ -216,6 +217,7 @@ export function batchStudentsEndpoint(app, authMiddleware, requireStaff) {
     res.status(500).json({ message: 'Failed to load student details' })
   }
 })
+}
 
 // Student search suggestions endpoint (for autocomplete)
 export function studentSuggestionsEndpoint(app, authMiddleware, requireStaff) {
@@ -238,7 +240,7 @@ export function studentSuggestionsEndpoint(app, authMiddleware, requireStaff) {
           { last_name: searchRegex },
           { school_email: searchRegex }
         ],
-        active: { $ne: false }
+        active: { $ne: 0 }
       })
       .project({
         student_id: 1,
@@ -267,6 +269,7 @@ export function studentSuggestionsEndpoint(app, authMiddleware, requireStaff) {
     res.status(500).json({ message: 'Failed to get suggestions' })
   }
 })
+}
 
 // Cache invalidation endpoint (for admin use)
 export function cacheClearEndpoint(app, authMiddleware, requireAdmin) {
